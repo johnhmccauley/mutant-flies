@@ -305,6 +305,10 @@
     <button class="go2" id="dbgGo" type="button">Jump</button>
   </div>
   <div class="grid" id="dbgQuick"></div>
+  <div class="jump" style="margin:12px 0 0">
+    <button id="dbgRegen" type="button" style="flex:1">Regenerate cellar</button>
+    <button id="dbgAI" type="button" style="flex:1">AI play: off</button>
+  </div>
   <p class="what" id="dbgWhat"></p>
 </div>
 
@@ -2613,6 +2617,7 @@ var manPos = new THREE.Vector3(), manWant = new THREE.Vector3();
 var manFace = 0, manFaceWant = 0;
 var PRIORITY = ["left", "right", "up", "down"];
 var bannerT = 0, titleWalkT = 0;
+var ai = { on: false, plan: [] };   /* declared here: enterLevel clears it */
 var plan = $("plan"), planCtx = plan.getContext("2d");
 
 var STEP = 0.55;                       /* world height of one step of floor */
@@ -2908,15 +2913,27 @@ function stepTitleWalkers() {
 /* ==================================================================
    PLAY
    ================================================================== */
-/* what has been explained already, remembered between visits */
+/* What has been explained already. Remembered between visits where
+   storage allows it, and for this session regardless - private windows
+   and blocked storage throw, and without the fallback the briefing came
+   back every single time you retried a cellar. */
+var seenHere = {};
 function seenBriefing(F, mark) {
-  var s = MF.save.read() || {};
-  s.seen = s.seen || {};
-  if (mark) { s.seen[F] = 1; MF.save.write(s); return false; }
-  return !!s.seen[F];
+  if (mark) {
+    seenHere[F] = 1;
+    var w = MF.save.read() || {};
+    w.seen = w.seen || {};
+    w.seen[F] = 1;
+    MF.save.write(w);
+    return false;
+  }
+  if (seenHere[F]) return true;
+  var r = MF.save.read();
+  return !!(r && r.seen && r.seen[F]);
 }
 
 function enterLevel() {
+  ai.plan = [];
   syncTerrain();
   syncBricks();
   makeRigs(game.monsters.map(function (m) { return m.kind; }));
@@ -2983,7 +3000,8 @@ function restartCellar() {
 
 function turn() {
   var dir = null;
-  for (var i = 0; i < PRIORITY.length; i++) if (held[PRIORITY[i]]) { dir = PRIORITY[i]; break; }
+  if (ai.on) dir = aiThink();
+  else for (var i = 0; i < PRIORITY.length; i++) if (held[PRIORITY[i]]) { dir = PRIORITY[i]; break; }
   var ev = game.step(dir);
 
   /* the drone, once a turn, each kind at its own pitch - a cellar with
@@ -3046,7 +3064,10 @@ function turn() {
     FX.death();
     burst(game.manC, ROWS - 1 - game.manR, 0x7a6244);
     MF.save.end(game.HI);
-    setTimeout(function () { endScreen(ev.lostTo, false); }, 1500);
+    setTimeout(function () {
+      if (ai.on) { restartCellar(); return; }     /* it plays on */
+      endScreen(ev.lostTo, false);
+    }, 1500);
   } else if (ev.won) {
     mode = "won";
     FX.cleared();
@@ -3212,6 +3233,18 @@ function dbgToggle() {
     wrap.appendChild(btn);
   });
   $("dbgGo").addEventListener("click", function () { dbgJump(+$("dbgLevel").value); });
+  $("dbgRegen").addEventListener("click", function () {
+    Beeb.wake();
+    game.regenerate();
+    $("dbg").hidden = true;
+    enterLevel();
+  });
+  $("dbgAI").addEventListener("click", function () {
+    ai.on = !ai.on; ai.plan = [];
+    aiSetLabel();
+    if (ai.on && mode !== "play") { $("dbg").hidden = true; if (mode === "title") newGame(); }
+  });
+  aiSetLabel();
   $("dbgLevel").addEventListener("input", function () {
     var v = Math.max(1, Math.min(999, +this.value | 0));
     $("dbgWhat").innerHTML = dbgDescribe(v);
@@ -3221,6 +3254,148 @@ function dbgToggle() {
     e.stopPropagation();               /* Z and X are digits to nobody here */
   });
 })();
+
+/* ==================================================================
+   AI PLAY
+   A heuristic, not a solver. It looks for a square a monster still needs
+   walled, finds a brick it can shove into that square, walks to the spot
+   the shove has to come from, and shoves. It keeps off squares a monster
+   could reach next turn while it does it.
+
+   It plays a reasonable game and dies a fair amount, which is roughly
+   what it is for: watching it play is the quickest way to find out
+   whether a cellar is winnable, and whether a new element does anything
+   interesting or just gets in the way.
+   ================================================================== */
+var AI_D = { left: [-1, 0], right: [1, 0], up: [0, 1], down: [0, -1] };
+var AI_ORDER = ["left", "right", "up", "down"];
+
+function aiFree(c, r) {
+  return game.inField(c, r) && game.grid[r * COLS + c] === MF.EMPTY;
+}
+/* anywhere something loose could be standing next turn */
+function aiDanger(c, r) {
+  for (var i = 0; i < game.monsters.length; i++) {
+    var m = game.monsters[i];
+    if (m.trapped || m.gone) continue;
+    var cs = game.cellsOf(m);
+    for (var k = 0; k < cs.length; k++)
+      if (Math.abs(cs[k][0] - c) + Math.abs(cs[k][1] - r) <= 1) return true;
+  }
+  return false;
+}
+
+/* shortest way there on foot, going round bricks rather than through
+   them - returns the whole route so it can be followed without
+   rethinking every turn */
+function aiRoute(sc, sr, tc, tr, allowDanger) {
+  if (sc === tc && sr === tr) return [];
+  var seen = {}, q = [[sc, sr, []]], guard = 0;
+  seen[sc + "," + sr] = 1;
+  while (q.length && guard++ < 4000) {
+    var cur = q.shift();
+    for (var i = 0; i < 4; i++) {
+      var d = AI_D[AI_ORDER[i]];
+      var nc = cur[0] + d[0], nr = cur[1] + d[1], key = nc + "," + nr;
+      if (seen[key]) continue;
+      if (!aiFree(nc, nr)) continue;
+      if (!allowDanger && aiDanger(nc, nr) && !(nc === tc && nr === tr)) continue;
+      var route = cur[2].concat([AI_ORDER[i]]);
+      if (nc === tc && nr === tr) return route;
+      seen[key] = 1;
+      q.push([nc, nr, route]);
+    }
+  }
+  return null;
+}
+
+/* every shove that would put a brick on a square a monster needs walled */
+function aiJobs() {
+  var jobs = [];
+  for (var i = 0; i < game.monsters.length; i++) {
+    var m = game.monsters[i];
+    if (m.trapped || m.gone) continue;
+    var cs = game.cellsOf(m);
+    for (var k = 0; k < cs.length; k++) for (var g = 0; g < 4; g++) {
+      var gd = AI_D[AI_ORDER[g]];
+      var tc = cs[k][0] + gd[0], tr = cs[k][1] + gd[1];
+      if (!game.inField(tc, tr) || game.solid(tc, tr)) continue;
+      if (game.isPartOf(m, tc, tr)) continue;
+      /* to land a brick on (tc,tr) going direction d, the brick is one
+         square back and he stands one square back of that */
+      for (var d2 = 0; d2 < 4; d2++) {
+        var dd = AI_D[AI_ORDER[d2]];
+        var bc = tc - dd[0], br = tr - dd[1];
+        var pc = bc - dd[0], pr = br - dd[1];
+        if (!game.inField(bc, br) || !game.inField(pc, pr)) continue;
+        if (game.grid[br * COLS + bc] !== MF.BRICK) continue;
+        if (!aiFree(pc, pr)) continue;
+        if (game.monsterAt(pc, pr) || game.monsterAt(bc, br)) continue;
+        /* a shove you have to stand next to the thing to make is a shove
+           that gets you caught, so those go to the back of the queue */
+        jobs.push({ standC: pc, standR: pr, dir: AI_ORDER[d2],
+                    cost: Math.abs(pc - game.manC) + Math.abs(pr - game.manR)
+                          + (aiDanger(pc, pr) ? 40 : 0) });
+      }
+    }
+  }
+  jobs.sort(function (a, b) { return a.cost - b.cost; });
+  return jobs;
+}
+
+function aiThink() {
+  /* first, do not be standing where something can reach you */
+  if (aiDanger(game.manC, game.manR)) {
+    var best = null, bestD = -1;
+    for (var i = 0; i < 4; i++) {
+      var d = AI_D[AI_ORDER[i]];
+      var nc = game.manC + d[0], nr = game.manR + d[1];
+      if (!aiFree(nc, nr) || aiDanger(nc, nr)) continue;
+      var far = 99;
+      for (var j = 0; j < game.monsters.length; j++) {
+        var m = game.monsters[j];
+        if (m.trapped || m.gone) continue;
+        far = Math.min(far, Math.abs(m.c - nc) + Math.abs(m.r - nr));
+      }
+      if (far > bestD) { bestD = far; best = AI_ORDER[i]; }
+    }
+    if (best) { ai.plan = []; return best; }
+  }
+
+  if (ai.plan.length) return ai.plan.shift();
+
+  var jobs = aiJobs();
+  for (var n = 0; n < jobs.length && n < 14; n++) {
+    var job = jobs[n];
+    var route = aiRoute(game.manC, game.manR, job.standC, job.standR, false);
+    if (!route) continue;
+    ai.plan = route.concat([job.dir]);
+    return ai.plan.shift();
+  }
+
+  /* nothing to shove that helps - keep away from things and wait */
+  var away = null, awayD = -1;
+  for (var k = 0; k < 4; k++) {
+    var dd = AI_D[AI_ORDER[k]];
+    var ac = game.manC + dd[0], ar = game.manR + dd[1];
+    if (!aiFree(ac, ar) || aiDanger(ac, ar)) continue;
+    var dist = 0;
+    for (var q = 0; q < game.monsters.length; q++) {
+      var mm = game.monsters[q];
+      if (mm.trapped || mm.gone) continue;
+      dist += Math.abs(mm.c - ac) + Math.abs(mm.r - ar);
+    }
+    if (dist > awayD) { awayD = dist; away = AI_ORDER[k]; }
+  }
+  return away;
+}
+
+function aiSetLabel() {
+  $("dbgAI").textContent = "AI play: " + (ai.on ? "on" : "off");
+  $("dbgAI").style.background = ai.on ? "var(--blood)" : "";
+  $("dbgAI").style.borderColor = ai.on ? "var(--blood)" : "";
+  $("dbgAI").style.color = ai.on ? "#fff" : "";
+}
 
 /* ==================================================================
    FRAME
