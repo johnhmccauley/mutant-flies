@@ -1,13 +1,16 @@
 # assets
 
-Drop-in replacements for the two models the 3D game builds in code.
+Drop-in replacements for the models the 3D game builds in code.
 
 | file | replaces |
 |---|---|
-| `fly.glb` | the mutant fly |
+| `fly.glb` | the fly |
+| `spider.glb` | the spider |
+| `beetle.glb` | the beetle |
+| `wasp.glb` | the wasp |
 | `man.glb` | the man |
 
-Both are **optional**. With the folder empty the game uses its own procedural
+All are **optional**. With no models listed the game uses its own procedural
 geometry and nothing is fetched.
 
 ## Using a model from Meshy (or anywhere else)
@@ -18,9 +21,18 @@ geometry and nothing is fetched.
    wings, game asset, clean topology"*.
 2. Export **glTF binary (`.glb`)** with textures embedded. Keep it under a few
    megabytes — it is downloaded on every page load.
-3. Save it here as exactly `fly.glb` or `man.glb`.
-4. Reload. The console logs `mutant-fly: using assets/fly.glb` when a model is
-   picked up.
+3. Save it here as exactly `fly.glb`, `spider.glb`, `beetle.glb`, `wasp.glb`
+   or `man.glb`.
+4. Add its name to `manifest.json`:
+
+   ```json
+   { "models": ["fly", "spider"] }
+   ```
+
+   The manifest exists so the game does not fire a 404 at every visitor for
+   every model nobody supplied. Delete `manifest.json` entirely and the game
+   falls back to probing for all five, which is handy while experimenting.
+5. Reload.
 
 ## What the game does to your model
 

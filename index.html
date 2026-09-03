@@ -2023,16 +2023,33 @@ var LOADED = {};
 function loadAssets() {
   if (location.protocol === "file:" || !THREE.GLTFLoader) return;
   var loader = new THREE.GLTFLoader();
-  Object.keys(ASSET_HEIGHT).forEach(function (key) {
-    var url = "assets/" + key + ".glb";
-    fetch(url, { method: "HEAD" }).then(function (r) {
-      if (!r.ok) return;
-      loader.load(url, function (gl) {
-        LOADED[key] = gl.scene;
-        if (key === "man") adopt("man", gl.scene.clone(), manRig);
-        else monsterRigs.forEach(function (rg) { if (rg.userData.kind === key) adopt(key, gl.scene.clone(), rg); });
-      }, null, function () {});
-    }).catch(function () {});
+
+  function take(key) {
+    if (!ASSET_HEIGHT[key]) return;
+    loader.load("assets/" + key + ".glb", function (gl) {
+      LOADED[key] = gl.scene;
+      if (key === "man") adopt("man", gl.scene.clone(), manRig);
+      else monsterRigs.forEach(function (rg) { if (rg.userData.kind === key) adopt(key, gl.scene.clone(), rg); });
+    }, null, function () {});
+  }
+
+  /* assets/manifest.json says what is actually in the folder. Probing for
+     each model instead would put a 404 in the console of every visitor
+     for every model nobody supplied. If the manifest is missing we fall
+     back to probing, so dropping a .glb in still just works. */
+  fetch("assets/manifest.json").then(function (r) {
+    if (!r.ok) throw 0;
+    return r.json();
+  }).then(function (m) {
+    (m && m.models ? m.models : []).forEach(function (n) {
+      take(String(n).replace(/\.glb$/i, ""));
+    });
+  }).catch(function () {
+    Object.keys(ASSET_HEIGHT).forEach(function (key) {
+      fetch("assets/" + key + ".glb", { method: "HEAD" })
+        .then(function (r) { if (r.ok) take(key); })
+        .catch(function () {});
+    });
   });
 }
 function adopt(key, model, rig) {
