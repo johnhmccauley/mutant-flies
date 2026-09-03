@@ -210,7 +210,31 @@
     return away;
   }
 
-  root.MutantBot = { think: think, findShove: findShove, wanted: wanted,
+  /* ------------------------------------------------------------------
+     Which way to play.
+
+     `think` above fills the squares touching a monster, which is the
+     obvious thing to do and does not work: you get three sides up and it
+     walks out of the fourth while you are away fetching the brick for
+     it. tools/tournament.js raced eighteen ways of playing over the same
+     128 cellars and the winner - by better than three to one - was the
+     den: find a hole that has two solid sides already, seal a third,
+     park the brick that will shut the mouth, stand behind it and wait
+     for the thing to walk in. Two bricks instead of four, and the last
+     one goes in while it is standing there rather than while it is on
+     its way past.
+
+     So that is what drives AI play and the robots. `think` stays as it
+     is, because the den falls back to it and the tournament needs it as
+     the thing to beat.
+     ------------------------------------------------------------------ */
+  function play(g, actor) {
+    var S = root.MutantStrategies;
+    if (!S || !S.den || actor) return think(g, actor);
+    return S.den(g);
+  }
+
+  root.MutantBot = { think: think, play: play, findShove: findShove, wanted: wanted,
                      route: route, danger: danger, walkable: walkable,
                      empty: empty, brick: brick, D: D, ORDER: ORDER, idx: idx };
 })(typeof window !== "undefined" ? window : globalThis);
