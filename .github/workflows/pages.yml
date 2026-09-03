@@ -37,6 +37,9 @@ jobs:
       - name: Check the cellar furniture
         run: node tools/test-elements.js
 
+      - name: Check the catalogue of made-up levels
+        run: node tools/test-catalogue.js
+
       - uses: actions/configure-pages@v5
         with:
           enablement: true
