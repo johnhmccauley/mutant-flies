@@ -40,6 +40,9 @@ jobs:
       - name: Check the catalogue of made-up levels
         run: node tools/test-catalogue.js
 
+      - name: Check a level packs into a code and back
+        run: node tools/test-levelio.js
+
       - uses: actions/configure-pages@v5
         with:
           enablement: true
