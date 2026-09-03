@@ -54,8 +54,15 @@
   /* ---------- overlays ---------- */
   .sheet{
     position:fixed;inset:0;display:grid;place-items:center;padding:5vmin;
-    background:radial-gradient(120% 80% at 50% 45%,rgba(16,11,8,.72),rgba(4,3,2,.93));
+    background:
+      linear-gradient(180deg,rgba(4,3,2,.94) 0%,rgba(6,4,3,.66) 32%,
+                              rgba(6,4,3,.66) 68%,rgba(4,3,2,.94) 100%),
+      radial-gradient(90% 65% at 50% 48%,rgba(10,7,5,0),rgba(4,3,2,.72));
     text-align:center;overflow:auto;
+  }
+  /* the pause and end cards are read, not admired - they get the full wash */
+  #pauseSheet,#overSheet{
+    background:radial-gradient(120% 80% at 50% 45%,rgba(16,11,8,.86),rgba(4,3,2,.96));
   }
   .card{max-width:min(620px,93vw);display:flex;flex-direction:column;gap:clamp(11px,2.2vw,18px)}
   .kicker{
@@ -64,11 +71,18 @@
     color:var(--torch-dim);margin:0;
   }
   h1{
-    margin:0;font-size:clamp(34px,9vw,72px);line-height:.9;font-weight:700;
-    letter-spacing:-.015em;text-wrap:balance;
-    text-shadow:0 4px 30px rgba(0,0,0,.9),0 0 34px rgba(255,155,61,.22);
+    margin:0;font-size:clamp(38px,10vw,84px);line-height:.86;font-weight:700;
+    letter-spacing:-.03em;text-wrap:balance;
+    text-shadow:0 4px 34px rgba(0,0,0,.95),0 0 40px rgba(255,155,61,.18);
   }
   h1 em{font-style:normal;color:var(--blood)}
+  /* a hairline under the title, the width of the type - the kind of rule
+     a magazine would have set, and it stops the lede floating */
+  .lockup{display:flex;flex-direction:column;align-items:center;gap:clamp(10px,1.8vw,15px)}
+  .lockup hr{
+    width:min(280px,54vw);height:1px;border:0;margin:2px 0 0;
+    background:linear-gradient(90deg,transparent,rgba(232,220,200,.34),transparent);
+  }
   .lede{margin:0 auto;max-width:50ch;font-size:clamp(13.5px,2.2vw,16px);line-height:1.6;color:#c8bca9}
   .lede b{color:var(--bone);font-weight:600}
   .row{display:flex;gap:10px;justify-content:center;flex-wrap:wrap}
@@ -88,28 +102,53 @@
     font-family:"IBM Plex Mono",ui-monospace,monospace;
     font-size:clamp(9px,1.6vw,11px);line-height:1.85;color:#7d7264;margin:0;
   }
+  /* controls on their own line, provenance quieter still beneath it */
+  .keysline{
+    display:flex;gap:8px;align-items:center;justify-content:center;flex-wrap:wrap;
+    font-family:"IBM Plex Mono",ui-monospace,monospace;
+    font-size:clamp(10px,1.7vw,12px);color:#9a8d7d;
+  }
+  .keysline .grp{display:inline-flex;gap:4px;align-items:center}
+  .keysline .sep{color:#4f473e;padding:0 4px}
+  .provenance{
+    font-family:"IBM Plex Mono",ui-monospace,monospace;
+    font-size:clamp(9px,1.5vw,10.5px);line-height:1.9;color:#6d6459;margin:0;
+    letter-spacing:.03em;
+  }
+  .provenance a{color:#9b8e79;text-underline-offset:3px}
+  .provenance a:hover{color:var(--bone)}
   .fine a{color:#a2957f}
-  .fine kbd{background:#241c16;border:1px solid #3d3128;border-radius:2px;padding:1px 5px;color:#c0b4a2}
+  .fine kbd,.keysline kbd{
+    background:#241c16;border:1px solid #3d3128;border-bottom-width:2px;
+    border-radius:2px;padding:1px 6px;color:#c0b4a2;font-size:.92em;
+  }
   .tally{display:flex;gap:clamp(16px,4vw,40px);justify-content:center;font-family:"IBM Plex Mono",ui-monospace,monospace}
   .tally div{display:flex;flex-direction:column;gap:4px}
   .tally .k{font-size:10px;letter-spacing:.2em;text-transform:uppercase;color:var(--bone-dim)}
   .tally .v{font-size:clamp(19px,4.6vw,28px);font-weight:600}
 
   .bestiary{
-    display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));
-    gap:8px;text-align:left;margin:0;padding:0;list-style:none;
+    display:grid;grid-template-columns:repeat(2,1fr);
+    gap:7px;text-align:left;margin:0;padding:0;list-style:none;
   }
+  @media (min-width:900px){ .bestiary{grid-template-columns:repeat(4,1fr)} }
   .bestiary li{
-    display:grid;grid-template-columns:auto 1fr;gap:9px;align-items:start;
-    background:rgba(20,15,11,.5);border:1px solid rgba(232,220,200,.09);
-    border-radius:3px;padding:8px 10px;
+    display:grid;grid-template-columns:auto 1fr;gap:10px;align-items:start;
+    background:rgba(16,12,9,.62);
+    border:1px solid rgba(232,220,200,.08);
+    border-left:0;
+    border-radius:2px;padding:9px 11px 10px;
   }
-  .bestiary .chip{width:10px;height:10px;border-radius:2px;margin-top:.34em}
+  /* the stripe is the colour that monster actually is in the cellar and
+     on the plan, so the card teaches you to read the board */
+  .bestiary .chip{
+    width:3px;align-self:stretch;border-radius:1px;margin:0;height:auto;min-height:2.4em;
+  }
   .bestiary .n{
     display:block;font-family:"IBM Plex Mono",ui-monospace,monospace;
-    font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--bone);
+    font-size:10.5px;letter-spacing:.16em;text-transform:uppercase;color:var(--bone);
   }
-  .bestiary .b{display:block;font-size:12.5px;line-height:1.4;color:#a89b8b;margin-top:2px}
+  .bestiary .b{display:block;font-size:12.5px;line-height:1.45;color:#a29584;margin-top:3px}
 
   .pad{
     position:fixed;left:clamp(10px,2vw,20px);bottom:clamp(10px,2vw,20px);
@@ -180,22 +219,27 @@
 
 <div class="sheet" id="titleSheet">
   <div class="card">
-    <p class="kicker">The Micro User &middot; July 1985 &middot; John McCauley</p>
-    <h1>Mutant <em>Fly</em></h1>
+    <div class="lockup">
+      <p class="kicker">The Micro User &middot; July 1985 &middot; John McCauley</p>
+      <h1>Mutant <em>Fly</em></h1>
+      <hr>
+    </div>
     <p class="lede">A fortune lies in the cellars under the ruins, and something is
-      guarding every level down. You cannot kill it. <b>You can only wall it in</b> &mdash;
-      four bricks, one on each side. The cellar wall is no help to you.</p>
+      guarding every level down. You cannot kill it &mdash; <b>you can only wall it in.</b></p>
     <ul class="bestiary" id="bestiary"></ul>
     <div class="row">
       <button class="go" id="continue" type="button" hidden>Continue</button>
       <button class="go" id="start" type="button">Go down</button>
     </div>
     <p class="fine" id="record"></p>
-    <p class="fine">
-      <kbd>Z</kbd> <kbd>X</kbd> <kbd>:</kbd> <kbd>/</kbd> or the arrow keys. Bricks shove in
-      whole lines; one driven into a monster is eaten; one pushed off the edge is gone for good.<br>
-      Ported from the original BBC Micro BASIC &middot;
-      <a href="classic/">Play the 1985 screen &rarr;</a>
+    <p class="keysline">
+      <span class="grp"><kbd>Z</kbd><kbd>X</kbd><kbd>:</kbd><kbd>/</kbd></span> move
+      <span class="sep">&middot;</span> bricks shove in whole lines
+      <span class="sep">&middot;</span> one pushed off the edge is gone
+    </p>
+    <p class="provenance">
+      Ported from the original BBC&nbsp;Micro BASIC, recovered from the 1985 cassette.
+      <a href="classic/">Play it on the 1985 screen &rarr;</a>
     </p>
   </div>
 </div>
