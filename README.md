@@ -47,7 +47,10 @@ only wall it in.
 
 1. Walking into a brick shoves it one square, and **a whole line of bricks
    shifts together**. A push never fails: you always advance.
-2. A brick pushed **off the edge of the cellar is gone for good**.
+2. A brick pushed **off the edge of the cellar is gone for good** — in the
+   1985 game. In the deep cellars a wall is a wall: it stops the line and
+   costs you nothing, and the only thing that still takes bricks off you is
+   a chopper.
 3. A brick driven **into the fly** is destroyed — one per push, and you stay
    where you are.
 4. **Four bricks around the fly** wins the cellar. Walls do not count.
@@ -153,11 +156,11 @@ node tools/build.js          # inline src/ into the pages (run after editing src
 node tools/check.js          # geometry, syntax, markup, inlined copies in sync
 node tools/test-rules.js     # 17 assertions pinning the port to the 1985 listing
 node tools/test-monsters.js  # 29 on the monsters, the endless levels, the saves
-node tools/test-elements.js  # 45 on slopes, trees, marbles, items, tar and water
+node tools/test-elements.js  # 53 on slopes, trees, marbles, items, tar, water, choppers
 node tools/plan.js           # print the descent
 ```
 
-Ninety-one assertions in all, and every push to `main` runs the lot before
+Ninety-nine assertions in all, and every push to `main` runs the lot before
 republishing the site. `test-rules.js` is the important one: nothing added
 to the deep cellars is allowed to change what happens in the 1985 game.
 
@@ -175,12 +178,13 @@ anything new before the cellar starts.
 | **Sloping floors** | 4 | Climbing costs a turn; shoving uphill costs another; downhill gives one back. |
 | **Beetle**, **boots** | 5 | It eats a brick every fourteen turns. Boots give you two squares a turn. |
 | **Wasp**, **frost jars** | 6 | Still for a turn, then two squares at once. Frost stops everything for fifty turns. |
-| **Trees and the axe** | 7 | Trees only move for an axe, and an axe is good for three swings. A tree walls a monster in as well as a brick. |
+| **Trees and the saw** | 7 | Nothing else fells a tree, and a saw is good for three. A line of bricks driven into a tree stops dead — cut it down first. A tree walls a monster in as well as a brick. |
 | **Marbles** | 8 | Heavy and they keep going. Uphill they come back at you. Slowly they bounce, quickly they smash bricks, at speed they flatten a monster — or you. |
 | **Sealed jars** | 9 | Half are frost. The other half are not. |
 | **The tar** | 10 | Break a vat and it runs downhill burning everything, then sets into a wall you did not have to build. |
 | **The cistern** | 11 | Water runs further, puts the tar out, shoves marbles along, and sweeps you off your feet. |
-| | 12+ | Combinations, tightening. It does not stop. |
+| **Choppers** | 13 | Fixed machinery, still running. Anything shoved into one comes out as splinters — the only thing left that costs you bricks. It holds a monster in like any other fixture. |
+| | 14+ | Combinations, tightening. It does not stop. |
 
 Progress is saved in your browser after every cellar cleared, so you can
 put it down and pick it up.
@@ -192,8 +196,10 @@ put it down and pick it up.
 - **v3** — the original recovered and properly ported, plus a 3D cellar.
 - **v4** — four kinds of monster, endless hand-crafted cellars, saved games,
   and a title screen built out of the game the way the original's was.
-- **v5** — sloping floors, trees and the axe, rolling marbles with real
+- **v5** — sloping floors, trees and the saw, rolling marbles with real
   reflections, and tar and water that flow.
+- **v6** — walls stop a shove instead of eating it, choppers that do not, and
+  a main character you can actually read from the game camera.
 
 ## Credit and copyright
 

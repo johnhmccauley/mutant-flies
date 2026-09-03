@@ -144,7 +144,7 @@
 
   /* what can be standing on a square */
   var EMPTY = 0, BRICK = 1, TREE = 2, MARBLE = 3,
-      VAT_TAR = 4, VAT_WATER = 5, COOLED = 6;
+      VAT_TAR = 4, VAT_WATER = 5, COOLED = 6, CHOPPER = 7;
 
   /* and what can be running across it. The cellars are old and things
      have been sealed up down here for a long time. */
@@ -152,11 +152,11 @@
   var TAR_COOLS = 26;          /* turns a tar cell burns before it sets */
 
   /* what can be lying on one */
-  var NOTHING = 0, BOOTS = 1, FROST = 2, AXE = 3, JAR = 4;
+  var NOTHING = 0, BOOTS = 1, FROST = 2, SAW = 3, JAR = 4;
   var ITEMS = {
     1: { key: "boots", name: "Boots", blurb: "Two squares a turn for a while.", colour: 0xc8a017 },
     2: { key: "frost", name: "Frost jar", blurb: "Everything down here stops moving.", colour: 0x63c8e0 },
-    3: { key: "axe",   name: "Axe",   blurb: "Three swings. Trees do not move any other way.", colour: 0xb0b6bd },
+    3: { key: "saw",   name: "Saw",   blurb: "Three trees. Nothing else will take one down.", colour: 0xb0b6bd },
     4: { key: "jar",   name: "Sealed jar", blurb: "Nobody labelled it. Could go either way.", colour: 0x9a5bc4 }
   };
 
@@ -169,7 +169,7 @@
   var MAN_C0 = 16, MAN_R0 = 14, MON_C0 = 15, MON_R0 = 12;
 
   var MAX_H = 3;                      /* how high the floor ever gets */
-  var BOOTS_TURNS = 70, FROST_TURNS = 50, AXE_SWINGS = 3;
+  var BOOTS_TURNS = 70, FROST_TURNS = 50, SAW_USES = 3;
 
   function sign(n) { return n < 0 ? -1 : n > 0 ? 1 : 0; }
   function rnd(n) { return (Math.random() * n) | 0; }
@@ -282,8 +282,8 @@
        8  marbles
        9  the unlabelled jars
      ================================================================== */
-  var FEATURE_AT = { slopes: 4, boots: 5, frost: 6, trees: 7, axe: 7,
-                     marbles: 8, jar: 9, tar: 10, water: 11 };
+  var FEATURE_AT = { slopes: 4, boots: 5, frost: 6, trees: 7, saw: 7,
+                     marbles: 8, jar: 9, tar: 10, water: 11, choppers: 13 };
 
   var PLAN = [
     /*  1 */ { kinds: ["fly"], PE: 200, PA: 400, adds: [] },
@@ -298,9 +298,9 @@
     /* 10 */ { kinds: ["beetle"], PE: 140, PA: 145, adds: ["tar"] },
     /* 11 */ { kinds: ["wasp"], PE: 140, PA: 140, adds: ["water"] },
     /* 12 */ { kinds: ["fly", "beetle"], PE: 145, PA: 130, adds: [] },
-    /* 13 */ { kinds: ["spider", "wasp"], PE: 135, PA: 125, adds: [] },
-    /* 14 */ { kinds: ["fly", "spider", "beetle"], PE: 150, PA: 120, adds: [] },
-    /* 15 */ { kinds: ["wasp", "beetle"], PE: 125, PA: 115, adds: [] },
+    /* 13 */ { kinds: ["spider"], PE: 145, PA: 130, adds: ["choppers"] },
+    /* 14 */ { kinds: ["spider", "wasp"], PE: 140, PA: 120, adds: [] },
+    /* 15 */ { kinds: ["fly", "spider", "beetle"], PE: 150, PA: 115, adds: [] },
     /* 16 */ { kinds: ["fly", "spider", "wasp", "beetle"], PE: 160, PA: 110, adds: [] }
   ];
 
@@ -339,6 +339,7 @@
     marbles: { name: "Marbles", body: "Heavy, and they keep going. Shove one and it runs until something stops it. Uphill it slows, and if it cannot crest the rise it comes back down at you, gathering speed. Slowly it bounces off things; quickly it smashes bricks; at speed it flattens a monster - or you." },
     jar:     { name: "Sealed jars", body: "Nobody labelled them. Half are frost. The other half have something in them that has been waiting a long time to get out." },
     tar:     { name: "The tar", body: "Sealed in vats, and still hot. Break one - a marble will do it, so will the axe - and it runs downhill burning what it touches: trees, bricks, monsters, you. Eventually it sets, and what it leaves behind is as good as a wall." },
+    choppers:{ name: "The choppers", body: "Somebody left the machinery running. A chopper is fixed where it stands and nothing will shift it, but anything you shove into it comes out as splinters - so it is the one thing down here that will still take a brick off you. It will hold a monster in as well as a wall would." },
     water:   { name: "The cistern", body: "Water runs further and faster than tar and finds every low corner. It puts fires out, shoves marbles along in front of it, and sweeps you and the monsters off your feet. It burns nothing - but where it takes you is not your choice." }
   };
   function briefingFor(F) {
@@ -411,7 +412,8 @@
   Game.prototype.solid = function (c, r) {
     var v = this.at(c, r);
     if (this.classic) return v === BRICK;
-    if (v === BRICK || v === TREE || v === VAT_TAR || v === VAT_WATER || v === COOLED) return true;
+    if (v === BRICK || v === TREE || v === VAT_TAR || v === VAT_WATER ||
+        v === COOLED || v === CHOPPER) return true;
     if (v === MARBLE) { var m = this.marbleAt(c, r); return !!m && m.v <= 0; }
     return false;
   };
@@ -463,7 +465,7 @@
     this.steps = 0;
     this.boots = 0;
     this.frost = 0;
-    this.axe = 0;
+    this.saw = 0;
 
     this.manC = MAN_C0; this.manR = MAN_R0;
 
@@ -559,8 +561,9 @@
     });
     if (f.boots) scatter(1, function (c, r) { self.item[self.idx(c, r)] = BOOTS; });
     if (f.frost) scatter(1, function (c, r) { self.item[self.idx(c, r)] = FROST; });
-    if (f.axe) scatter(1 + rnd(2), function (c, r) { self.item[self.idx(c, r)] = AXE; });
+    if (f.saw) scatter(1 + rnd(2), function (c, r) { self.item[self.idx(c, r)] = SAW; });
     if (f.jar) scatter(1 + rnd(2), function (c, r) { self.item[self.idx(c, r)] = JAR; });
+    if (f.choppers) scatter(2 + rnd(3), function (c, r) { self.grid[self.idx(c, r)] = CHOPPER; });
     if (f.tar) scatter(1 + rnd(2), function (c, r) { self.grid[self.idx(c, r)] = VAT_TAR; });
     if (f.water) scatter(1 + rnd(2), function (c, r) { self.grid[self.idx(c, r)] = VAT_WATER; });
   };
@@ -614,7 +617,8 @@
                eaten: 0, chopped: 0, picked: null, strained: false, rolled: [],
                smashed: 0, crushed: [], trappedNow: [], won: false, lost: false,
                lostTo: null, bonus: 0, stuck: false, spawned: null,
-               burst: 0, burned: 0, doused: 0, swept: 0, set: 0 };
+               burst: 0, burned: 0, doused: 0, swept: 0, set: 0,
+               blocked: false, chopped_brick: 0 };
     if (this.over || this.won) return ev;
 
     /* --- step points ------------------------------------------------
@@ -685,14 +689,14 @@
 
         if (here === TREE || here === VAT_TAR || here === VAT_WATER) {
           /* none of these shove. The axe is the only argument they take */
-          if (this.axe > 0 && this.steps >= 1) {
-            this.axe--; this.steps -= 1;
+          if (this.saw > 0 && this.steps >= 1) {
+            this.saw--; this.steps -= 1;
             if (here === TREE) { this.grid[this.idx(nc, nr)] = EMPTY; ev.chopped = 1; }
             else this.breakVat(nc, nr, ev);
           } else ev.strained = true;
 
-        } else if (here === COOLED) {
-          ev.strained = true;                  /* set tar is rock now */
+        } else if (here === COOLED || here === CHOPPER) {
+          ev.strained = true;      /* set tar is rock; the chopper is worse */
 
         } else if (here === MARBLE) {
           var mar = this.marbleAt(nc, nr);
@@ -723,18 +727,39 @@
 
             if (run) {
               var blocker = this.monsterAt(cc, rr);
+              var beyond = this.at(cc, rr);
+
               if (!this.inField(cc, rr)) {
-                /* over the edge of the cellar: the original drew it outside
-                   the graphics viewport, where it was clipped and lost */
-                ev.lostOverEdge = 1; this.bricks--;
+                if (this.classic) {
+                  /* 1985: the brick was drawn outside the graphics
+                     viewport, clipped away, and never came back */
+                  ev.lostOverEdge = 1; this.bricks--;
+                } else {
+                  /* down here a wall is a wall. It stops the line, nothing
+                     is lost, and nothing moves - including him. */
+                  ev.blocked = true;
+                  this.manC -= d[0]; this.manR -= d[1];
+                  this.steps += cost2;
+                  ev.moved = false;
+                  return false;
+                }
               } else if (blocker) {
                 /* driven straight at a monster. The brick lands on its
                    square and its redraw wipes it, so the leading brick -
                    and only the leading brick - is destroyed. */
                 ev.crunched = 1; ev.crunchedBy = blocker; this.bricks--;
-              } else if (this.at(cc, rr) !== EMPTY) {
-                /* a tree or a marble at the end of the run stops it dead */
-                ev.lostOverEdge = 0; this.bricks--; ev.crunched = 1;
+              } else if (beyond === CHOPPER) {
+                /* the one thing left down here that still takes bricks
+                   off you - it comes out the far side as splinters */
+                ev.chopped_brick = 1; this.bricks--;
+              } else if (beyond !== EMPTY) {
+                /* a tree, a marble, set tar: the line simply stops, and so
+                   does he. Cut the tree down first. */
+                ev.blocked = true;
+                this.manC -= d[0]; this.manR -= d[1];
+                this.steps += cost2;
+                ev.moved = false;
+                return false;
               } else {
                 this.grid[this.idx(cc, rr)] = BRICK;
               }
@@ -767,7 +792,7 @@
     var spec = ITEMS[it];
     if (it === BOOTS) this.boots = BOOTS_TURNS;
     else if (it === FROST) this.frost = FROST_TURNS;
-    else if (it === AXE) this.axe += AXE_SWINGS;
+    else if (it === SAW) this.saw += SAW_USES;
     else if (it === JAR) {
       /* nobody labelled it */
       if (rnd(2) === 0) { this.frost = FROST_TURNS + 20; return { key: "jar", name: "Sealed jar", got: "It was frost. Everything has stopped." }; }
@@ -821,7 +846,7 @@
           else this.bounce(m, 0.4);
           continue;
         }
-        if (what === TREE || what === MARBLE || what === COOLED) { this.bounce(m, 0.35); continue; }
+        if (what === TREE || what === MARBLE || what === COOLED || what === CHOPPER) { this.bounce(m, 0.35); continue; }
 
         var mon = this.monsterAt(nc, nr);
         if (mon && !mon.gone) {
@@ -885,7 +910,7 @@
   Game.prototype.blocksFluid = function (c, r, kind) {
     var v = this.at(c, r);
     if (v === -1) return true;
-    if (v === BRICK || v === COOLED || v === VAT_TAR || v === VAT_WATER) return true;
+    if (v === BRICK || v === COOLED || v === VAT_TAR || v === VAT_WATER || v === CHOPPER) return true;
     if (v === TREE) return kind !== TAR;        /* tar takes the tree with it */
     return false;                                /* MARBLE is handled by the caller */
   };
@@ -1117,9 +1142,9 @@
     Game: Game,
     COLS: COLS, ROWS: ROWS, TICK_HZ: TICK_HZ, MAX_H: MAX_H,
     EMPTY: EMPTY, BRICK: BRICK, TREE: TREE, MARBLE: MARBLE,
-    VAT_TAR: VAT_TAR, VAT_WATER: VAT_WATER, COOLED: COOLED,
+    VAT_TAR: VAT_TAR, VAT_WATER: VAT_WATER, COOLED: COOLED, CHOPPER: CHOPPER,
     DRY: DRY, WATER: WATER, TAR: TAR,
-    NOTHING: NOTHING, BOOTS: BOOTS, FROST: FROST, AXE: AXE, JAR: JAR, ITEMS: ITEMS,
+    NOTHING: NOTHING, BOOTS: BOOTS, FROST: FROST, SAW: SAW, JAR: JAR, ITEMS: ITEMS,
     levelOf: levelOf, monstersFor: monstersFor, featuresFor: featuresFor,
     briefingFor: briefingFor, BRIEFINGS: BRIEFINGS, leashCells: leashCells, palette: palette, bonusFor: bonusFor,
     MONSTERS: MONSTERS, MONSTER_ORDER: MONSTER_ORDER,

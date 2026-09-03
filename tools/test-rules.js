@@ -66,11 +66,12 @@ const isBrick = (g, c, r) => g.grid[r * MF.COLS + c] === MF.BRICK;
      the fly's redraw wipes it. Exactly one brick, and the fly is unhurt. */
   const g = bare(); fly(g).c = 13; fly(g).r = 10;
   put(g, 11, 10); put(g, 12, 10);
-  const before = fly(g).c;
   g.step("right");
+  /* "unharmed" means still loose - not that it stood still. It takes its
+     turn after he takes his, so its square moves under the assertion. */
   ok("bricks driven at the fly cost exactly one brick, fly unharmed (line 350/360)",
-     [g.bricks, g.manC, fly(g).c === before || fly(g).c === before, isBrick(g, 12, 10)],
-     [1, 11, true, true]);
+     [g.bricks, g.manC, fly(g).trapped, isBrick(g, 12, 10)],
+     [1, 11, false, true]);
 }
 
 /* --- line 380: the win test ------------------------------------------ */

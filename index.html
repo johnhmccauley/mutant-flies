@@ -284,7 +284,7 @@
 
   /* what can be standing on a square */
   var EMPTY = 0, BRICK = 1, TREE = 2, MARBLE = 3,
-      VAT_TAR = 4, VAT_WATER = 5, COOLED = 6;
+      VAT_TAR = 4, VAT_WATER = 5, COOLED = 6, CHOPPER = 7;
 
   /* and what can be running across it. The cellars are old and things
      have been sealed up down here for a long time. */
@@ -292,11 +292,11 @@
   var TAR_COOLS = 26;          /* turns a tar cell burns before it sets */
 
   /* what can be lying on one */
-  var NOTHING = 0, BOOTS = 1, FROST = 2, AXE = 3, JAR = 4;
+  var NOTHING = 0, BOOTS = 1, FROST = 2, SAW = 3, JAR = 4;
   var ITEMS = {
     1: { key: "boots", name: "Boots", blurb: "Two squares a turn for a while.", colour: 0xc8a017 },
     2: { key: "frost", name: "Frost jar", blurb: "Everything down here stops moving.", colour: 0x63c8e0 },
-    3: { key: "axe",   name: "Axe",   blurb: "Three swings. Trees do not move any other way.", colour: 0xb0b6bd },
+    3: { key: "saw",   name: "Saw",   blurb: "Three trees. Nothing else will take one down.", colour: 0xb0b6bd },
     4: { key: "jar",   name: "Sealed jar", blurb: "Nobody labelled it. Could go either way.", colour: 0x9a5bc4 }
   };
 
@@ -309,7 +309,7 @@
   var MAN_C0 = 16, MAN_R0 = 14, MON_C0 = 15, MON_R0 = 12;
 
   var MAX_H = 3;                      /* how high the floor ever gets */
-  var BOOTS_TURNS = 70, FROST_TURNS = 50, AXE_SWINGS = 3;
+  var BOOTS_TURNS = 70, FROST_TURNS = 50, SAW_USES = 3;
 
   function sign(n) { return n < 0 ? -1 : n > 0 ? 1 : 0; }
   function rnd(n) { return (Math.random() * n) | 0; }
@@ -422,8 +422,8 @@
        8  marbles
        9  the unlabelled jars
      ================================================================== */
-  var FEATURE_AT = { slopes: 4, boots: 5, frost: 6, trees: 7, axe: 7,
-                     marbles: 8, jar: 9, tar: 10, water: 11 };
+  var FEATURE_AT = { slopes: 4, boots: 5, frost: 6, trees: 7, saw: 7,
+                     marbles: 8, jar: 9, tar: 10, water: 11, choppers: 13 };
 
   var PLAN = [
     /*  1 */ { kinds: ["fly"], PE: 200, PA: 400, adds: [] },
@@ -438,9 +438,9 @@
     /* 10 */ { kinds: ["beetle"], PE: 140, PA: 145, adds: ["tar"] },
     /* 11 */ { kinds: ["wasp"], PE: 140, PA: 140, adds: ["water"] },
     /* 12 */ { kinds: ["fly", "beetle"], PE: 145, PA: 130, adds: [] },
-    /* 13 */ { kinds: ["spider", "wasp"], PE: 135, PA: 125, adds: [] },
-    /* 14 */ { kinds: ["fly", "spider", "beetle"], PE: 150, PA: 120, adds: [] },
-    /* 15 */ { kinds: ["wasp", "beetle"], PE: 125, PA: 115, adds: [] },
+    /* 13 */ { kinds: ["spider"], PE: 145, PA: 130, adds: ["choppers"] },
+    /* 14 */ { kinds: ["spider", "wasp"], PE: 140, PA: 120, adds: [] },
+    /* 15 */ { kinds: ["fly", "spider", "beetle"], PE: 150, PA: 115, adds: [] },
     /* 16 */ { kinds: ["fly", "spider", "wasp", "beetle"], PE: 160, PA: 110, adds: [] }
   ];
 
@@ -479,6 +479,7 @@
     marbles: { name: "Marbles", body: "Heavy, and they keep going. Shove one and it runs until something stops it. Uphill it slows, and if it cannot crest the rise it comes back down at you, gathering speed. Slowly it bounces off things; quickly it smashes bricks; at speed it flattens a monster - or you." },
     jar:     { name: "Sealed jars", body: "Nobody labelled them. Half are frost. The other half have something in them that has been waiting a long time to get out." },
     tar:     { name: "The tar", body: "Sealed in vats, and still hot. Break one - a marble will do it, so will the axe - and it runs downhill burning what it touches: trees, bricks, monsters, you. Eventually it sets, and what it leaves behind is as good as a wall." },
+    choppers:{ name: "The choppers", body: "Somebody left the machinery running. A chopper is fixed where it stands and nothing will shift it, but anything you shove into it comes out as splinters - so it is the one thing down here that will still take a brick off you. It will hold a monster in as well as a wall would." },
     water:   { name: "The cistern", body: "Water runs further and faster than tar and finds every low corner. It puts fires out, shoves marbles along in front of it, and sweeps you and the monsters off your feet. It burns nothing - but where it takes you is not your choice." }
   };
   function briefingFor(F) {
@@ -551,7 +552,8 @@
   Game.prototype.solid = function (c, r) {
     var v = this.at(c, r);
     if (this.classic) return v === BRICK;
-    if (v === BRICK || v === TREE || v === VAT_TAR || v === VAT_WATER || v === COOLED) return true;
+    if (v === BRICK || v === TREE || v === VAT_TAR || v === VAT_WATER ||
+        v === COOLED || v === CHOPPER) return true;
     if (v === MARBLE) { var m = this.marbleAt(c, r); return !!m && m.v <= 0; }
     return false;
   };
@@ -603,7 +605,7 @@
     this.steps = 0;
     this.boots = 0;
     this.frost = 0;
-    this.axe = 0;
+    this.saw = 0;
 
     this.manC = MAN_C0; this.manR = MAN_R0;
 
@@ -699,8 +701,9 @@
     });
     if (f.boots) scatter(1, function (c, r) { self.item[self.idx(c, r)] = BOOTS; });
     if (f.frost) scatter(1, function (c, r) { self.item[self.idx(c, r)] = FROST; });
-    if (f.axe) scatter(1 + rnd(2), function (c, r) { self.item[self.idx(c, r)] = AXE; });
+    if (f.saw) scatter(1 + rnd(2), function (c, r) { self.item[self.idx(c, r)] = SAW; });
     if (f.jar) scatter(1 + rnd(2), function (c, r) { self.item[self.idx(c, r)] = JAR; });
+    if (f.choppers) scatter(2 + rnd(3), function (c, r) { self.grid[self.idx(c, r)] = CHOPPER; });
     if (f.tar) scatter(1 + rnd(2), function (c, r) { self.grid[self.idx(c, r)] = VAT_TAR; });
     if (f.water) scatter(1 + rnd(2), function (c, r) { self.grid[self.idx(c, r)] = VAT_WATER; });
   };
@@ -754,7 +757,8 @@
                eaten: 0, chopped: 0, picked: null, strained: false, rolled: [],
                smashed: 0, crushed: [], trappedNow: [], won: false, lost: false,
                lostTo: null, bonus: 0, stuck: false, spawned: null,
-               burst: 0, burned: 0, doused: 0, swept: 0, set: 0 };
+               burst: 0, burned: 0, doused: 0, swept: 0, set: 0,
+               blocked: false, chopped_brick: 0 };
     if (this.over || this.won) return ev;
 
     /* --- step points ------------------------------------------------
@@ -825,14 +829,14 @@
 
         if (here === TREE || here === VAT_TAR || here === VAT_WATER) {
           /* none of these shove. The axe is the only argument they take */
-          if (this.axe > 0 && this.steps >= 1) {
-            this.axe--; this.steps -= 1;
+          if (this.saw > 0 && this.steps >= 1) {
+            this.saw--; this.steps -= 1;
             if (here === TREE) { this.grid[this.idx(nc, nr)] = EMPTY; ev.chopped = 1; }
             else this.breakVat(nc, nr, ev);
           } else ev.strained = true;
 
-        } else if (here === COOLED) {
-          ev.strained = true;                  /* set tar is rock now */
+        } else if (here === COOLED || here === CHOPPER) {
+          ev.strained = true;      /* set tar is rock; the chopper is worse */
 
         } else if (here === MARBLE) {
           var mar = this.marbleAt(nc, nr);
@@ -863,18 +867,39 @@
 
             if (run) {
               var blocker = this.monsterAt(cc, rr);
+              var beyond = this.at(cc, rr);
+
               if (!this.inField(cc, rr)) {
-                /* over the edge of the cellar: the original drew it outside
-                   the graphics viewport, where it was clipped and lost */
-                ev.lostOverEdge = 1; this.bricks--;
+                if (this.classic) {
+                  /* 1985: the brick was drawn outside the graphics
+                     viewport, clipped away, and never came back */
+                  ev.lostOverEdge = 1; this.bricks--;
+                } else {
+                  /* down here a wall is a wall. It stops the line, nothing
+                     is lost, and nothing moves - including him. */
+                  ev.blocked = true;
+                  this.manC -= d[0]; this.manR -= d[1];
+                  this.steps += cost2;
+                  ev.moved = false;
+                  return false;
+                }
               } else if (blocker) {
                 /* driven straight at a monster. The brick lands on its
                    square and its redraw wipes it, so the leading brick -
                    and only the leading brick - is destroyed. */
                 ev.crunched = 1; ev.crunchedBy = blocker; this.bricks--;
-              } else if (this.at(cc, rr) !== EMPTY) {
-                /* a tree or a marble at the end of the run stops it dead */
-                ev.lostOverEdge = 0; this.bricks--; ev.crunched = 1;
+              } else if (beyond === CHOPPER) {
+                /* the one thing left down here that still takes bricks
+                   off you - it comes out the far side as splinters */
+                ev.chopped_brick = 1; this.bricks--;
+              } else if (beyond !== EMPTY) {
+                /* a tree, a marble, set tar: the line simply stops, and so
+                   does he. Cut the tree down first. */
+                ev.blocked = true;
+                this.manC -= d[0]; this.manR -= d[1];
+                this.steps += cost2;
+                ev.moved = false;
+                return false;
               } else {
                 this.grid[this.idx(cc, rr)] = BRICK;
               }
@@ -907,7 +932,7 @@
     var spec = ITEMS[it];
     if (it === BOOTS) this.boots = BOOTS_TURNS;
     else if (it === FROST) this.frost = FROST_TURNS;
-    else if (it === AXE) this.axe += AXE_SWINGS;
+    else if (it === SAW) this.saw += SAW_USES;
     else if (it === JAR) {
       /* nobody labelled it */
       if (rnd(2) === 0) { this.frost = FROST_TURNS + 20; return { key: "jar", name: "Sealed jar", got: "It was frost. Everything has stopped." }; }
@@ -961,7 +986,7 @@
           else this.bounce(m, 0.4);
           continue;
         }
-        if (what === TREE || what === MARBLE || what === COOLED) { this.bounce(m, 0.35); continue; }
+        if (what === TREE || what === MARBLE || what === COOLED || what === CHOPPER) { this.bounce(m, 0.35); continue; }
 
         var mon = this.monsterAt(nc, nr);
         if (mon && !mon.gone) {
@@ -1025,7 +1050,7 @@
   Game.prototype.blocksFluid = function (c, r, kind) {
     var v = this.at(c, r);
     if (v === -1) return true;
-    if (v === BRICK || v === COOLED || v === VAT_TAR || v === VAT_WATER) return true;
+    if (v === BRICK || v === COOLED || v === VAT_TAR || v === VAT_WATER || v === CHOPPER) return true;
     if (v === TREE) return kind !== TAR;        /* tar takes the tree with it */
     return false;                                /* MARBLE is handled by the caller */
   };
@@ -1257,9 +1282,9 @@
     Game: Game,
     COLS: COLS, ROWS: ROWS, TICK_HZ: TICK_HZ, MAX_H: MAX_H,
     EMPTY: EMPTY, BRICK: BRICK, TREE: TREE, MARBLE: MARBLE,
-    VAT_TAR: VAT_TAR, VAT_WATER: VAT_WATER, COOLED: COOLED,
+    VAT_TAR: VAT_TAR, VAT_WATER: VAT_WATER, COOLED: COOLED, CHOPPER: CHOPPER,
     DRY: DRY, WATER: WATER, TAR: TAR,
-    NOTHING: NOTHING, BOOTS: BOOTS, FROST: FROST, AXE: AXE, JAR: JAR, ITEMS: ITEMS,
+    NOTHING: NOTHING, BOOTS: BOOTS, FROST: FROST, SAW: SAW, JAR: JAR, ITEMS: ITEMS,
     levelOf: levelOf, monstersFor: monstersFor, featuresFor: featuresFor,
     briefingFor: briefingFor, BRIEFINGS: BRIEFINGS, leashCells: leashCells, palette: palette, bonusFor: bonusFor,
     MONSTERS: MONSTERS, MONSTER_ORDER: MONSTER_ORDER,
@@ -1384,29 +1409,104 @@ function stoneMaps() {
   });
   return { map: tex(col, 1, 1, true), bump: tex(bump, 1, 1) };
 }
-function floorMaps() {
-  var S = 512, n = 4, h = S / n;
+/* --- the floor -------------------------------------------------------
+   The cellar is a stone floor with one flagstone to a square, which is
+   deliberate: the player has to count squares to plan a shove, and a
+   visible joint between every stone does that job for free.
+
+   The trap is that one texture on every square, laid the same way up,
+   reads as graph paper. So there are three cuts of stone - plain, worn
+   and damp - dealt out by a hash of the coordinates, each laid at one of
+   four rotations, and tinted per stone. Nothing repeats on any axis you
+   can see.
+
+   Value does the rest of the work: low ground is darker and cooler
+   because that is where the damp collects, high ground lighter and
+   warmer because it is nearer the torches. The floor stays quiet in
+   tone so the brick and the monsters are the only saturated things in
+   the room.
+   -------------------------------------------------------------------- */
+function slabMaps(variant) {
+  var S = 256, m = 13;                       /* m = the joint, in pixels */
+
   var col = noiseCanvas(S, function (g) {
-    g.fillStyle = "#0f0d0b"; g.fillRect(0, 0, S, S);
-    for (var r = 0; r < n; r++) for (var c = 0; c < n; c++) {
-      g.fillStyle = "hsl(" + (30 + Math.random() * 14) + ",11%," + (15 + Math.random() * 13) + "%)";
-      g.fillRect(c * h + 3, r * h + 3, h - 6, h - 6);
-      for (var s = 0; s < 40; s++) {
-        g.fillStyle = "rgba(255,240,210," + (Math.random() * 0.035) + ")";
-        g.fillRect(c * h + Math.random() * h, r * h + Math.random() * h, Math.random() * 9, Math.random() * 3);
+    /* the joint between stones */
+    g.fillStyle = "#14100c";
+    g.fillRect(0, 0, S, S);
+
+    /* the face of the stone */
+    var base = [26, 23, 20][variant];
+    g.fillStyle = "hsl(" + (30 + variant * 4) + "," + [10, 8, 12][variant] + "%," + base + "%)";
+    g.fillRect(m, m, S - m * 2, S - m * 2);
+
+    /* a chamfer: light where the torchlight would catch the edge,
+       dark where the stone falls away */
+    g.fillStyle = "rgba(255,238,214,.055)";
+    g.fillRect(m, m, S - m * 2, 7);
+    g.fillRect(m, m, 7, S - m * 2);
+    g.fillStyle = "rgba(0,0,0,.34)";
+    g.fillRect(m, S - m - 7, S - m * 2, 7);
+    g.fillRect(S - m - 7, m, 7, S - m * 2);
+
+    /* the grain of the cut face */
+    for (var i = 0; i < 240; i++) {
+      var x = m + Math.random() * (S - m * 2), y = m + Math.random() * (S - m * 2);
+      g.fillStyle = "rgba(" + (Math.random() < 0.5 ? "255,244,222," : "0,0,0,") +
+                    (0.012 + Math.random() * 0.05) + ")";
+      g.fillRect(x, y, 2 + Math.random() * 26, 1 + Math.random() * 3);
+    }
+
+    if (variant === 1) {
+      /* worn: a chipped corner and a couple of cracks */
+      g.strokeStyle = "rgba(0,0,0,.42)";
+      for (var k = 0; k < 3; k++) {
+        g.lineWidth = 1 + Math.random() * 2;
+        g.beginPath();
+        var x0 = m + Math.random() * (S - m * 2), y0 = m + Math.random() * (S - m * 2);
+        g.moveTo(x0, y0);
+        for (var seg = 0; seg < 4; seg++)
+          g.lineTo(x0 += (Math.random() - 0.5) * 60, y0 += (Math.random() - 0.5) * 60);
+        g.stroke();
+      }
+      g.fillStyle = "rgba(0,0,0,.3)";
+      g.beginPath();
+      g.moveTo(S - m, S - m); g.lineTo(S - m - 46, S - m); g.lineTo(S - m, S - m - 38);
+      g.closePath(); g.fill();
+    }
+    if (variant === 2) {
+      /* damp: the low corner never dries out */
+      var gr = g.createRadialGradient(S * 0.62, S * 0.66, 6, S * 0.62, S * 0.66, S * 0.5);
+      gr.addColorStop(0, "rgba(30,46,40,.42)");
+      gr.addColorStop(1, "rgba(30,46,40,0)");
+      g.fillStyle = gr;
+      g.fillRect(m, m, S - m * 2, S - m * 2);
+      g.fillStyle = "rgba(150,180,170,.05)";
+      g.beginPath(); g.ellipse(S * 0.6, S * 0.64, 40, 26, 0.4, 0, 6.3); g.fill();
+    }
+    grain(g, S, 16, true);
+  });
+
+  var bump = noiseCanvas(S, function (g) {
+    g.fillStyle = "#0b0b0b"; g.fillRect(0, 0, S, S);      /* joint sits low */
+    g.fillStyle = "#cfcfcf"; g.fillRect(m, m, S - m * 2, S - m * 2);
+    g.fillStyle = "#8a8a8a";
+    g.fillRect(m, m, S - m * 2, 6); g.fillRect(m, m, 6, S - m * 2);
+    g.fillRect(m, S - m - 6, S - m * 2, 6); g.fillRect(S - m - 6, m, 6, S - m * 2);
+    if (variant === 1) {
+      g.strokeStyle = "#404040"; g.lineWidth = 3;
+      for (var k = 0; k < 3; k++) {
+        g.beginPath();
+        var x0 = m + Math.random() * (S - m * 2), y0 = m + Math.random() * (S - m * 2);
+        g.moveTo(x0, y0);
+        for (var seg = 0; seg < 4; seg++)
+          g.lineTo(x0 += (Math.random() - 0.5) * 60, y0 += (Math.random() - 0.5) * 60);
+        g.stroke();
       }
     }
-    grain(g, S, 22, true);
+    grain(g, S, 34);
   });
-  var bump = noiseCanvas(S, function (g) {
-    g.fillStyle = "#0a0a0a"; g.fillRect(0, 0, S, S);
-    for (var r = 0; r < n; r++) for (var c = 0; c < n; c++) {
-      g.fillStyle = "hsl(0,0%," + (52 + Math.random() * 26) + "%)";
-      g.fillRect(c * h + 3, r * h + 3, h - 6, h - 6);
-    }
-    grain(g, S, 46);
-  });
-  return { map: tex(col, 9, 7, true), bump: tex(bump, 9, 7) };
+
+  return { map: tex(col, 1, 1, true), bump: tex(bump, 1, 1) };
 }
 
 /* ==================================================================
@@ -1416,7 +1516,7 @@ var renderer, scene, camera, clock;
 var brickMesh, floorMesh, manRig, motes, debris = [], torches = [], keyLight;
 var BRICK_MAT, BRICK_TEX = {};
 var monsterRigs = [];
-var terrain, props = {}, marbleMeshes = [], cubeCam, cubeT = 0, bobT = 0;
+var terrain, terrains = [], props = {}, marbleMeshes = [], cubeCam, cubeT = 0, bobT = 0;
 
 function init3D() {
   renderer = new THREE.WebGLRenderer({ canvas: $("gl"), antialias: true, powerPreference: "high-performance" });
@@ -1457,21 +1557,27 @@ function resize() {
 }
 
 function buildCellar() {
-  /* the floor is a block per square, so it can rise and fall */
-  var fm = floorMaps();
-  fm.map.repeat.set(1, 1); fm.bump.repeat.set(1, 1);
-  var floorMat = new THREE.MeshStandardMaterial({ map: fm.map, bumpMap: fm.bump,
-                  bumpScale: 0.07, roughness: 0.97, metalness: 0.02 });
-  terrain = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), floorMat, COLS * ROWS);
-  terrain.receiveShadow = true;
-  terrain.castShadow = false;      /* tiles shadowing each other reads as mud */
-  scene.add(terrain);
+  /* the floor is a block per square, so it can rise and fall, and comes
+     in three cuts of stone dealt out by position */
+  var slabGeo = new THREE.BoxGeometry(1, 1, 1);
+  for (var v = 0; v < 3; v++) {
+    var sm2 = slabMaps(v);
+    var mat = new THREE.MeshStandardMaterial({ map: sm2.map, bumpMap: sm2.bump,
+                bumpScale: 0.075, roughness: 0.96, metalness: 0.015 });
+    var t = new THREE.InstancedMesh(slabGeo, mat, COLS * ROWS);
+    t.receiveShadow = true;
+    t.castShadow = false;          /* tiles shadowing each other reads as mud */
+    t.frustumCulled = false;
+    scene.add(t);
+    terrains.push(t);
+  }
+  terrain = terrains[0];
 
   /* an apron of dead ground so the cellar does not end in mid-air */
-  var apron = new THREE.Mesh(new THREE.PlaneGeometry(COLS + 16, ROWS + 16), floorMat.clone());
-  apron.material.map = fm.map; apron.material.color.setHex(0x6a6a6a);
+  var apron = new THREE.Mesh(new THREE.PlaneGeometry(COLS + 22, ROWS + 22),
+    new THREE.MeshStandardMaterial({ color: 0x100d0a, roughness: 1 }));
   apron.rotation.x = -Math.PI / 2;
-  apron.position.set(COLS / 2, -0.52, ROWS / 2);
+  apron.position.set(COLS / 2, -0.55, ROWS / 2);
   apron.receiveShadow = true;
   scene.add(apron);
 
@@ -1541,6 +1647,11 @@ function buildProps() {
   props.crown = inst(new THREE.IcosahedronGeometry(0.62, 0), leaf, 40, true);
   props.cooled = inst(new THREE.BoxGeometry(0.98, 0.34, 0.98), slag, 320, true);
   props.vatT = inst(new THREE.CylinderGeometry(0.42, 0.46, 0.86, 10), iron, 12, true);
+  /* the chopper: a bed, and a blade that never stops turning */
+  props.chopBed = inst(new THREE.CylinderGeometry(0.46, 0.5, 0.2, 12), iron, 16, true);
+  var blade = new THREE.MeshStandardMaterial({ color: 0x9aa2a8, roughness: 0.18, metalness: 0.95 });
+  props.chopBlade = inst(new THREE.BoxGeometry(0.86, 0.045, 0.13), blade, 16, true);
+  props.chopBlade2 = inst(new THREE.BoxGeometry(0.13, 0.045, 0.86), blade, 16, true);
   props.vatW = inst(new THREE.CylinderGeometry(0.42, 0.46, 0.86, 10), stone, 12, true);
 
   props.water = inst(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshStandardMaterial({
@@ -1579,41 +1690,161 @@ function buildProps() {
   }
 }
 
-/* --- the man -------------------------------------------------------- */
+/* --- the man ---------------------------------------------------------
+   A treasure hunter who came down a hole in some ruins with a lantern,
+   a satchel and a rolled-up copy of The Times. He is the only warm thing
+   in the cellar, so he is built to read at a distance: pale lantern-lit
+   face, a bright collar and cuffs, a dark silhouette below the belt.
+   The lantern is the light that follows him - the spotlight overhead is
+   the same colour and comes from the same place.
+   -------------------------------------------------------------------- */
 function buildMan() {
   var g = new THREE.Group();
-  var cloth = new THREE.MeshStandardMaterial({ color: 0x6d5a3f, roughness: 0.86 });
-  var skin = new THREE.MeshStandardMaterial({ color: 0xc79b74, roughness: 0.72 });
-  var dark = new THREE.MeshStandardMaterial({ color: 0x37301f, roughness: 0.9 });
-  var paper = new THREE.MeshStandardMaterial({ color: 0xd8d0bb, roughness: 0.95 });
 
-  var torso = new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.30, 0.62, 10), cloth);
-  torso.position.y = 0.92; g.add(torso);
-  var hips = new THREE.Mesh(new THREE.SphereGeometry(0.27, 12, 10), dark);
-  hips.position.y = 0.62; hips.scale.y = 0.75; g.add(hips);
-  var head = new THREE.Mesh(new THREE.SphereGeometry(0.21, 14, 12), skin);
-  head.position.y = 1.38; g.add(head);
-  var hair = new THREE.Mesh(new THREE.SphereGeometry(0.215, 14, 10, 0, Math.PI * 2, 0, Math.PI * 0.55), dark);
-  hair.position.y = 1.40; g.add(hair);
+  /* The cellar is lit by one orange lamp, so anything sandy-coloured
+     disappears into the floor. He is dressed cold against it - a dark
+     green coat, a pale hat brim and a red neckerchief - because from the
+     game camera you are looking almost straight down on him and the only
+     things that read are the top of his hat and his shoulders. */
+  var coat   = new THREE.MeshStandardMaterial({ color: 0x2b4a42, roughness: 0.82 });
+  var coatHi = new THREE.MeshStandardMaterial({ color: 0x3d6357, roughness: 0.78 });
+  var trews  = new THREE.MeshStandardMaterial({ color: 0x23211d, roughness: 0.93 });
+  var boot   = new THREE.MeshStandardMaterial({ color: 0x15120f, roughness: 0.68 });
+  var felt   = new THREE.MeshStandardMaterial({ color: 0x8c7444, roughness: 0.95 });
+  var scarf  = new THREE.MeshStandardMaterial({ color: 0xb03a2a, roughness: 0.9 });
+  var skin   = new THREE.MeshStandardMaterial({ color: 0xd9a87e, roughness: 0.66 });
+  var hair   = new THREE.MeshStandardMaterial({ color: 0x2e2419, roughness: 0.95 });
+  var shirt  = new THREE.MeshStandardMaterial({ color: 0xe6dcc4, roughness: 0.85 });
+  var leather= new THREE.MeshStandardMaterial({ color: 0x4a3624, roughness: 0.8 });
+  var brass  = new THREE.MeshStandardMaterial({ color: 0xc9a233, roughness: 0.32, metalness: 0.85 });
+  var glass  = new THREE.MeshBasicMaterial({ color: 0xffd79a, transparent: true, opacity: 0.92 });
+  var paper  = new THREE.MeshStandardMaterial({ color: 0xd8d0bb, roughness: 0.96 });
 
-  function limb(r, len, mat) {
-    var m = new THREE.Mesh(new THREE.CylinderGeometry(r, r * 0.85, len, 8), mat);
-    m.position.y = -len / 2;
-    var pivot = new THREE.Group(); pivot.add(m);
-    return pivot;
+  function put(mesh, x, y, z, sx, sy, sz) {
+    mesh.position.set(x, y, z);
+    if (sx !== undefined) mesh.scale.set(sx, sy, sz);
+    return mesh;
   }
-  g.userData.legL = limb(0.09, 0.58, dark); g.userData.legL.position.set(-0.13, 0.60, 0);
-  g.userData.legR = limb(0.09, 0.58, dark); g.userData.legR.position.set(0.13, 0.60, 0);
-  g.userData.armL = limb(0.075, 0.50, cloth); g.userData.armL.position.set(-0.30, 1.16, 0);
-  g.userData.armR = limb(0.075, 0.50, cloth); g.userData.armR.position.set(0.30, 1.16, 0);
-  g.add(g.userData.legL, g.userData.legR, g.userData.armL, g.userData.armR);
 
-  /* the rolled-up copy of The Times he came down with */
-  var roll = new THREE.Mesh(new THREE.CylinderGeometry(0.055, 0.055, 0.46, 8), paper);
-  roll.rotation.z = 0.5; roll.position.set(0.06, -0.46, 0.06);
-  g.userData.armR.add(roll);
+  /* ---- head ---- */
+  var head = new THREE.Group(); head.position.y = 1.40; g.add(head);
+  head.add(put(new THREE.Mesh(new THREE.SphereGeometry(0.155, 18, 14), skin), 0, 0, 0, 1, 1.12, 0.98));
+  /* jaw, so he is not simply a ball */
+  head.add(put(new THREE.Mesh(new THREE.BoxGeometry(0.17, 0.10, 0.16), skin), 0, -0.09, 0.012));
+  /* hair, swept back off the face */
+  var cap = new THREE.Mesh(new THREE.SphereGeometry(0.163, 18, 12, 0, Math.PI * 2, 0, Math.PI * 0.62), hair);
+  head.add(put(cap, 0, 0.012, -0.012, 1, 1.02, 1.06));
+  /* nose and brow give the profile something to catch the light */
+  head.add(put(new THREE.Mesh(new THREE.ConeGeometry(0.032, 0.075, 5), skin), 0, -0.01, 0.15).rotateX(1.62));
+  head.add(put(new THREE.Mesh(new THREE.BoxGeometry(0.19, 0.028, 0.03), hair), 0, 0.055, 0.135));
+  for (var e = 0; e < 2; e++)
+    head.add(put(new THREE.Mesh(new THREE.SphereGeometry(0.021, 8, 6),
+      new THREE.MeshStandardMaterial({ color: 0x1a1410, roughness: 0.3 })),
+      e ? 0.056 : -0.056, 0.012, 0.132));
+  /* ears */
+  for (var a = 0; a < 2; a++)
+    head.add(put(new THREE.Mesh(new THREE.SphereGeometry(0.033, 8, 6), skin),
+      a ? 0.15 : -0.15, -0.005, 0, 0.5, 1, 0.85));
+
+  /* a hat: the brim is the one shape that reads from straight above */
+  var hat = new THREE.Group(); hat.position.set(0, 0.1, -0.012); head.add(hat);
+  hat.add(put(new THREE.Mesh(new THREE.CylinderGeometry(0.245, 0.255, 0.022, 20), felt), 0, 0.02, 0.012, 1, 1, 0.88));
+  hat.add(put(new THREE.Mesh(new THREE.CylinderGeometry(0.13, 0.145, 0.125, 16), felt), 0, 0.086, 0));
+  hat.add(put(new THREE.Mesh(new THREE.CylinderGeometry(0.134, 0.134, 0.03, 16), leather), 0, 0.036, 0));
+  hat.rotation.x = -0.1;
+
+  /* ---- neck, collar and body ---- */
+  g.add(put(new THREE.Mesh(new THREE.CylinderGeometry(0.062, 0.07, 0.1, 8), skin), 0, 1.26, 0));
+  g.add(put(new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.115, 0.075, 12), shirt), 0, 1.215, 0));
+  /* neckerchief - a spot of red is what your eye actually tracks */
+  g.add(put(new THREE.Mesh(new THREE.TorusGeometry(0.1, 0.035, 8, 16), scarf), 0, 1.222, 0).rotateX(Math.PI / 2));
+  g.add(put(new THREE.Mesh(new THREE.ConeGeometry(0.055, 0.13, 6), scarf), 0, 1.16, 0.1).rotateX(0.35));
+
+  /* a chest that tapers to a waist, and shoulders on top of it */
+  g.add(put(new THREE.Mesh(new THREE.CylinderGeometry(0.215, 0.175, 0.44, 14), coat), 0, 0.99, 0, 1, 1, 0.72));
+  g.add(put(new THREE.Mesh(new THREE.SphereGeometry(0.215, 14, 10), coat), 0, 1.17, 0, 1, 0.55, 0.72));
+  for (var sd = 0; sd < 2; sd++)
+    g.add(put(new THREE.Mesh(new THREE.SphereGeometry(0.095, 12, 10), coatHi),
+      sd ? 0.2 : -0.2, 1.155, 0, 1, 0.9, 0.9));
+  /* open coat front, so he is not a barrel */
+  g.add(put(new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.4, 0.03), shirt), 0, 1.0, 0.126));
+  /* belt and buckle */
+  g.add(put(new THREE.Mesh(new THREE.CylinderGeometry(0.182, 0.182, 0.058, 14), leather), 0, 0.755, 0, 1, 1, 0.76));
+  g.add(put(new THREE.Mesh(new THREE.BoxGeometry(0.062, 0.052, 0.02), brass), 0, 0.755, 0.108));
+  /* hips */
+  g.add(put(new THREE.Mesh(new THREE.SphereGeometry(0.185, 14, 10), trews), 0, 0.715, 0, 1, 0.72, 0.78));
+
+  /* satchel on the hip - he came down here to carry something out */
+  var bag = new THREE.Group(); bag.position.set(-0.21, 0.72, -0.03); bag.rotation.z = 0.16; g.add(bag);
+  bag.add(new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.19, 0.1), leather));
+  bag.add(put(new THREE.Mesh(new THREE.BoxGeometry(0.21, 0.07, 0.11), coatHi), 0, 0.075, 0.006));
+  g.add(put(new THREE.Mesh(new THREE.TorusGeometry(0.2, 0.016, 6, 18), leather), 0.02, 1.02, 0, 1, 1, 0.62).rotateY(0.5));
+
+  /* ---- limbs: two segments each, so the walk has a knee in it ---- */
+  function limb(rTop, rBot, upper, lower, matA, matB) {
+    var hip = new THREE.Group();
+    var u = new THREE.Mesh(new THREE.CylinderGeometry(rTop, rBot, upper, 9), matA);
+    u.position.y = -upper / 2; hip.add(u);
+    var knee = new THREE.Group(); knee.position.y = -upper; hip.add(knee);
+    var l = new THREE.Mesh(new THREE.CylinderGeometry(rBot, rBot * 0.86, lower, 9), matB);
+    l.position.y = -lower / 2; knee.add(l);
+    return { hip: hip, knee: knee, lowerLen: lower };
+  }
+
+  var legL = limb(0.088, 0.068, 0.36, 0.34, trews, trews);
+  var legR = limb(0.088, 0.068, 0.36, 0.34, trews, trews);
+  legL.hip.position.set(-0.095, 0.70, 0);
+  legR.hip.position.set(0.095, 0.70, 0);
+  [legL, legR].forEach(function (L) {
+    var b = new THREE.Mesh(new THREE.BoxGeometry(0.13, 0.09, 0.23), boot);
+    b.position.set(0, -L.lowerLen - 0.03, 0.032);
+    L.knee.add(b);
+  });
+  g.add(legL.hip, legR.hip);
+
+  var armL = limb(0.062, 0.05, 0.3, 0.29, coat, coat);
+  var armR = limb(0.062, 0.05, 0.3, 0.29, coat, coat);
+  armL.hip.position.set(-0.225, 1.145, 0);
+  armR.hip.position.set(0.225, 1.145, 0);
+  [armL, armR].forEach(function (A) {
+    A.knee.add(put(new THREE.Mesh(new THREE.CylinderGeometry(0.055, 0.05, 0.05, 9), shirt), 0, -A.lowerLen + 0.03, 0));
+    var hand = new THREE.Mesh(new THREE.SphereGeometry(0.052, 10, 8), skin);
+    hand.position.y = -A.lowerLen - 0.02;
+    A.knee.add(hand);
+    A.hand = hand;
+  });
+  g.add(armL.hip, armR.hip);
+
+  /* the rolled-up copy of The Times, in his right hand */
+  var roll = new THREE.Mesh(new THREE.CylinderGeometry(0.032, 0.03, 0.34, 9), paper);
+  roll.position.set(0, -0.06, 0.03);
+  roll.rotation.set(0.5, 0, 0.25);
+  armR.hand.add(roll);
+
+  /* and the lantern in his left, which is where the light comes from */
+  var lamp = new THREE.Group();
+  lamp.position.set(0, -0.10, 0.02);
+  armL.hand.add(lamp);
+  lamp.add(put(new THREE.Mesh(new THREE.TorusGeometry(0.05, 0.008, 5, 12), brass), 0, 0.075, 0).rotateX(Math.PI / 2));
+  lamp.add(put(new THREE.Mesh(new THREE.CylinderGeometry(0.052, 0.052, 0.012, 9), brass), 0, 0.055, 0));
+  lamp.add(put(new THREE.Mesh(new THREE.CylinderGeometry(0.046, 0.05, 0.1, 9), glass), 0, -0.005, 0));
+  lamp.add(put(new THREE.Mesh(new THREE.CylinderGeometry(0.055, 0.058, 0.022, 9), brass), 0, -0.062, 0));
+  var flame = new THREE.Mesh(new THREE.SphereGeometry(0.028, 8, 6),
+    new THREE.MeshBasicMaterial({ color: 0xffe0a8 }));
+  lamp.add(flame);
+  var lampLight = new THREE.PointLight(0xffb163, 1.5, 7.5, 1.6);
+  lamp.add(lampLight);
 
   g.traverse(function (o) { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
+  /* the lantern glass and flame should not cast a shadow of themselves */
+  flame.castShadow = false;
+
+  g.userData.legL = legL.hip; g.userData.legR = legR.hip;
+  g.userData.armL = armL.hip; g.userData.armR = armR.hip;
+  g.userData.kneeL = legL.knee; g.userData.kneeR = legR.knee;
+  g.userData.elbowL = armL.knee; g.userData.elbowR = armR.knee;
+  g.userData.head = head;
+  g.userData.lamp = lamp; g.userData.lampLight = lampLight; g.userData.flame = flame;
   g.userData.walk = 0;
   return g;
 }
@@ -1626,8 +1857,9 @@ function buildMonster(kind) {
   var spec = MF.MONSTERS[kind];
   var g = new THREE.Group();
   var body = new THREE.Group(); body.position.y = 0.95; g.add(body);
-  var shell = new THREE.MeshStandardMaterial({ color: spec.colour, roughness: 0.34, metalness: 0.12 });
-  var dark = new THREE.MeshStandardMaterial({ color: spec.dark, roughness: 0.44, metalness: 0.1 });
+  var shell = new THREE.MeshStandardMaterial({ color: spec.colour, roughness: 0.56, metalness: 0.1,
+                                             emissive: spec.colour, emissiveIntensity: 0.1 });
+  var dark = new THREE.MeshStandardMaterial({ color: spec.dark, roughness: 0.62, metalness: 0.08 });
   var eyeMat = new THREE.MeshStandardMaterial({ color: spec.eye, roughness: 0.2, metalness: 0.05,
                                                 emissive: spec.eye, emissiveIntensity: 0.45, flatShading: true });
   var wingMat = new THREE.MeshStandardMaterial({ color: 0xdfe9f7, transparent: true, opacity: 0.13,
@@ -1941,28 +2173,48 @@ function placeAt(mesh, n, c, r, y, sx, sy, sz, rotY) {
 }
 
 /* the terrain only changes when the cellar does */
+function hash2(c, r) {                 /* cheap, stable, no visible pattern */
+  /* Math.imul, because the plain multiply overflows into float and the
+     distribution comes out lopsided - one cut of stone never appearing */
+  var h = Math.imul(c, 374761393) + Math.imul(r, 668265263);
+  h = Math.imul(h ^ (h >>> 13), 1274126177);
+  return ((h ^ (h >>> 16)) >>> 0) / 4294967296;
+}
 function syncTerrain() {
-  var n = 0, col = new THREE.Color();
+  var n = [0, 0, 0], col = new THREE.Color();
   for (var r = 0; r < ROWS; r++) for (var c = 0; c < COLS; c++) {
-    var h = game.height[r * COLS + c] * STEP;
-    var thick = 1 + h;
-    placeAt(terrain, n, c, r, h - thick / 2, 1, thick, 1);
-    /* the low ground is darker, which is most of what tells you the
-       shape of the floor at a glance */
-    var t = 0.62 + 0.16 * (game.height[r * COLS + c]);
-    col.setRGB(t, t * 0.97, t * 0.92);
-    terrain.setColorAt(n, col);
-    n++;
+    var lvl = game.height[r * COLS + c];
+    var h = lvl * STEP, thick = 1 + h;
+    var a = hash2(c, r), b = hash2(r + 91, c + 17);
+
+    /* damp stone gathers in the low ground, worn stone anywhere */
+    var cut = (lvl === 0 && a < 0.26) ? 2 : (a < 0.62 ? 0 : 1);
+    var mesh = terrains[cut];
+    placeAt(mesh, n[cut], c, r, h - thick / 2, 1, thick, 1, (Math.floor(b * 4) * Math.PI) / 2);
+
+    /* value carries the shape of the floor: low ground darker and
+       cooler where the damp sits, high ground lighter and warmer for
+       being nearer the torches. Plus a little per-stone variation so no
+       two neighbours match. */
+    var v = 0.56 + 0.17 * lvl + (b - 0.5) * 0.1;
+    var warm = 0.9 + 0.07 * lvl;
+    col.setRGB(v * (0.94 + 0.09 * lvl), v * 0.95, v * warm * 0.92);
+    mesh.setColorAt(n[cut], col);
+    n[cut]++;
   }
-  terrain.count = n;
-  terrain.instanceMatrix.needsUpdate = true;
-  if (terrain.instanceColor) terrain.instanceColor.needsUpdate = true;
+  for (var k = 0; k < 3; k++) {
+    terrains[k].count = n[k];
+    terrains[k].instanceMatrix.needsUpdate = true;
+    if (terrains[k].instanceColor) terrains[k].instanceColor.needsUpdate = true;
+  }
 }
 
 /* everything that can change from one turn to the next */
 function syncWorld() {
   var counts = { trunk: 0, crown: 0, cooled: 0, vatT: 0, vatW: 0, water: 0, tar: 0,
+                 chopBed: 0, chopBlade: 0, chopBlade2: 0,
                  item1: 0, item2: 0, item3: 0, item4: 0 };
+  var spin = bobT * 7.4;
   var bricks = [];
   for (var r = 0; r < ROWS; r++) for (var c = 0; c < COLS; c++) {
     var i = r * COLS + c, what = game.grid[i], g0 = game.height[i] * STEP;
@@ -1977,6 +2229,10 @@ function syncWorld() {
       placeAt(props.vatT, counts.vatT++, c, r, g0 + 0.43);
     } else if (what === MF.VAT_WATER) {
       placeAt(props.vatW, counts.vatW++, c, r, g0 + 0.43);
+    } else if (what === MF.CHOPPER) {
+      placeAt(props.chopBed, counts.chopBed++, c, r, g0 + 0.1);
+      placeAt(props.chopBlade, counts.chopBlade++, c, r, g0 + 0.26, 1, 1, 1, spin);
+      placeAt(props.chopBlade2, counts.chopBlade2++, c, r, g0 + 0.26, 1, 1, 1, spin);
     }
 
     var it = game.item[i];
@@ -2455,11 +2711,26 @@ function frame() {
   var speed = manPos.distanceTo(manWant);
   manRig.userData.walk += dt * (4 + speed * 26);
   if (manRig.userData.legL) {
-    var sw = Math.sin(manRig.userData.walk) * Math.min(0.75, 0.2 + speed * 5);
-    manRig.userData.legL.rotation.x = sw;
-    manRig.userData.legR.rotation.x = -sw;
-    manRig.userData.armL.rotation.x = -sw * 0.7;
-    manRig.userData.armR.rotation.x = sw * 0.7;
+    var u = manRig.userData;
+    var gait = Math.min(0.8, 0.16 + speed * 5.2);
+    var sw = Math.sin(u.walk) * gait;
+    u.legL.rotation.x = sw;
+    u.legR.rotation.x = -sw;
+    /* knees only bend one way, and only on the leg coming through */
+    u.kneeL.rotation.x = Math.max(0, -Math.sin(u.walk - 0.9)) * gait * 1.5;
+    u.kneeR.rotation.x = Math.max(0, -Math.sin(u.walk + 2.24)) * gait * 1.5;
+    u.armL.rotation.x = -sw * 0.55;
+    u.armR.rotation.x = sw * 0.62;
+    u.elbowL.rotation.x = -0.35 - Math.max(0, sw) * 0.5;   /* holding the lamp up */
+    u.elbowR.rotation.x = -0.22 - Math.max(0, -sw) * 0.55;
+    u.head.rotation.x = -0.06 + Math.sin(u.walk * 2) * 0.03 * gait;
+    /* he bobs on his stride */
+    manRig.position.y = manPos.y + Math.abs(Math.sin(u.walk)) * 0.035 * gait;
+    if (u.lampLight) {
+      var fl = 1 + Math.sin(now * 13.7) * 0.13 + Math.sin(now * 31.1) * 0.07;
+      u.lampLight.intensity = 1.45 * fl;
+      u.flame.scale.setScalar(0.9 + fl * 0.18);
+    }
   }
 
   for (var i = 0; i < monsterRigs.length; i++) {

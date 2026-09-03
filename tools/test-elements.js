@@ -33,7 +33,7 @@ function bare(level) {
   g.monsters.length = 0;
   g.bricks = 0;
   g.manC = 10; g.manR = 10;
-  g.steps = 0; g.boots = 0; g.frost = 0; g.axe = 0;
+  g.steps = 0; g.boots = 0; g.frost = 0; g.saw = 0;
   return g;
 }
 const put = (g, c, r, what) => { g.grid[I(c, r)] = what === undefined ? MF.BRICK : what; if (what === undefined) g.bricks++; };
@@ -92,16 +92,16 @@ const marble = (g, c, r) => { g.grid[I(c, r)] = MF.MARBLE; const m = { c, r, dc:
 {
   const g = bare();
   put(g, 11, 10, MF.TREE);
-  g.axe = 3;
+  g.saw = 3;
   const ev = g.step("right");
-  ok("an axe takes the tree out", [ev.chopped, g.grid[I(11, 10)], g.axe], [1, MF.EMPTY, 2]);
+  ok("a saw takes the tree out", [ev.chopped, g.grid[I(11, 10)], g.saw], [1, MF.EMPTY, 2]);
 }
 {
   const g = bare();
-  g.axe = 1;
+  g.saw = 1;
   for (let i = 0; i < 4; i++) put(g, 11 + i, 10, MF.TREE);
   g.step("right"); g.step("right");
-  ok("an axe is good for the swings it has and no more", g.axe, 0);
+  ok("a saw is good for the trees it has and no more", g.saw, 0);
 }
 {
   /* a tree will hold a monster in, in the deep cellars */
@@ -229,9 +229,9 @@ function roll(g, times) {
 }
 {
   const g = bare();
-  g.item[I(11, 10)] = MF.AXE;
+  g.item[I(11, 10)] = MF.SAW;
   g.step("right");
-  ok("an axe arrives with three swings", g.axe, 3);
+  ok("a saw arrives with three trees in it", g.saw, 3);
 }
 {
   /* the unlabelled jar does one of exactly two things */
@@ -265,10 +265,10 @@ function settle(g, turns) {
 {
   const g = bare();
   put(g, 12, 10, MF.VAT_TAR);
-  g.axe = 1;
+  g.saw = 1;
   g.manC = 11; g.manR = 10;
   const ev = g.step("right");
-  ok("an axe will open a vat", [ev.burst, g.sources.length], [MF.TAR, 1]);
+  ok("a saw will open a vat", [ev.burst, g.sources.length], [MF.TAR, 1]);
 }
 {
   /* it runs downhill, not uphill */
@@ -376,6 +376,82 @@ function settle(g, turns) {
     if (g.marbles.length || g.sources.length) found++;
   }
   ok("the classic cellar has nothing in it but bricks", found, 0);
+}
+
+/* ================= what stops a shove ============================= */
+{
+  /* a line of bricks driven into a tree simply stops, and so does he */
+  const g = bare();
+  put(g, 11, 10); put(g, 12, 10);
+  put(g, 13, 10, MF.TREE);
+  const before = g.bricks;
+  g.steps = 3;                            /* a heavy shove needs two */
+  const ev = g.step("right");
+  ok("bricks shoved against a tree stop dead",
+     [ev.blocked, ev.moved, g.manC, g.bricks,
+      g.grid[I(11, 10)], g.grid[I(12, 10)], g.grid[I(13, 10)]],
+     [true, false, 10, before, MF.BRICK, MF.BRICK, MF.TREE]);
+}
+{
+  /* fell the tree with the saw and the same shove goes through */
+  const g = bare();
+  put(g, 11, 10); put(g, 12, 10);
+  put(g, 13, 10, MF.TREE);
+  g.manC = 12; g.manR = 10; g.saw = 1;
+  g.step("right");                        /* the saw takes the tree */
+  ok("and once the tree is down the way is clear",
+     [g.grid[I(13, 10)], g.saw], [MF.EMPTY, 0]);
+  g.manC = 10; g.steps = 3;
+  const ev = g.step("right");
+  ok("so the line moves after all",
+     [ev.blocked, g.grid[I(13, 10)], g.grid[I(11, 10)]], [false, MF.BRICK, MF.EMPTY]);
+}
+{
+  /* the cellar wall holds the line instead of eating it */
+  const g = bare();
+  g.manC = MF.COLS - 3;
+  put(g, MF.COLS - 2, 10); put(g, MF.COLS - 1, 10);
+  const before = g.bricks;
+  g.steps = 3;
+  const ev = g.step("right");
+  ok("a wall stops a shove without taking a brick",
+     [ev.blocked, ev.lostOverEdge, g.bricks, g.manC], [true, 0, before, MF.COLS - 3]);
+}
+{
+  /* but 1985 still loses it over the edge, which is the whole point */
+  const g = new MF.Game({ classic: true });
+  g.sheet(); g.grid.fill(MF.EMPTY); g.bricks = 0;
+  g.manC = MF.COLS - 2; g.manR = 10;
+  g.monsters[0].c = 2; g.monsters[0].r = 2;
+  put(g, MF.COLS - 1, 10);
+  const ev = g.step("right");
+  ok("the 1985 cellar still loses bricks over its edge",
+     [ev.lostOverEdge, g.bricks, g.manC], [1, 0, MF.COLS - 1]);
+}
+{
+  /* the chopper is the one thing left that takes bricks off you */
+  const g = bare();
+  put(g, 11, 10); put(g, 12, 10);
+  put(g, 13, 10, MF.CHOPPER);
+  const before = g.bricks;
+  g.steps = 3;
+  const ev = g.step("right");
+  ok("a chopper mills the brick driven into it",
+     [ev.chopped_brick, g.bricks, g.manC, g.grid[I(13, 10)]],
+     [1, before - 1, 11, MF.CHOPPER]);
+}
+{
+  const g = bare();
+  put(g, 11, 10, MF.CHOPPER);
+  const ev = g.step("right");
+  ok("and he is not going to walk into one", [g.manC, ev.strained], [10, true]);
+}
+{
+  const g = bare();
+  const m = monster(g, "fly", 15, 15);
+  g.leash = 0;
+  put(g, 16, 15, MF.CHOPPER); put(g, 14, 15); put(g, 15, 16); put(g, 15, 14);
+  ok("a chopper holds a monster in like any other fixture", g.step(null).won, true);
 }
 
 /* ================= the descent ==================================== */
