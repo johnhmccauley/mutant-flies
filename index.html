@@ -1577,30 +1577,37 @@ function buildCellar() {
   var apron = new THREE.Mesh(new THREE.PlaneGeometry(COLS + 22, ROWS + 22),
     new THREE.MeshStandardMaterial({ color: 0x100d0a, roughness: 1 }));
   apron.rotation.x = -Math.PI / 2;
-  apron.position.set(COLS / 2, -0.55, ROWS / 2);
+  apron.position.set(COLS / 2, -1.1, ROWS / 2);   /* below the lamp's reach */
   apron.receiveShadow = true;
   scene.add(apron);
 
   var sm = stoneMaps();
   var wallMat = new THREE.MeshStandardMaterial({ map: sm.map, bumpMap: sm.bump, bumpScale: 0.11, roughness: 0.95, metalness: 0.03 });
-  var H = 5.2, T = 2.4, W = COLS, D = ROWS;
-  function wall(w, d, x, z) {
-    var m = new THREE.Mesh(new THREE.BoxGeometry(w, H, d), wallMat);
-    m.position.set(x, H / 2, z);
+  var H = 5.2, T = 2.4, W = COLS, D = ROWS, KERB = 0.5;
+  function wall(w, h, d, x, z) {
+    var m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), wallMat);
+    m.position.set(x, h / 2, z);
     m.receiveShadow = true; m.castShadow = true;
     scene.add(m);
   }
-  wall(W + T * 2, T, W / 2, -T / 2);
-  wall(W + T * 2, T, W / 2, D + T / 2);
-  wall(T, D + T * 2, -T / 2, D / 2);
-  wall(T, D + T * 2, W + T / 2, D / 2);
+  wall(W + T * 2, H, T, W / 2, -T / 2);          /* the far wall           */
+  wall(T, H, D + T * 2, -T / 2, D / 2);          /* west                   */
+  wall(T, H, D + T * 2, W + T / 2, D / 2);       /* east                   */
+  /* and no near wall. The camera looks north from beyond the south edge,
+     so a full-height wall there stands between you and the cellar and you
+     spend the game looking at the back of it. A kerb marks the edge
+     instead - the room is still closed, you can just see into it. */
+  wall(W + T * 2, KERB, T, W / 2, D + T / 2);
 
-  var spots = [[6,-0.4],[17,-0.4],[28,-0.4],[6,ROWS+0.4],[17,ROWS+0.4],[28,ROWS+0.4],
-               [-0.4,7],[-0.4,19],[COLS+0.4,7],[COLS+0.4,19]];
+  /* x, z, and how high off the floor - the three along the near kerb sit
+     low on it as braziers rather than hanging in mid-air */
+  var spots = [[6,-0.4,3.0],[17,-0.4,3.0],[28,-0.4,3.0],
+               [6,ROWS+0.5,0.62],[17,ROWS+0.5,0.62],[28,ROWS+0.5,0.62],
+               [-0.4,7,3.0],[-0.4,19,3.0],[COLS+0.4,7,3.0],[COLS+0.4,19,3.0]];
   var flameMat = new THREE.MeshBasicMaterial({ color: 0xffc06a, transparent: true, opacity: 0.95 });
   for (var i = 0; i < spots.length; i++) {
     var g = new THREE.Group();
-    g.position.set(spots[i][0], 3.0, spots[i][1]);
+    g.position.set(spots[i][0], spots[i][2], spots[i][1]);
     var bracket = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.09, 0.7, 6),
       new THREE.MeshStandardMaterial({ color: 0x2a2018, roughness: 0.7, metalness: 0.5 }));
     bracket.rotation.z = 0.4; g.add(bracket);
@@ -2800,6 +2807,9 @@ function frame() {
     camera.lookAt(TITLE_AIM);
   } else {
     camAim.copy(manPos).add(tmp.set(0, 0.9, 0));
+    /* Clamping this to keep the camera over the cellar was worse: it
+       closes the distance to the man at the near edge and the perspective
+       skews. Let it follow him straight. */
     camPos.set(manPos.x, 16.5, manPos.z + 12.8);
     camera.position.lerp(camPos, 1 - Math.pow(0.002, dt));
     camera.lookAt(camAim);
