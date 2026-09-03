@@ -224,14 +224,14 @@
     /*  6 */ { kinds: ["wasp"], PE: 145, PA: 190, adds: ["wasp", "frost"] },
     /*  7 */ { kinds: ["fly"], PE: 145, PA: 175, adds: ["trees"] },
     /*  8 */ { kinds: ["spider"], PE: 140, PA: 165, adds: ["marbles"] },
-    /*  9 */ { kinds: ["fly", "spider"], PE: 155, PA: 155, adds: ["jar"] },
-    /* 10 */ { kinds: ["beetle"], PE: 140, PA: 145, adds: ["tar"] },
-    /* 11 */ { kinds: ["wasp"], PE: 140, PA: 140, adds: ["water"] },
-    /* 12 */ { kinds: ["fly", "beetle"], PE: 145, PA: 130, adds: [] },
-    /* 13 */ { kinds: ["spider"], PE: 145, PA: 130, adds: ["choppers"] },
-    /* 14 */ { kinds: ["spider", "wasp"], PE: 140, PA: 120, adds: [] },
-    /* 15 */ { kinds: ["fly", "spider", "beetle"], PE: 150, PA: 115, adds: [] },
-    /* 16 */ { kinds: ["fly", "spider", "wasp", "beetle"], PE: 160, PA: 110, adds: [] }
+    /*  9 */ { kinds: ["beetle"], PE: 140, PA: 155, adds: ["jar"] },
+    /* 10 */ { kinds: ["fly", "spider"], PE: 170, PA: 150, adds: ["company", "tar"] },
+    /* 11 */ { kinds: ["wasp", "beetle"], PE: 165, PA: 145, adds: ["water"] },
+    /* 12 */ { kinds: ["fly", "beetle"], PE: 160, PA: 135, adds: [] },
+    /* 13 */ { kinds: ["spider", "wasp"], PE: 160, PA: 130, adds: ["choppers"] },
+    /* 14 */ { kinds: ["fly", "spider", "beetle"], PE: 175, PA: 125, adds: [] },
+    /* 15 */ { kinds: ["wasp", "beetle"], PE: 150, PA: 118, adds: [] },
+    /* 16 */ { kinds: ["fly", "spider", "wasp", "beetle"], PE: 185, PA: 110, adds: [] }
   ];
 
   /* below the plan the cellars keep coming, tightening slowly and never
@@ -269,6 +269,7 @@
     marbles: { name: "Marbles", body: "Heavy, and they keep going. Shove one and it runs until something stops it. Uphill it slows, and if it cannot crest the rise it comes back down at you, gathering speed. Slowly it bounces off things; quickly it smashes bricks; at speed it flattens a monster - or you." },
     jar:     { name: "Sealed jars", body: "Nobody labelled them. Half are frost. The other half have something in them that has been waiting a long time to get out." },
     tar:     { name: "The tar", body: "Sealed in vats, and still hot. Break one - a marble will do it, so will the axe - and it runs downhill burning what it touches: trees, bricks, monsters, you. Eventually it sets, and what it leaves behind is as good as a wall." },
+    company: { name: "You are not alone down here", body: "Every cellar so far had one thing in it. From here down there are two, and later more. A wall is only the bricks holding something in, so the first one you shut away stays shut away only as long as you leave its wall alone - go careless taking bricks for the second and the first walks out behind you." },
     choppers:{ name: "The choppers", body: "Somebody left the machinery running. A chopper is fixed where it stands and nothing will shift it, but anything you shove into it comes out as splinters - so it is the one thing down here that will still take a brick off you. It will hold a monster in as well as a wall would." },
     water:   { name: "The cistern", body: "Water runs further and faster than tar and finds every low corner. It puts fires out, shoves marbles along in front of it, and sweeps you and the monsters off your feet. It burns nothing - but where it takes you is not your choice." }
   };
@@ -476,14 +477,44 @@
        cellar has opened - which hands you the level, or traps you in it -
        so open a way out of whatever got boxed and settle again, because
        freeing a square lets the next brick move. */
-    for (var round = 0; round < 6; round++) {
+    for (var round = 0; round < 8; round++) {
       for (var settleN = 0; settleN < MAX_H * 8; settleN++) if (!this.slideBricks(null)) break;
       var opened = false;
       for (var mi = 0; mi < this.monsters.length; mi++)
-        if (this.isBoxed(this.monsters[mi])) opened = this.freeUp(this.cellsOf(this.monsters[mi])) || opened;
+        if (this.isBoxed(this.monsters[mi])) opened = this.openOut(this.monsters[mi]) || opened;
       if (this.penned(this.manC, this.manR)) opened = this.freeUp([[this.manC, this.manR]]) || opened;
       if (!opened) break;
     }
+
+    /* Belt and braces: a cellar that opens with everything already walled
+       in is a cellar you win by standing still, and one that opens with
+       the man sealed in is one you cannot play at all. */
+    for (var mj = 0; mj < this.monsters.length; mj++) {
+      var mm = this.monsters[mj];
+      for (var tries = 0; tries < 12 && this.isBoxed(mm); tries++) this.openOut(mm);
+      mm.trapped = this.isBoxed(mm);
+    }
+  };
+
+  /* clear whatever is holding this thing in - a brick for choice, but a
+     tree or a marble will do if that is all there is */
+  Game.prototype.openOut = function (m) {
+    if (this.freeUp(this.cellsOf(m))) return true;
+    var D = [[1, 0], [-1, 0], [0, 1], [0, -1]], cs = this.cellsOf(m), pick = [];
+    for (var i = 0; i < cs.length; i++) for (var d = 0; d < 4; d++) {
+      var nc = cs[i][0] + D[d][0], nr = cs[i][1] + D[d][1];
+      if (!this.inField(nc, nr) || this.isPartOf(m, nc, nr)) continue;
+      var v = this.grid[this.idx(nc, nr)];
+      if (v === TREE || v === MARBLE || v === COOLED) pick.push([nc, nr, v]);
+    }
+    if (!pick.length) return false;
+    var p = pick[this.grnd(pick.length)];
+    if (p[2] === MARBLE) {
+      for (var k = 0; k < this.marbles.length; k++)
+        if (this.marbles[k].c === p[0] && this.marbles[k].r === p[1]) { this.marbles.splice(k, 1); break; }
+    }
+    this.grid[this.idx(p[0], p[1])] = EMPTY;
+    return true;
   };
 
   /* somewhere clear to put somebody - level ground for choice, and not
@@ -509,9 +540,18 @@
               tick: 0, trapped: false, crushed: false, gone: false, ate: false };
     /* The 1985 fly is one square: VDU 226 and 227 are two characters
        drawn at the SAME graphics position in two colours, not two cells.
-       It only lies across two squares in the deep cellars. */
+       It only lies across two squares in the deep cellars.
+
+       The tail needs a square it actually fits on. Dropping it blindly
+       behind the head buried it in whatever was already there. */
     if (!this.classic && MONSTERS[kind].size === 2) {
-      m.tc = Math.max(1, c - 1); m.tr = r;
+      var D = [[-1, 0], [1, 0], [0, -1], [0, 1]];
+      for (var d = 0; d < 4; d++) {
+        var tc = c + D[d][0], tr = r + D[d][1];
+        if (this.inField(tc, tr) && this.grid[this.idx(tc, tr)] === EMPTY &&
+            !this.monsterAt(tc, tr)) { m.tc = tc; m.tr = tr; break; }
+      }
+      /* nowhere at all to lie: it is one square today */
     }
     return m;
   };
@@ -597,14 +637,14 @@
     if (f.trees) scatter(6 + self.grnd(7), function (c, r) { self.grid[self.idx(c, r)] = TREE; });
     /* how many marbles is part of the cellar; where they have rolled to
        is not */
-    this.marbleCount = f.marbles ? (1 + this.grnd(3)) : 0;
-    if (f.boots) scatter(1, function (c, r) { self.item[self.idx(c, r)] = BOOTS; });
-    if (f.frost) scatter(1, function (c, r) { self.item[self.idx(c, r)] = FROST; });
-    if (f.saw) scatter(1 + self.grnd(2), function (c, r) { self.item[self.idx(c, r)] = SAW; });
-    if (f.jar) scatter(1 + self.grnd(2), function (c, r) { self.item[self.idx(c, r)] = JAR; });
+    this.marbleCount = f.marbles ? (2 + this.grnd(4)) : 0;
+    if (f.boots) scatter(2, function (c, r) { self.item[self.idx(c, r)] = BOOTS; });
+    if (f.frost) scatter(2, function (c, r) { self.item[self.idx(c, r)] = FROST; });
+    if (f.saw) scatter(2 + self.grnd(2), function (c, r) { self.item[self.idx(c, r)] = SAW; });
+    if (f.jar) scatter(2 + self.grnd(3), function (c, r) { self.item[self.idx(c, r)] = JAR; });
     if (f.choppers) scatter(2 + self.grnd(3), function (c, r) { self.grid[self.idx(c, r)] = CHOPPER; });
-    if (f.tar) scatter(1 + self.grnd(2), function (c, r) { self.grid[self.idx(c, r)] = VAT_TAR; });
-    if (f.water) scatter(1 + self.grnd(2), function (c, r) { self.grid[self.idx(c, r)] = VAT_WATER; });
+    if (f.tar) scatter(2 + self.grnd(2), function (c, r) { self.grid[self.idx(c, r)] = VAT_TAR; });
+    if (f.water) scatter(2 + self.grnd(2), function (c, r) { self.grid[self.idx(c, r)] = VAT_WATER; });
   };
 
   /* --- bricks run downhill -------------------------------------------
@@ -771,7 +811,7 @@
                lostTo: null, bonus: 0, stuck: false, spawned: null,
                burst: 0, burned: 0, doused: 0, swept: 0, set: 0,
                blocked: false, chopped_brick: 0, squashed: [], slid: 0,
-               treesDown: 0 };
+               treesDown: 0, freed: [] };
     if (this.over || this.won) return ev;
 
     /* --- step points ------------------------------------------------
@@ -1214,10 +1254,20 @@
     ev.doused++;
   };
 
+  /* Being walled in is a state it is in, not something done to it once.
+     A wall is only the few bricks that happen to be preventing it
+     leaving, and anything that takes one away - a shove, a marble, the
+     tar, a beetle's supper, or a brick sliding off downhill - lets it
+     straight back out. Which is why you keep the first one walled while
+     you go and deal with the second. */
   Game.prototype.settle = function (ev) {
     for (var i = 0; i < this.monsters.length; i++) {
       var m = this.monsters[i];
-      if (!m.trapped && !m.gone && this.isBoxed(m)) { m.trapped = true; ev.trappedNow.push(m); }
+      if (m.gone) continue;
+      var was = m.trapped;
+      m.trapped = this.isBoxed(m);
+      if (!was && m.trapped) ev.trappedNow.push(m);
+      else if (was && !m.trapped) ev.freed.push(m);
     }
   };
 

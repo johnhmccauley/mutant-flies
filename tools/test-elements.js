@@ -779,10 +779,13 @@ function placeOf(g) {
 }
 {
   /* how many monsters is part of the cellar, and it grows as you go down */
-  ok("one monster in the early cellars, more further down",
-     [MF.levelOf(1).kinds.length, MF.levelOf(6).kinds.length,
-      MF.levelOf(9).kinds.length, MF.levelOf(16).kinds.length],
+  ok("one monster until cellar ten, and more after it",
+     [MF.levelOf(1).kinds.length, MF.levelOf(9).kinds.length,
+      MF.levelOf(10).kinds.length, MF.levelOf(16).kinds.length],
      [1, 1, 2, 4]);
+  let singles = 0;
+  for (let F = 1; F <= 9; F++) if (MF.levelOf(F).kinds.length === 1) singles++;
+  ok("every cellar before ten has exactly one thing in it", singles, 9);
   const a = new MF.Game({ seed: 5 }); a.reset(14);
   const b = new MF.Game({ seed: 999 }); b.reset(14);
   ok("and it does not vary between runs", a.monsters.length, b.monsters.length);
@@ -797,6 +800,75 @@ function placeOf(g) {
   const first = at(a);
   for (let i = 0; i < 8; i++) { a.F = 12; a.sheet(); if (at(a) !== first) moved++; }
   ok("but they are not in the same places", moved > 0, true);
+}
+
+/* ================= a wall is only a wall while it stands ========== */
+{
+  /* box a spider, then take one brick out of the wall */
+  const g = bare();
+  const m = monster(g, "spider", 15, 15);
+  g.leash = 0; g.manC = 2; g.manR = 2;
+  put(g, 16, 15); put(g, 14, 15); put(g, 15, 16); put(g, 15, 14);
+  let ev = g.step(null);
+  ok("walled in", [m.trapped, ev.trappedNow.length, ev.won], [true, 1, true]);
+
+  g.won = false;                       /* keep playing, to see it get out */
+  g.grid[I(16, 15)] = MF.EMPTY; g.bricks--;
+  ev = g.step(null);
+  ok("take a brick out of the wall and it is loose again",
+     [m.trapped, ev.freed.length], [false, 1]);
+}
+{
+  /* and it starts moving the moment it is */
+  const g = bare();
+  const m = monster(g, "spider", 15, 15);
+  g.leash = 0; g.manC = 2; g.manR = 2;
+  put(g, 16, 15); put(g, 14, 15); put(g, 15, 16); put(g, 15, 14);
+  g.step(null); g.won = false;
+  const held = [m.c, m.r];
+  for (let i = 0; i < 5; i++) { g.step(null); g.won = false; }
+  ok("a walled-in monster stays put", [m.c, m.r], held);
+  g.grid[I(14, 15)] = MF.EMPTY;
+  for (let i = 0; i < 6; i++) { g.step(null); g.won = false; }
+  ok("and moves again once the wall is broken", m.c !== held[0] || m.r !== held[1], true);
+}
+{
+  /* two monsters: the cellar is only cleared while both are held at once */
+  const g = bare();
+  g.height.fill(0);
+  const a = monster(g, "spider", 10, 15);
+  const b = monster(g, "spider", 25, 8);
+  g.leash = 0; g.manC = 2; g.manR = 2;
+  const box = (m) => { put(g, m.c + 1, m.r); put(g, m.c - 1, m.r); put(g, m.c, m.r + 1); put(g, m.c, m.r - 1); };
+  box(a);
+  let ev = g.step(null);
+  ok("one held is not enough", [ev.won, a.trapped, b.trapped], [false, true, false]);
+  /* break the first wall in the same breath as building the second */
+  g.grid[I(11, 15)] = MF.EMPTY;
+  box(b);
+  ev = g.step(null);
+  ok("letting the first go while walling the second clears nothing",
+     [ev.won, a.trapped, b.trapped, ev.freed.length], [false, false, true, 1]);
+  put(g, 11, 15);
+  ev = g.step(null);
+  ok("both at once clears the cellar", ev.won, true);
+}
+{
+  /* nothing is ever laid down walled in, or lying on top of something */
+  const g = new MF.Game({ seed: 8 });
+  let boxed = 0, buried = 0, tailless = 0;
+  for (let F = 1; F <= 20; F++) {
+    g.F = F; g.sheet();
+    for (const m of g.monsters) {
+      if (g.isBoxed(m)) boxed++;
+      const cs = g.cellsOf(m);
+      if (m.spec.size === 2 && cs.length === 1) tailless++;
+      for (const [c, r] of cs) if (g.grid[I(c, r)] !== MF.EMPTY) buried++;
+    }
+  }
+  ok("no monster starts walled in", boxed, 0);
+  ok("and none starts buried in the scenery", buried, 0);
+  ok("and the fly always has room to lie down", tailless, 0);
 }
 
 /* ================= the descent ==================================== */
