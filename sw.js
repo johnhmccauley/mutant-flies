@@ -50,7 +50,11 @@ self.addEventListener("install", (e) => {
       try { await cache.add(new Request(url, { cache: "reload" })); }
       catch (err) { /* that one is not available; the rest still are */ }
     }));
-    self.skipWaiting();
+    /* Deliberately NOT skipWaiting(). A new build must not take over a
+       page that is in the middle of a cellar - swapping the scripts out
+       from under a running game is how you lose somebody's descent to a
+       deploy. The new worker installs, waits, and takes over the next
+       time the game is opened. */
   })());
 });
 
@@ -58,6 +62,9 @@ self.addEventListener("activate", (e) => {
   e.waitUntil((async () => {
     const keys = await caches.keys();
     await Promise.all(keys.map((k) => (k !== CACHE && k.startsWith("mutant-fly-")) ? caches.delete(k) : null));
+    /* claim() is safe here and is what makes the very first visit
+       controlled without a reload - by the time this runs there is no
+       older version left to interrupt */
     await self.clients.claim();
   })());
 });
