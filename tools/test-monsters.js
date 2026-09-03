@@ -26,6 +26,7 @@ function withMonster(kind, level) {
   const g = new MF.Game();
   g.F = level || 6; g.sheet();
   g.grid.fill(MF.EMPTY); g.bricks = 0;
+  g.height.fill(0);        /* level ground: bricks placed by hand stay put */
   g.manC = 10; g.manR = 10;
   g.monsters = [{ kind: kind, spec: MF.MONSTERS[kind], c: 20, r: 10,
                   tick: 0, trapped: false, ate: false }];
@@ -109,6 +110,7 @@ function withMonster(kind, level) {
   const g = new MF.Game();
   g.F = 7; g.sheet();
   g.grid.fill(MF.EMPTY); g.bricks = 0;
+  g.height.fill(0);        /* level ground: bricks placed by hand stay put */
   g.manC = 2; g.manR = 2;
   g.monsters = [
     { kind: "fly", spec: MF.MONSTERS.fly, c: 15, r: 15, tick: 0, trapped: false },

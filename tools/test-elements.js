@@ -544,6 +544,261 @@ function settle(g, turns) {
   ok("a chopper holds a monster in like any other fixture", g.step(null).won, true);
 }
 
+/* ================= the ground, and what rolls down it ============= */
+{
+  /* every rise is a slope you can walk, never a cliff */
+  let steepest = 0;
+  const g = new MF.Game();
+  for (let F = 4; F <= 24; F++) {
+    g.F = F; g.sheet();
+    for (let r = 0; r < MF.ROWS; r++) for (let c = 0; c < MF.COLS; c++) {
+      const h = g.height[I(c, r)];
+      for (const [dc, dr] of [[1, 0], [0, 1]]) {
+        const nc = c + dc, nr = r + dr;
+        if (nc >= MF.COLS || nr >= MF.ROWS) continue;
+        steepest = Math.max(steepest, Math.abs(h - g.height[I(nc, nr)]));
+      }
+    }
+  }
+  ok("the floor never steps more than one at a time", steepest, 1);
+}
+{
+  /* and there is actually some ground to slope */
+  const g = new MF.Game();
+  let raised = 0, total = 0;
+  for (let F = 4; F <= 20; F++) {
+    g.F = F; g.sheet();
+    for (let i = 0; i < g.height.length; i++) { total++; if (g.height[i] > 0) raised++; }
+  }
+  ok("a good part of the cellar is not level", raised / total > 0.25, true);
+}
+{
+  /* nothing is left mid-slide when the cellar opens */
+  const g = new MF.Game();
+  let restless = 0;
+  for (let F = 4; F <= 24; F++) { g.F = F; g.sheet(); if (g.slideBricks(null)) restless++; }
+  ok("bricks have found their level before play starts", restless, 0);
+}
+{
+  /* A hillside, uniform north to south, so the only way down is west.
+     Raising single squares instead just lets a brick slide off sideways,
+     which is correct and tests nothing. */
+  const hill = (g, edge) => {
+    for (let c = 0; c < MF.COLS; c++) for (let r = 0; r < MF.ROWS; r++)
+      g.height[I(c, r)] = c >= edge ? 1 : 0;
+  };
+  const g = bare();
+  hill(g, 12);
+  put(g, 12, 10);
+  g.manC = 11; g.manR = 10; g.steps = 3;
+  g.step("right");                      /* shove it further up the hill */
+  ok("a brick can be shoved uphill", [g.grid[I(13, 10)], g.manC], [MF.BRICK, 12]);
+  g.step("up");                         /* and step off the square below it */
+  ok("but it follows him back down the moment he leaves",
+     [g.grid[I(13, 10)], g.grid[I(12, 10)]], [MF.BRICK, MF.EMPTY]);
+}
+{
+  /* downhill it keeps going, which is why downhill is the easy way */
+  /* a continuous fall, not a terrace - a brick only rolls to strictly
+     lower ground, so on a flat step it correctly stops dead */
+  const g = bare();
+  for (let c = 0; c < MF.COLS; c++) for (let r = 0; r < MF.ROWS; r++)
+    g.height[I(c, r)] = Math.max(0, 3 - Math.max(0, c - 11));
+  put(g, 12, 10);
+  g.manC = 11; g.manR = 10; g.steps = 3;
+  g.step("right");
+  let resting = -1;
+  for (let c = 12; c < MF.COLS; c++) if (g.grid[I(c, 10)] === MF.BRICK) resting = c;
+  ok("shoved downhill it runs on past where you pushed it", resting > 13, true);
+  ok("and comes to rest on the level ground below", g.height[I(resting, 10)], 0);
+}
+{
+  /* it will not roll onto anybody */
+  const g = bare();
+  for (let c = 0; c < MF.COLS; c++) for (let r = 0; r < MF.ROWS; r++)
+    g.height[I(c, r)] = c <= 11 ? 1 : 0;
+  put(g, 11, 10);
+  const m = monster(g, "spider", 12, 10);
+  g.slideBricks(null);
+  ok("a brick will not roll onto a monster",
+     [g.grid[I(11, 10)], g.grid[I(12, 10)]], [MF.BRICK, MF.EMPTY]);
+  g.monsters.length = 0;
+  g.manC = 12; g.manR = 10;
+  g.slideBricks(null);
+  ok("nor onto the man", g.grid[I(11, 10)], MF.BRICK);
+  g.manC = 2; g.manR = 2;
+  g.slideBricks(null);
+  ok("but it goes the moment the way is clear", g.grid[I(12, 10)], MF.BRICK);
+}
+{
+  /* and none of it happens in 1985 */
+  const g = new MF.Game({ classic: true });
+  g.sheet();
+  ok("the classic cellar has no slopes and nothing slides",
+     [g.slideBricks(null), Math.max.apply(null, Array.from(g.height))], [0, 0]);
+}
+
+/* ================= leaning on a tree ============================== */
+/* A bowl with the tree at the bottom of it, so every square around the
+   tree is uphill of it and a brick on any of them leans in. An east-west
+   slope only ever gives you one square that presses. */
+function bowl(g, cx, cy) {
+  for (let c = 0; c < MF.COLS; c++) for (let r = 0; r < MF.ROWS; r++)
+    g.height[I(c, r)] = Math.min(6, Math.abs(c - cx) + Math.abs(r - cy));
+}
+{
+  const g = bare();
+  bowl(g, 15, 10);
+  put(g, 15, 10, MF.TREE);
+  put(g, 14, 10);                       /* one brick leaning on it */
+  let turns = 0;
+  while (g.grid[I(15, 10)] === MF.TREE && turns < 60) { g.slideBricks(null); turns++; }
+  ok("one brick leaning on a tree never brings it down",
+     [turns, g.grid[I(15, 10)]], [60, MF.TREE]);
+}
+{
+  const g = bare();
+  bowl(g, 15, 10);
+  put(g, 15, 10, MF.TREE);
+  put(g, 14, 10); put(g, 16, 10);
+  let two = 0;
+  while (g.grid[I(15, 10)] === MF.TREE && two < 90) { g.slideBricks(null); two++; }
+  ok("two will have it over, given time", g.grid[I(15, 10)], MF.EMPTY);
+  ok("but it does take time", two > 4, true);
+
+  const h = bare();
+  bowl(h, 15, 10);
+  put(h, 15, 10, MF.TREE);
+  put(h, 14, 10); put(h, 16, 10); put(h, 15, 9); put(h, 15, 11);
+  let many = 0;
+  while (h.grid[I(15, 10)] === MF.TREE && many < 90) { h.slideBricks(null); many++; }
+  ok("the more that pile up the quicker it goes", many < two, true);
+}
+{
+  /* and once it is gone, what it was holding carries on down */
+  const g = bare();
+  bowl(g, 15, 10);
+  put(g, 15, 10, MF.TREE);
+  put(g, 14, 10); put(g, 16, 10);
+  let fell = 0;
+  while (g.grid[I(15, 10)] === MF.TREE && fell < 120) { g.slideBricks(null); fell++; }
+  ok("bricks leaning on a tree on a slope bring it down", g.grid[I(15, 10)], MF.EMPTY);
+  for (let i = 0; i < 60; i++) g.slideBricks(null);
+  ok("and one of them carries on down into where it stood",
+     g.grid[I(15, 10)], MF.BRICK);
+}
+{
+  /* a tree on the flat is under no pressure at all */
+  const g = bare();
+  put(g, 10, 10, MF.TREE);
+  put(g, 9, 10); put(g, 10, 9); put(g, 11, 10); put(g, 10, 11);
+  for (let i = 0; i < 90; i++) g.slideBricks(null);
+  ok("bricks resting beside a tree on level ground never shift it",
+     g.grid[I(10, 10)], MF.TREE);
+}
+
+/* ================= friction ======================================= */
+{
+  ok("friction depends on the surface",
+     [MF.frictionOn(MF.EMPTY, MF.DRY) < MF.frictionOn(MF.EMPTY, MF.WATER),
+      MF.frictionOn(MF.EMPTY, MF.WATER) < MF.frictionOn(MF.EMPTY, MF.TAR),
+      MF.frictionOn(MF.EMPTY, MF.DRY) < MF.frictionOn(MF.COOLED, MF.DRY)],
+     [true, true, true]);
+}
+{
+  /* the same shove carries a marble further over stone than through
+     water, and tar stops it. The man goes elsewhere: left in the way he
+     is what the marble hits, and every surface scores the same. */
+  const runFor = (fluidKind) => {
+    const g = bare();
+    g.manC = 2; g.manR = 22;
+    const m = marble(g, 5, 10);
+    if (fluidKind) for (let c = 0; c < MF.COLS; c++) {
+      g.fluid[I(c, 10)] = fluidKind; g.fvol[I(c, 10)] = 1;
+    }
+    m.dc = 1; m.dr = 0; m.v = 3;
+    const ev = { rolled: [], smashed: 0, crushed: [], lost: false, burst: 0 };
+    let turns = 0;
+    while (m.v > 0 && turns < 40) { g.rollMarbles(ev); turns++; }
+    return m.c - 5;
+  };
+  const dry = runFor(0), wet = runFor(MF.WATER), sticky = runFor(MF.TAR);
+  ok("a marble runs furthest over dry stone", [dry > wet, wet > sticky], [true, true]);
+  ok("and tar all but stops it", sticky <= 3, true);
+}
+{
+  /* a brick will not slide out of tar */
+  const g = bare();
+  for (let c = 0; c < MF.COLS; c++) for (let r = 0; r < MF.ROWS; r++)
+    g.height[I(c, r)] = Math.max(0, Math.min(6, 20 - c));
+  put(g, 8, 10);
+  g.fluid[I(8, 10)] = MF.TAR; g.fvol[I(8, 10)] = 3;
+  for (let i = 0; i < 20; i++) g.slideBricks(null);
+  ok("tar holds a brick where it stands", g.grid[I(8, 10)], MF.BRICK);
+}
+
+/* ================= a cellar is the same cellar ==================== */
+/* The place is seeded; the state of play is not. So compare the land and
+   its fixtures, and separately check that the movable parts really do
+   move. */
+function placeOf(g) {
+  const fixed = [];
+  for (let i = 0; i < g.grid.length; i++) {
+    const v = g.grid[i];
+    fixed.push((v === MF.TREE || v === MF.VAT_TAR || v === MF.VAT_WATER || v === MF.CHOPPER) ? v : 0);
+  }
+  return Array.from(g.height).join("") + "|" + fixed.join("") +
+         "|" + Array.from(g.item).join("") + "|" + g.marbleCount;
+}
+{
+  const a = new MF.Game({ seed: 4242 }); a.reset(9);
+  const b = new MF.Game({ seed: 4242 }); b.reset(9);
+  ok("the same run lays out the same place", placeOf(a), placeOf(b));
+
+  const was = placeOf(a);
+  a.F = 12; a.sheet();
+  a.F = 9; a.sheet();
+  ok("and it is still that place when you come back to it", placeOf(a), was);
+
+  const c = new MF.Game({ seed: 77 }); c.reset(9);
+  ok("a different run is a different place", placeOf(c) !== was, true);
+
+  a.regenerate();
+  ok("regenerating is the one thing that changes it", placeOf(a) !== was, true);
+}
+{
+  /* but the bricks, the way in, and the monsters are dealt fresh */
+  const state = (g) => Array.from(g.grid).join("") + "|" + g.manC + "," + g.manR +
+                       "|" + g.monsters.map((m) => m.c + "," + m.r).join(";");
+  const g = new MF.Game({ seed: 4242 });
+  g.reset(9);
+  const first = state(g);
+  let differed = 0;
+  for (let i = 0; i < 8; i++) { g.F = 9; g.sheet(); if (state(g) !== first) differed++; }
+  ok("the bricks, the way in and the monsters are dealt again", differed, 8);
+}
+{
+  /* how many monsters is part of the cellar, and it grows as you go down */
+  ok("one monster in the early cellars, more further down",
+     [MF.levelOf(1).kinds.length, MF.levelOf(6).kinds.length,
+      MF.levelOf(9).kinds.length, MF.levelOf(16).kinds.length],
+     [1, 1, 2, 4]);
+  const a = new MF.Game({ seed: 5 }); a.reset(14);
+  const b = new MF.Game({ seed: 999 }); b.reset(14);
+  ok("and it does not vary between runs", a.monsters.length, b.monsters.length);
+}
+{
+  /* how many marbles is part of the cellar; where they are is not */
+  const a = new MF.Game({ seed: 31 }); a.reset(12);
+  const b = new MF.Game({ seed: 31 }); b.reset(12);
+  ok("the same cellar has the same number of marbles", a.marbleCount, b.marbleCount);
+  const at = (g) => g.marbles.map((m) => m.c + "," + m.r).join(";");
+  let moved = 0;
+  const first = at(a);
+  for (let i = 0; i < 8; i++) { a.F = 12; a.sheet(); if (at(a) !== first) moved++; }
+  ok("but they are not in the same places", moved > 0, true);
+}
+
 /* ================= the descent ==================================== */
 {
   const at = { slopes: 4, boots: 5, frost: 6, trees: 7, marbles: 8, jar: 9, tar: 10, water: 11 };

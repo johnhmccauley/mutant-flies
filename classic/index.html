@@ -169,10 +169,42 @@
   var MAN_C0 = 16, MAN_R0 = 14, MON_C0 = 15, MON_R0 = 12;
 
   var MAX_H = 3;                      /* how high the floor ever gets */
+  var TREE_STRENGTH = 10;             /* how much leaning a tree will take */
+
+  /* Friction, by what the thing is rolling over. Gravity is the slope;
+     this is what decides whether it keeps going. */
+  function frictionOn(what, fluid) {
+    if (fluid === TAR) return 1.10;         /* a square of it and it is done */
+    if (fluid === WATER) return 0.42;       /* wading, and it drags          */
+    if (what === COOLED) return 0.30;       /* set tar is rough              */
+    return 0.16;                            /* bare stone                    */
+  }
   var BOOTS_TURNS = 70, FROST_TURNS = 50, SAW_USES = 3;
 
   function sign(n) { return n < 0 ? -1 : n > 0 ? 1 : 0; }
+
+  /* Live randomness - what a monster does this turn. Never used to lay a
+     cellar out, or the same cellar would come out different every time
+     you walked back into it. */
   function rnd(n) { return (Math.random() * n) | 0; }
+
+  /* Laying a cellar out uses this instead: mulberry32, seeded from the
+     run and the level, so cellar 7 of a given run is always the same
+     cellar. Come back to a saved game and it is where you left it. */
+  function mulberry32(a) {
+    return function () {
+      a |= 0; a = (a + 0x6D2B79F5) | 0;
+      var t = Math.imul(a ^ (a >>> 15), 1 | a);
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+  function mix(a, b, c) {
+    var h = Math.imul(a ^ 0x9E3779B9, 0x85EBCA6B);
+    h = Math.imul(h ^ b, 0xC2B2AE35);
+    h = Math.imul(h ^ c, 0x27D4EB2F);
+    return (h ^ (h >>> 15)) | 0;
+  }
 
   /* ==================================================================
      THE MONSTERS
@@ -340,7 +372,7 @@
     slopes:  { name: "The floor is not level", body: "Climbing costs you. Going up a step takes an extra turn, shoving a line of bricks uphill takes another again, and walking downhill gives you a free step back. Read the ground before you commit to a push." },
     boots:   { name: "Boots", body: "Two squares a turn for the next seventy turns. Nothing else speeds up. It is the only time you are genuinely faster than they are." },
     frost:   { name: "Frost jars", body: "Everything loose in the cellar stops for fifty turns. Time enough to build a wall around something that would never otherwise hold still." },
-    trees:   { name: "Trees, and the axe", body: "Trees do not shove. Nothing moves them but an axe, and an axe is good for three swings. They hold a monster in as well as a brick does - so a tree in the right place is four bricks you did not have to push." },
+    trees:   { name: "Trees, and the saw", body: "Trees do not shove, and a line of bricks driven into one stops dead. Nothing moves them but a saw, and a saw is good for three. They hold a monster in as well as a brick does - so a tree in the right place is four bricks you did not have to push." },
     marbles: { name: "Marbles", body: "Heavy, and they keep going. Shove one and it runs until something stops it. Uphill it slows, and if it cannot crest the rise it comes back down at you, gathering speed. Slowly it bounces off things; quickly it smashes bricks; at speed it flattens a monster - or you." },
     jar:     { name: "Sealed jars", body: "Nobody labelled them. Half are frost. The other half have something in them that has been waiting a long time to get out." },
     tar:     { name: "The tar", body: "Sealed in vats, and still hot. Break one - a marble will do it, so will the axe - and it runs downhill burning what it touches: trees, bricks, monsters, you. Eventually it sets, and what it leaves behind is as good as a wall." },
@@ -392,12 +424,15 @@
   function Game(opts) {
     this.classic = !!(opts && opts.classic);
     this.HI = 0;
+    this.seed = (opts && opts.seed) || ((Math.random() * 0x7FFFFFFF) | 0);
+    this.variant = {};          /* bumped by regenerate(), per level */
     this.grid = new Uint8Array(COLS * ROWS);
     this.height = new Uint8Array(COLS * ROWS);
     this.item = new Uint8Array(COLS * ROWS);
     this.fluid = new Uint8Array(COLS * ROWS);
     this.fvol = new Uint8Array(COLS * ROWS);
     this.burn = new Uint8Array(COLS * ROWS);
+    this.stress = new Uint8Array(COLS * ROWS);   /* how hard a tree is leaning */
     this.monsters = [];
     this.marbles = [];
     this.sources = [];
@@ -449,6 +484,14 @@
     return this.at(c, r) === EMPTY && !this.monsterAt(c, r, except);
   };
 
+  /* the same cellar, laid out afresh - the only way a level changes */
+  Game.prototype.regenerate = function () {
+    this.variant[this.F] = (this.variant[this.F] || 0) + 1;
+    this.won = false; this.over = false;
+    this.sheet();
+  };
+  Game.prototype.grnd = function (n) { return (this.rng() * n) | 0; };
+
   Game.prototype.reset = function (startLevel) {
     this.F = startLevel || 1;
     this.SC = 0;
@@ -460,8 +503,20 @@
 
   /* --- laying out a cellar: PROCnext_sheet (860) and
          PROCprint_bricks (810), plus everything that came later ------ */
+  /* --- what a cellar is, and what it is not ---------------------------
+     The place is fixed: the lie of the land, the trees, the vats of tar
+     and water, the choppers, what is lying about to pick up, and how
+     many marbles there are. Walk out and back in and it is the same
+     cellar.
+
+     What is dealt fresh every attempt is the state of play: where the
+     bricks have fallen, where you come in, where the monsters are, and
+     where the marbles have rolled to. So a cellar is a place you can
+     learn, and still a different problem each time you go down.
+     -------------------------------------------------------------------- */
   Game.prototype.sheet = function () {
     if (this.SC > this.HI) this.HI = this.SC;       /* line 1030 */
+    this.rng = mulberry32(mix(this.seed, this.F, this.variant[this.F] || 0));
     var lv = levelOf(this.F, this.classic);
     this.PE = lv.PE;
     this.PA = lv.PA;
@@ -473,6 +528,7 @@
     this.fluid.fill(DRY);
     this.fvol.fill(0);
     this.burn.fill(0);
+    this.stress.fill(0);
     this.marbles.length = 0;
     this.sources.length = 0;
 
@@ -482,26 +538,37 @@
     this.frost = 0;
     this.saw = 0;
 
-    this.manC = MAN_C0; this.manR = MAN_R0;
-
-    this.monsters = [];
-    var spots = [[MON_C0, MON_R0], [MON_C0 + 9, MON_R0 + 7],
-                 [MON_C0 - 9, MON_R0 + 6], [MON_C0 + 8, MON_R0 - 8]];
-    for (var i = 0; i < lv.kinds.length; i++) {
-      var s = spots[i % spots.length];
-      this.monsters.push(this.newMonster(lv.kinds[i],
-        Math.max(1, Math.min(COLS - 2, s[0])), Math.max(1, Math.min(ROWS - 2, s[1]))));
-    }
-
     this.makeHeights();
+    this.makeFurniture();
+
+    /* now the movable parts, dealt fresh */
+    this.monsters = [];
+    if (this.classic) {
+      this.manC = MAN_C0; this.manR = MAN_R0;       /* line 130 */
+      this.monsters.push(this.newMonster(lv.kinds[0], MON_C0, MON_R0));
+    } else {
+      var start = this.openSpot(null, 0);
+      this.manC = start[0]; this.manR = start[1];
+      for (var i = 0; i < lv.kinds.length; i++) {
+        var at = this.openSpot([[this.manC, this.manR]], 7);
+        this.monsters.push(this.newMonster(lv.kinds[i], at[0], at[1]));
+      }
+      /* and the marbles, however many this cellar has, wherever they
+         have ended up this time */
+      for (var mb = 0; mb < this.marbleCount; mb++) {
+        var ms = this.openSpot([[this.manC, this.manR]], 3);
+        this.grid[this.idx(ms[0], ms[1])] = MARBLE;
+        this.marbles.push({ c: ms[0], r: ms[1], dc: 0, dr: 0, v: 0 });
+      }
+    }
 
     /* line 820-840: PE% bricks dropped on squares that are not already
        bricks. Squares beside a monster are left clear so nothing starts
        walled in by luck. */
     var placed = 0, guard = 0;
     while (placed < this.PE && guard++ < 400000) {
-      var c = BRICK_C0 + rnd(BRICK_C1 - BRICK_C0 + 1);
-      var r = BRICK_R0 + rnd(BRICK_R1 - BRICK_R0 + 1);
+      var c = BRICK_C0 + this.grnd(BRICK_C1 - BRICK_C0 + 1);
+      var r = BRICK_R0 + this.grnd(BRICK_R1 - BRICK_R0 + 1);
       if (this.grid[this.idx(c, r)] !== EMPTY) continue;
       if (c === this.manC && r === this.manR) continue;
       if (this.nearMonster(c, r)) continue;
@@ -510,7 +577,38 @@
     }
     this.bricks = placed;
 
-    this.makeFurniture();
+    /* Let them find their level before anybody looks, or the first turns
+       are spent watching the cellar tidy itself up. Settling can also
+       pile bricks into the low ground and wall something in before the
+       cellar has opened - which hands you the level, or traps you in it -
+       so open a way out of whatever got boxed and settle again, because
+       freeing a square lets the next brick move. */
+    for (var round = 0; round < 6; round++) {
+      for (var settleN = 0; settleN < MAX_H * 8; settleN++) if (!this.slideBricks(null)) break;
+      var opened = false;
+      for (var mi = 0; mi < this.monsters.length; mi++)
+        if (this.isBoxed(this.monsters[mi])) opened = this.freeUp(this.cellsOf(this.monsters[mi])) || opened;
+      if (this.penned(this.manC, this.manR)) opened = this.freeUp([[this.manC, this.manR]]) || opened;
+      if (!opened) break;
+    }
+  };
+
+  /* somewhere clear to put somebody - level ground for choice, and not
+     on top of anything already there */
+  Game.prototype.openSpot = function (away, minDist) {
+    var best = null, bestScore = -1;
+    for (var t = 0; t < 500; t++) {
+      var c = 2 + rnd(COLS - 4), r = 2 + rnd(ROWS - 4);
+      if (this.grid[this.idx(c, r)] !== EMPTY) continue;
+      if (this.monsterAt(c, r)) continue;
+      var ok = true;
+      for (var i = 0; away && i < away.length; i++)
+        if (Math.abs(away[i][0] - c) + Math.abs(away[i][1] - r) < (minDist || 0)) ok = false;
+      if (!ok) continue;
+      var score = 10 - this.height[this.idx(c, r)] * 3 + rnd(3);
+      if (score > bestScore) { bestScore = score; best = [c, r]; if (score >= 12) break; }
+    }
+    return best || [MAN_C0, MAN_R0];
   };
 
   Game.prototype.newMonster = function (kind, c, r) {
@@ -540,10 +638,13 @@
   Game.prototype.makeHeights = function () {
     this.height.fill(0);
     if (this.classic || !this.feat.slopes) return;
-    var mounds = 2 + rnd(3);
+    /* Wide and low. A tall narrow mound is all cliff, and smoothing then
+       grinds it - and everything round it - back to nothing, which is how
+       the whole floor ended up flat. */
+    var mounds = 3 + this.grnd(4);
     for (var k = 0; k < mounds; k++) {
-      var cx = 4 + rnd(COLS - 8), cy = 3 + rnd(ROWS - 6);
-      var rad = 4 + rnd(5), amp = 1 + rnd(MAX_H);
+      var cx = 4 + this.grnd(COLS - 8), cy = 3 + this.grnd(ROWS - 6);
+      var amp = 1 + this.grnd(MAX_H), rad = 3 + amp * 3 + this.grnd(6);
       for (var r = 0; r < ROWS; r++) for (var c = 0; c < COLS; c++) {
         var d = Math.sqrt((c - cx) * (c - cx) + (r - cy) * (r - cy));
         if (d > rad) continue;
@@ -555,9 +656,34 @@
     /* flatten the rim and the ground everyone starts on */
     for (var c2 = 0; c2 < COLS; c2++) { this.height[this.idx(c2, 0)] = 0; this.height[this.idx(c2, ROWS - 1)] = 0; }
     for (var r2 = 0; r2 < ROWS; r2++) { this.height[this.idx(0, r2)] = 0; this.height[this.idx(COLS - 1, r2)] = 0; }
-    this.flatten(this.manC, this.manR);
-    for (var m = 0; m < this.monsters.length; m++) this.flatten(this.monsters[m].c, this.monsters[m].r);
+    /* Nothing about where people are standing may shape the ground: the
+       land is seeded and they are not, so flattening around them made the
+       same cellar come out different every time. They are placed on the
+       finished terrain instead, and openSpot prefers the level parts. */
+    this.smooth();
   };
+  /* No cliffs. Stacking mounds leaves squares three steps above their
+     neighbours, which reads as a wall you cannot see and makes a shove
+     across it unaccountable. Grind every difference down to one step, so
+     the floor only ever rises and falls a step at a time and every rise
+     is a slope you can read. */
+  Game.prototype.smooth = function () {
+    var D = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+    for (var pass = 0; pass < MAX_H * 4; pass++) {
+      var changed = false;
+      for (var r = 0; r < ROWS; r++) for (var c = 0; c < COLS; c++) {
+        var i = this.idx(c, r), lowest = MAX_H;
+        for (var d = 0; d < 4; d++) {
+          var nc = c + D[d][0], nr = r + D[d][1];
+          if (!this.inField(nc, nr)) { lowest = 0; break; }
+          lowest = Math.min(lowest, this.height[this.idx(nc, nr)]);
+        }
+        if (this.height[i] > lowest + 1) { this.height[i] = lowest + 1; changed = true; }
+      }
+      if (!changed) break;
+    }
+  };
+
   Game.prototype.flatten = function (c, r) {
     for (var dr = -1; dr <= 1; dr++) for (var dc = -1; dc <= 1; dc++)
       if (this.inField(c + dc, r + dr)) this.height[this.idx(c + dc, r + dr)] = 0;
@@ -569,26 +695,107 @@
     var f = this.feat, self = this;
     function scatter(n, put) {
       for (var i = 0, guard = 0; i < n && guard < 4000; guard++) {
-        var c = 2 + rnd(COLS - 4), r = 2 + rnd(ROWS - 4);
+        var c = 2 + self.grnd(COLS - 4), r = 2 + self.grnd(ROWS - 4);
         if (self.grid[self.idx(c, r)] !== EMPTY) continue;
         if (self.item[self.idx(c, r)] !== NOTHING) continue;
-        if (Math.abs(c - self.manC) < 3 && Math.abs(r - self.manR) < 3) continue;
-        if (self.nearMonster(c, r)) continue;
         put(c, r); i++;
       }
     }
-    if (f.trees) scatter(6 + rnd(7), function (c, r) { self.grid[self.idx(c, r)] = TREE; });
-    if (f.marbles) scatter(1 + rnd(3), function (c, r) {
-      self.grid[self.idx(c, r)] = MARBLE;
-      self.marbles.push({ c: c, r: r, dc: 0, dr: 0, v: 0 });
-    });
+    if (f.trees) scatter(6 + self.grnd(7), function (c, r) { self.grid[self.idx(c, r)] = TREE; });
+    /* how many marbles is part of the cellar; where they have rolled to
+       is not */
+    this.marbleCount = f.marbles ? (1 + this.grnd(3)) : 0;
     if (f.boots) scatter(1, function (c, r) { self.item[self.idx(c, r)] = BOOTS; });
     if (f.frost) scatter(1, function (c, r) { self.item[self.idx(c, r)] = FROST; });
-    if (f.saw) scatter(1 + rnd(2), function (c, r) { self.item[self.idx(c, r)] = SAW; });
-    if (f.jar) scatter(1 + rnd(2), function (c, r) { self.item[self.idx(c, r)] = JAR; });
-    if (f.choppers) scatter(2 + rnd(3), function (c, r) { self.grid[self.idx(c, r)] = CHOPPER; });
-    if (f.tar) scatter(1 + rnd(2), function (c, r) { self.grid[self.idx(c, r)] = VAT_TAR; });
-    if (f.water) scatter(1 + rnd(2), function (c, r) { self.grid[self.idx(c, r)] = VAT_WATER; });
+    if (f.saw) scatter(1 + self.grnd(2), function (c, r) { self.item[self.idx(c, r)] = SAW; });
+    if (f.jar) scatter(1 + self.grnd(2), function (c, r) { self.item[self.idx(c, r)] = JAR; });
+    if (f.choppers) scatter(2 + self.grnd(3), function (c, r) { self.grid[self.idx(c, r)] = CHOPPER; });
+    if (f.tar) scatter(1 + self.grnd(2), function (c, r) { self.grid[self.idx(c, r)] = VAT_TAR; });
+    if (f.water) scatter(1 + self.grnd(2), function (c, r) { self.grid[self.idx(c, r)] = VAT_WATER; });
+  };
+
+  /* --- bricks run downhill -------------------------------------------
+     A brick shoved uphill is only up there as long as nothing lets it
+     back down: the square it came from is under the man the moment he
+     pushes it, but step off and it follows you. Shove one downhill and it
+     keeps going, which is most of the reason downhill is the easy
+     direction. Nothing rolls onto the man, a monster, or another brick.
+     -------------------------------------------------------------------- */
+  Game.prototype.slideBricks = function (ev) {
+    if (this.classic) return 0;
+    var D = [[1, 0], [-1, 0], [0, 1], [0, -1]], moved = 0;
+    var press = {};                     /* how many bricks lean on each tree */
+
+    for (var r = 0; r < ROWS; r++) for (var c = 0; c < COLS; c++) {
+      var i = this.idx(c, r);
+      if (this.grid[i] !== BRICK) continue;
+
+      /* tar sets round anything standing in it */
+      if (this.fluid[i] === TAR || this.grid[i] === COOLED) continue;
+
+      var here = this.height[i], best = null, bestH = here;
+      for (var d = 0; d < 4; d++) {
+        var nc = c + D[d][0], nr = r + D[d][1];
+        if (!this.inField(nc, nr)) continue;
+        var ni = this.idx(nc, nr);
+        if (this.height[ni] >= here) continue;      /* only downhill      */
+        if (this.grid[ni] === TREE) {               /* leaning on a tree  */
+          press[ni] = (press[ni] || 0) + 1;
+          continue;
+        }
+        if (this.height[ni] >= bestH) continue;
+        if (this.grid[ni] !== EMPTY) continue;
+        if (this.fluid[ni] === TAR) continue;       /* it will not run into tar */
+        if (nc === this.manC && nr === this.manR) continue;
+        if (this.monsterAt(nc, nr)) continue;
+        bestH = this.height[ni]; best = ni;
+      }
+      if (best !== null) { this.grid[i] = EMPTY; this.grid[best] = BRICK; moved++; }
+    }
+
+    /* A single brick resting against a tree does nothing for ever. Two
+       will have it over eventually, and the more that pile up behind
+       them the sooner it goes. When it goes, everything that was held
+       up by it carries on down the slope. */
+    for (var k = 0; k < this.stress.length; k++) {
+      var n = press[k] || 0;
+      if (this.grid[k] !== TREE) { this.stress[k] = 0; continue; }
+      if (n >= 2) this.stress[k] += (n - 1);
+      else if (this.stress[k] > 0) this.stress[k]--;   /* it recovers */
+      if (this.stress[k] >= TREE_STRENGTH) {
+        this.grid[k] = EMPTY;
+        this.stress[k] = 0;
+        if (ev) ev.treesDown++;
+      }
+    }
+
+    if (ev && moved) ev.slid += moved;
+    return moved;
+  };
+
+  /* take one brick off the squares around something, so it is not sealed
+     in before anybody has played a turn */
+  Game.prototype.freeUp = function (cells) {
+    var D = [[1, 0], [-1, 0], [0, 1], [0, -1]], pick = [];
+    for (var i = 0; i < cells.length; i++) for (var d = 0; d < 4; d++) {
+      var nc = cells[i][0] + D[d][0], nr = cells[i][1] + D[d][1];
+      if (this.inField(nc, nr) && this.grid[this.idx(nc, nr)] === BRICK) pick.push([nc, nr]);
+    }
+    if (!pick.length) return false;
+    var p = pick[this.grnd(pick.length)];
+    this.grid[this.idx(p[0], p[1])] = EMPTY;
+    this.bricks--;
+    return true;
+  };
+
+  /* the man walled in on every side has no game to play */
+  Game.prototype.penned = function (c, r) {
+    var D = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+    for (var d = 0; d < 4; d++) {
+      var nc = c + D[d][0], nr = r + D[d][1];
+      if (this.inField(nc, nr) && this.at(nc, nr) === EMPTY) return false;
+    }
+    return true;
   };
 
   /* the beetle's meal: one brick beside it, gone */
@@ -670,7 +877,8 @@
                smashed: 0, crushed: [], trappedNow: [], won: false, lost: false,
                lostTo: null, bonus: 0, stuck: false, spawned: null,
                burst: 0, burned: 0, doused: 0, swept: 0, set: 0,
-               blocked: false, chopped_brick: 0, squashed: [] };
+               blocked: false, chopped_brick: 0, squashed: [], slid: 0,
+               treesDown: 0 };
     if (this.over || this.won) return ev;
 
     /* --- step points ------------------------------------------------
@@ -690,6 +898,7 @@
       }
     }
 
+    this.slideBricks(ev);
     this.settle(ev);
     this.rollMarbles(ev);
     if (ev.lost) return ev;
@@ -890,8 +1099,7 @@
     for (var i = 0; i < this.marbles.length; i++) {
       var m = this.marbles[i];
       if (m.v <= 0) { m.v = 0; continue; }
-      var steps = Math.max(1, Math.min(3, Math.round(m.v)));
-      for (var s = 0; s < steps && m.v > 0; s++) {
+      for (var s = 0; s < 3 && m.v >= 1; s++) {
         var nc = m.c + m.dc, nr = m.r + m.dr;
         var dh = this.h(nc, nr) - this.h(m.c, m.r);
 
@@ -928,11 +1136,13 @@
           continue;
         }
 
-        /* clear ground */
+        /* clear ground. Gravity first - it gains coming down and pays
+           going up - then friction for the square it has arrived on. */
         this.place(m, nc, nr);
         m.v += (dh < 0) ? (-dh * 0.55) : (-dh * 0.95);
+        m.v -= frictionOn(this.grid[this.idx(nc, nr)], this.fluid[this.idx(nc, nr)]);
+        if (m.v <= 0.05) { m.v = 0; m.dc = 0; m.dr = 0; }
       }
-      m.v -= 0.16;                                   /* rolling friction */
       if (m.v <= 0.05) { m.v = 0; m.dc = 0; m.dr = 0; }
     }
   };
@@ -1213,7 +1423,8 @@
     MONSTERS: MONSTERS, MONSTER_ORDER: MONSTER_ORDER,
     titleCells: titleCells, TITLE_DATA: TITLE_DATA,
     UDG: UDG, ENVELOPES: ENVELOPES, INSTRUCTIONS: INSTRUCTIONS,
-    save: save,
+    save: save, mulberry32: mulberry32, TREE_STRENGTH: TREE_STRENGTH,
+    frictionOn: frictionOn,
     PHYSICAL: ["#000000", "#ff0000", "#00ff00", "#ffff00",
                "#0000ff", "#ff00ff", "#00ffff", "#ffffff"]
   };
