@@ -7,170 +7,155 @@
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo+Narrow:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
 <style>
   :root{
-    --stone:#171310;
-    --stone-hi:#2a231c;
-    --torch:#ff9b3d;
-    --torch-dim:#c66a1e;
-    --bone:#e8dcc8;
-    --bone-dim:#9c9083;
+    --torch:#ff9b3d; --torch-dim:#c66a1e;
+    --bone:#e8dcc8; --bone-dim:#9c9083;
     --blood:#c33a26;
-    --chitin:#4a6fd0;
   }
   *{box-sizing:border-box}
+  [hidden]{display:none!important}
   html,body{height:100%}
   body{
     margin:0;background:#0a0806;color:var(--bone);
     font-family:"Archivo Narrow","Helvetica Neue",Arial,sans-serif;
     overflow:hidden;overscroll-behavior:none;
   }
-  #stage{position:fixed;inset:0}
-  canvas#gl{display:block;width:100%;height:100%}
-
-  /* the cellar closes in at the edges */
+  canvas#gl{display:block;width:100%;height:100%;position:fixed;inset:0}
   .vignette{
     position:fixed;inset:0;pointer-events:none;
     box-shadow:inset 0 0 22vmin 8vmin rgba(0,0,0,.82),inset 0 0 40vmin 2vmin rgba(0,0,0,.45);
   }
 
   /* ---------- head-up display ---------- */
-  [hidden]{display:none!important}
   .hud{
     position:fixed;top:0;left:0;right:0;pointer-events:none;
-    display:flex;gap:clamp(10px,3vw,34px);align-items:baseline;
+    display:flex;gap:clamp(9px,2.6vw,30px);align-items:baseline;
     padding:clamp(10px,2vw,18px) clamp(12px,3vw,26px);
     font-family:"IBM Plex Mono",ui-monospace,monospace;
-    background:linear-gradient(180deg,rgba(6,4,3,.86),rgba(6,4,3,0));
+    background:linear-gradient(180deg,rgba(6,4,3,.88),rgba(6,4,3,0));
   }
   .stat{display:flex;flex-direction:column;gap:2px;line-height:1}
-  .stat .k{
-    font-size:clamp(8px,1.5vw,10px);letter-spacing:.18em;text-transform:uppercase;
-    color:var(--bone-dim);
-  }
-  .stat .v{
-    font-size:clamp(15px,3vw,22px);font-weight:600;font-variant-numeric:tabular-nums;
-    color:var(--bone);
-  }
+  .stat .k{font-size:clamp(8px,1.4vw,10px);letter-spacing:.18em;text-transform:uppercase;color:var(--bone-dim)}
+  .stat .v{font-size:clamp(14px,2.8vw,21px);font-weight:600;font-variant-numeric:tabular-nums}
   .stat.warn .v{color:var(--torch)}
   .stat.crit .v{color:var(--blood)}
   .spacer{flex:1}
   .stat.right{align-items:flex-end}
+  #hLoose{display:flex;gap:5px;align-items:center;height:1.05em}
+  #hLoose i{width:11px;height:11px;border-radius:2px;display:block}
+  #hLoose i.done{opacity:.22}
 
-  /* ---------- the cellar plan ---------- */
   #plan{
     position:fixed;right:clamp(10px,2vw,20px);bottom:clamp(10px,2vw,20px);
-    width:clamp(120px,17vw,204px);height:auto;aspect-ratio:34/26;
+    width:clamp(118px,16vw,196px);height:auto;aspect-ratio:34/26;
     background:rgba(8,6,5,.72);border:1px solid rgba(232,220,200,.16);
     border-radius:3px;pointer-events:none;image-rendering:pixelated;
   }
 
   /* ---------- overlays ---------- */
   .sheet{
-    position:fixed;inset:0;display:grid;place-items:center;padding:6vmin;
-    background:radial-gradient(120% 80% at 50% 40%,rgba(20,14,10,.86),rgba(4,3,2,.96));
-    backdrop-filter:blur(2px);text-align:center;
+    position:fixed;inset:0;display:grid;place-items:center;padding:5vmin;
+    background:radial-gradient(120% 80% at 50% 45%,rgba(16,11,8,.72),rgba(4,3,2,.93));
+    text-align:center;overflow:auto;
   }
-  .sheet[hidden]{display:none}
-  .card{max-width:min(640px,92vw);display:flex;flex-direction:column;gap:clamp(12px,2.4vw,20px)}
+  .card{max-width:min(620px,93vw);display:flex;flex-direction:column;gap:clamp(11px,2.2vw,18px)}
   .kicker{
     font-family:"IBM Plex Mono",ui-monospace,monospace;
     font-size:clamp(9px,1.7vw,11px);letter-spacing:.3em;text-transform:uppercase;
-    color:var(--torch-dim);
+    color:var(--torch-dim);margin:0;
   }
   h1{
-    margin:0;font-size:clamp(34px,9vw,74px);line-height:.92;font-weight:700;
-    letter-spacing:-.01em;text-wrap:balance;
-    color:var(--bone);
-    text-shadow:0 0 28px rgba(255,155,61,.28);
+    margin:0;font-size:clamp(34px,9vw,72px);line-height:.9;font-weight:700;
+    letter-spacing:-.015em;text-wrap:balance;
+    text-shadow:0 4px 30px rgba(0,0,0,.9),0 0 34px rgba(255,155,61,.22);
   }
   h1 em{font-style:normal;color:var(--blood)}
-  .lede{
-    margin:0 auto;max-width:52ch;font-size:clamp(14px,2.4vw,17px);line-height:1.62;
-    color:#c8bca9;
-  }
+  .lede{margin:0 auto;max-width:50ch;font-size:clamp(13.5px,2.2vw,16px);line-height:1.6;color:#c8bca9}
   .lede b{color:var(--bone);font-weight:600}
-  .rules{
-    margin:0;padding:0;list-style:none;display:grid;gap:8px;
-    max-width:52ch;margin-inline:auto;text-align:left;
-    font-size:clamp(13px,2.1vw,15px);line-height:1.5;color:#c0b4a2;
-  }
-  .rules li{display:grid;grid-template-columns:auto 1fr;gap:11px;align-items:start}
-  .rules .pip{
-    width:9px;height:9px;margin-top:.42em;border-radius:1px;background:var(--blood);
-    box-shadow:0 0 0 1px rgba(0,0,0,.5) inset;
-  }
-  .rules li:nth-child(2) .pip{background:var(--torch)}
-  .rules li:nth-child(3) .pip{background:var(--chitin)}
-  .rules li:nth-child(4) .pip{background:var(--bone-dim)}
-  .keys{
-    display:flex;gap:7px;justify-content:center;flex-wrap:wrap;
-    font-family:"IBM Plex Mono",ui-monospace,monospace;font-size:clamp(11px,1.9vw,13px);
-  }
-  .keys kbd{
-    background:#241c16;border:1px solid #3d3128;border-bottom-width:2px;
-    border-radius:3px;padding:5px 9px;color:var(--bone);
-  }
-  .levels{display:flex;gap:6px;justify-content:center;flex-wrap:wrap}
-  .lvl{
-    appearance:none;font:inherit;cursor:pointer;
-    width:clamp(30px,6vw,38px);height:clamp(30px,6vw,38px);
-    background:#1d1712;border:1px solid #3a2e25;border-radius:3px;color:#a89b8b;
-    font-family:"IBM Plex Mono",ui-monospace,monospace;font-weight:600;
-    transition:background .12s,color .12s,border-color .12s;
-  }
-  .lvl:hover{background:#2a211a;color:var(--bone)}
-  .lvl[aria-pressed="true"]{background:var(--blood);border-color:#e05a42;color:#fff}
-  .lvl:focus-visible{outline:2px solid var(--torch);outline-offset:2px}
+  .row{display:flex;gap:10px;justify-content:center;flex-wrap:wrap}
   .go{
-    appearance:none;font:inherit;cursor:pointer;justify-self:center;
-    padding:13px 30px;border:0;border-radius:3px;
+    appearance:none;font:inherit;cursor:pointer;
+    padding:12px 26px;border:0;border-radius:3px;
     background:var(--blood);color:#fff;font-weight:700;
-    font-size:clamp(14px,2.4vw,17px);letter-spacing:.06em;text-transform:uppercase;
+    font-size:clamp(13px,2.2vw,16px);letter-spacing:.06em;text-transform:uppercase;
     box-shadow:0 6px 24px -8px rgba(195,58,38,.9);
     transition:background .12s,transform .12s;
   }
   .go:hover{background:#d94630;transform:translateY(-1px)}
+  .go.quiet{background:#241c16;box-shadow:none;color:#c0b4a2}
+  .go.quiet:hover{background:#31261e;color:var(--bone)}
   .go:focus-visible{outline:2px solid var(--torch);outline-offset:3px}
   .fine{
     font-family:"IBM Plex Mono",ui-monospace,monospace;
-    font-size:clamp(9px,1.6vw,11px);line-height:1.8;color:#7d7264;
+    font-size:clamp(9px,1.6vw,11px);line-height:1.85;color:#7d7264;margin:0;
   }
   .fine a{color:#a2957f}
-  .tally{
-    display:flex;gap:clamp(16px,4vw,40px);justify-content:center;
-    font-family:"IBM Plex Mono",ui-monospace,monospace;
-  }
+  .fine kbd{background:#241c16;border:1px solid #3d3128;border-radius:2px;padding:1px 5px;color:#c0b4a2}
+  .tally{display:flex;gap:clamp(16px,4vw,40px);justify-content:center;font-family:"IBM Plex Mono",ui-monospace,monospace}
   .tally div{display:flex;flex-direction:column;gap:4px}
   .tally .k{font-size:10px;letter-spacing:.2em;text-transform:uppercase;color:var(--bone-dim)}
-  .tally .v{font-size:clamp(20px,5vw,30px);font-weight:600;color:var(--bone)}
+  .tally .v{font-size:clamp(19px,4.6vw,28px);font-weight:600}
 
-  /* ---------- touch pad ---------- */
+  .bestiary{
+    display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));
+    gap:8px;text-align:left;margin:0;padding:0;list-style:none;
+  }
+  .bestiary li{
+    display:grid;grid-template-columns:auto 1fr;gap:9px;align-items:start;
+    background:rgba(20,15,11,.5);border:1px solid rgba(232,220,200,.09);
+    border-radius:3px;padding:8px 10px;
+  }
+  .bestiary .chip{width:10px;height:10px;border-radius:2px;margin-top:.34em}
+  .bestiary .n{
+    display:block;font-family:"IBM Plex Mono",ui-monospace,monospace;
+    font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--bone);
+  }
+  .bestiary .b{display:block;font-size:12.5px;line-height:1.4;color:#a89b8b;margin-top:2px}
+
   .pad{
     position:fixed;left:clamp(10px,2vw,20px);bottom:clamp(10px,2vw,20px);
-    display:none;grid-template-columns:repeat(3,1fr);gap:6px;
-    width:min(45vw,190px);
+    display:none;grid-template-columns:repeat(3,1fr);gap:6px;width:min(45vw,186px);
   }
   body.touch .pad{display:grid}
   .pad button{
     appearance:none;border:1px solid rgba(232,220,200,.2);border-radius:4px;
-    background:rgba(20,15,11,.66);color:var(--bone);
-    aspect-ratio:1;font-size:19px;font-family:"IBM Plex Mono",ui-monospace,monospace;
-    display:grid;place-items:center;-webkit-tap-highlight-color:transparent;
-    touch-action:none;
+    background:rgba(20,15,11,.66);color:var(--bone);aspect-ratio:1;font-size:19px;
+    font-family:"IBM Plex Mono",ui-monospace,monospace;display:grid;place-items:center;
+    -webkit-tap-highlight-color:transparent;touch-action:none;
   }
   .pad button:active{background:var(--blood);border-color:var(--blood)}
   .pad .e{visibility:hidden}
+
   #banner{
-    position:fixed;left:50%;top:38%;transform:translate(-50%,-50%);
-    font-size:clamp(30px,9vw,66px);font-weight:700;letter-spacing:.02em;
-    text-shadow:0 0 30px rgba(0,0,0,.9);pointer-events:none;text-align:center;
+    position:fixed;left:50%;top:34%;transform:translate(-50%,-50%);
+    text-align:center;pointer-events:none;width:min(92vw,660px);
   }
-  #banner[hidden]{display:none}
-  #banner small{display:block;font-size:.34em;letter-spacing:.24em;color:var(--torch);margin-top:.5em}
-  @media (prefers-reduced-motion:reduce){.go,.lvl{transition:none}}
+  #banner .big{
+    font-size:clamp(26px,7.5vw,58px);font-weight:700;letter-spacing:.02em;
+    text-shadow:0 0 30px rgba(0,0,0,.95);line-height:1;
+  }
+  #banner .sub{
+    font-family:"IBM Plex Mono",ui-monospace,monospace;
+    font-size:clamp(10px,2vw,13px);letter-spacing:.2em;text-transform:uppercase;
+    color:var(--torch);margin-top:.9em;
+  }
+  #banner .who{
+    margin-top:1.1em;display:flex;gap:8px 18px;justify-content:center;flex-wrap:wrap;
+    font-family:"IBM Plex Mono",ui-monospace,monospace;font-size:clamp(10px,1.8vw,12px);
+    color:#bdb1a0;text-shadow:0 2px 12px rgba(0,0,0,.95);
+  }
+  #banner .who span{display:inline-flex;align-items:center;gap:6px}
+  #banner .who i{width:9px;height:9px;border-radius:2px;flex:none}
+  .hint{
+    position:fixed;left:50%;bottom:clamp(10px,2vw,18px);transform:translateX(-50%);
+    font-family:"IBM Plex Mono",ui-monospace,monospace;font-size:11px;letter-spacing:.14em;
+    text-transform:uppercase;color:#6f655a;pointer-events:none;
+  }
+  body.touch .hint{display:none}
+  @media (prefers-reduced-motion:reduce){.go{transition:none}}
 </style>
 </head>
 <body>
-<div id="stage"><canvas id="gl"></canvas></div>
+<canvas id="gl"></canvas>
 <div class="vignette" aria-hidden="true"></div>
 
 <div class="hud" id="hud" hidden>
@@ -178,45 +163,38 @@
   <div class="stat"><span class="k">Score</span><span class="v" id="hScore">0</span></div>
   <div class="stat"><span class="k">Best</span><span class="v" id="hBest">0</span></div>
   <div class="spacer"></div>
+  <div class="stat right"><span class="k">Carrying</span><span class="v" id="hKit">&mdash;</span></div>
+  <div class="stat right"><span class="k">Loose</span><span class="v" id="hLoose"></span></div>
   <div class="stat right" id="sBricks"><span class="k">Bricks</span><span class="v" id="hBricks">200</span></div>
   <div class="stat right" id="sMoves"><span class="k">Moves</span><span class="v" id="hMoves">0</span></div>
 </div>
 <canvas id="plan" width="34" height="26" hidden></canvas>
 <div id="banner" hidden></div>
+<p class="hint" id="hint" hidden>P pause &nbsp;&middot;&nbsp; R restart cellar &nbsp;&middot;&nbsp; M sound</p>
 
 <div class="pad" id="pad" aria-hidden="true">
-  <button class="e" tabindex="-1"></button>
-  <button data-act="up">:</button>
-  <button class="e" tabindex="-1"></button>
-  <button data-act="left">Z</button>
-  <button class="e" tabindex="-1"></button>
-  <button data-act="right">X</button>
-  <button class="e" tabindex="-1"></button>
-  <button data-act="down">/</button>
-  <button class="e" tabindex="-1"></button>
+  <button class="e" tabindex="-1"></button><button data-act="up">:</button><button class="e" tabindex="-1"></button>
+  <button data-act="left">Z</button><button class="e" tabindex="-1"></button><button data-act="right">X</button>
+  <button class="e" tabindex="-1"></button><button data-act="down">/</button><button class="e" tabindex="-1"></button>
 </div>
 
 <div class="sheet" id="titleSheet">
   <div class="card">
     <p class="kicker">The Micro User &middot; July 1985 &middot; John McCauley</p>
     <h1>Mutant <em>Fly</em></h1>
-    <p class="lede">A fortune lies in the cellars under the ruins, and on every level down
-      there is a fly the size of a man. You cannot kill it. <b>You can only wall it in.</b></p>
-    <ul class="rules">
-      <li><span class="pip"></span><span>Walk into a brick to shove it. A whole line shifts at once.</span></li>
-      <li><span class="pip"></span><span>Drive a brick <b>into</b> the fly and its jaws take it. Push one off the edge of the cellar and it is gone for good.</span></li>
-      <li><span class="pip"></span><span>Surround it with <b>four bricks</b> to trap it. The cellar wall is no help to you.</span></li>
-      <li><span class="pip"></span><span>Fewer bricks each cellar down, and the fly never lets you get far. Touch it once and that is that.</span></li>
-    </ul>
-    <div class="keys">
-      <kbd>Z</kbd> left <kbd>X</kbd> right <kbd>:</kbd> up <kbd>/</kbd> down
-      <kbd>&larr;&uarr;&darr;&rarr;</kbd> also
+    <p class="lede">A fortune lies in the cellars under the ruins, and something is
+      guarding every level down. You cannot kill it. <b>You can only wall it in</b> &mdash;
+      four bricks, one on each side. The cellar wall is no help to you.</p>
+    <ul class="bestiary" id="bestiary"></ul>
+    <div class="row">
+      <button class="go" id="continue" type="button" hidden>Continue</button>
+      <button class="go" id="start" type="button">Go down</button>
     </div>
-    <div class="levels" id="levels" role="group" aria-label="Starting difficulty"></div>
-    <button class="go" id="start" type="button">Go down</button>
+    <p class="fine" id="record"></p>
     <p class="fine">
-      Ported from the original BBC Micro BASIC, recovered from the Database
-      Publications cassette.<br>
+      <kbd>Z</kbd> <kbd>X</kbd> <kbd>:</kbd> <kbd>/</kbd> or the arrow keys. Bricks shove in
+      whole lines; one driven into a monster is eaten; one pushed off the edge is gone for good.<br>
+      Ported from the original BBC Micro BASIC &middot;
       <a href="classic/">Play the 1985 screen &rarr;</a>
     </p>
   </div>
@@ -225,14 +203,41 @@
 <div class="sheet" id="overSheet" hidden>
   <div class="card">
     <p class="kicker" id="overKicker">Caught</p>
-    <h1 id="overTitle">The fly got you</h1>
+    <h1 id="overTitle">Curtains</h1>
     <div class="tally">
       <div><span class="k">Score</span><span class="v" id="oScore">0</span></div>
       <div><span class="k">Cellar</span><span class="v" id="oCellar">1</span></div>
       <div><span class="k">Best</span><span class="v" id="oBest">0</span></div>
     </div>
-    <p class="lede" id="overNote">You get one life. That is all the dying you get.</p>
-    <button class="go" id="again" type="button">Again</button>
+    <p class="lede" id="overNote"></p>
+    <div class="row">
+      <button class="go" id="retry" type="button">Try this cellar again</button>
+      <button class="go quiet" id="quit" type="button">Back to the top</button>
+    </div>
+  </div>
+</div>
+
+<div class="sheet" id="briefSheet" hidden>
+  <div class="card">
+    <p class="kicker" id="briefKicker">Cellar 4</p>
+    <h1 id="briefTitle">Something new</h1>
+    <ul class="bestiary" id="briefList"></ul>
+    <button class="go" id="briefGo" type="button">Down we go</button>
+    <p class="fine">This only comes up the first time you meet something.</p>
+  </div>
+</div>
+
+<div class="sheet" id="pauseSheet" hidden>
+  <div class="card">
+    <p class="kicker">Paused</p>
+    <h1>Catching your breath</h1>
+    <p class="lede" id="pauseNote"></p>
+    <div class="row">
+      <button class="go" id="resume" type="button">Carry on</button>
+      <button class="go quiet" id="restart" type="button">Restart cellar</button>
+      <button class="go quiet" id="giveup" type="button">Save &amp; quit</button>
+    </div>
+    <p class="fine">Your progress is kept in this browser. Come back and continue.</p>
   </div>
 </div>
 
@@ -242,77 +247,267 @@
 <script>
 /* =====================================================================
    MUTANT FLY - the rules
-   Ported from the original BBC BASIC.
 
-   Source: FLY, by John Mc Cauley, (C) The Micro User. 125 lines, 10-1240,
-   detokenised from the Database Publications cassette for The Micro User
-   volume 3 issue 5 (July 1985) - the tape advertised in that issue as
-   "JULY: Fly. Take on mutant flies in this arcade spectacular."
+   Ported from the original BBC BASIC: FLY, by John Mc Cauley,
+   (C) The Micro User. 125 lines, 10-1240, detokenised from the Database
+   Publications cassette for The Micro User volume 3 issue 5, July 1985.
 
-   Everything here follows the listing rather than the magazine article,
-   which describes the game loosely and in two places incorrectly. The
-   line numbers in the comments are the original's.
+   Everything in the classic path follows the listing rather than the
+   magazine article, which describes the game loosely and in several
+   places incorrectly. Line numbers in the comments are the original's.
 
-   The original ran in MODE 1 and did all its collision detection with
-   POINT() against the screen: colour 2 meant "brick". This port keeps a
-   grid instead, but every rule below is the rule the BASIC implements.
+   Two modes:
+
+     classic  One fly, the original level table, a flat floor and
+              nothing else. This is the 1985 game and tools/test-rules.js
+              pins it there. Nothing below may change it.
+
+     deep     The same game, with the cellar getting stranger as you go
+              down. Cellars 1 and 2 are the original exactly; after that
+              one new thing arrives at a time - a second kind of monster,
+              then sloping floors, then tools, then trees, then the
+              marbles - so each can be learned on its own. The levels
+              do not stop.
    ===================================================================== */
 (function (root) {
   "use strict";
 
   /* --- geometry -----------------------------------------------------
-     The original worked in BBC graphics units: 32 units to a character
-     cell. The man was bounded by X%>96 / X%<1152 (line 230,240) and
-     Y%>128 / Y%<928 (250,260), giving a playfield 34 cells across and
-     26 down. Bricks were scattered from the PA%() table (line 100),
-     which holds 160,192,...1088 - so bricks land in the inner 30x23.  */
+     The original worked in BBC graphics units, 32 to a character cell.
+     The man was bounded by X%>96 / X%<1152 (lines 230,240) and
+     Y%>128 / Y%<928 (250,260): a playfield 34 cells across and 26 down.
+     Bricks came from the PA%() table built at line 100, which holds
+     160,192,...1088 - so they land in the inner 30x23.               */
   var COLS = 34, ROWS = 26;
-  var BRICK_C0 = 2, BRICK_C1 = 31;      /* PA%(1..30) = X 160..1088 */
-  var BRICK_R0 = 1, BRICK_R1 = 23;      /* PA%(1..23) = Y 160..864  */
+  var BRICK_C0 = 2, BRICK_C1 = 31;
+  var BRICK_R0 = 1, BRICK_R1 = 23;
 
-  var EMPTY = 0, BRICK = 1;
+  /* what can be standing on a square */
+  var EMPTY = 0, BRICK = 1, TREE = 2, MARBLE = 3,
+      VAT_TAR = 4, VAT_WATER = 5, COOLED = 6;
+
+  /* and what can be running across it. The cellars are old and things
+     have been sealed up down here for a long time. */
+  var DRY = 0, WATER = 1, TAR = 2;
+  var TAR_COOLS = 26;          /* turns a tar cell burns before it sets */
+
+  /* what can be lying on one */
+  var NOTHING = 0, BOOTS = 1, FROST = 2, AXE = 3, JAR = 4;
+  var ITEMS = {
+    1: { key: "boots", name: "Boots", blurb: "Two squares a turn for a while.", colour: 0xc8a017 },
+    2: { key: "frost", name: "Frost jar", blurb: "Everything down here stops moving.", colour: 0x63c8e0 },
+    3: { key: "axe",   name: "Axe",   blurb: "Three swings. Trees do not move any other way.", colour: 0xb0b6bd },
+    4: { key: "jar",   name: "Sealed jar", blurb: "Nobody labelled it. Could go either way.", colour: 0x9a5bc4 }
+  };
 
   /* The cassette edition has no frame limiter and runs as fast as BASIC
      manages. The disc conversion added one - `210 T%=TIME+5` with
-     `380 REPEAT UNTIL TIME>T%`, TIME being centiseconds - which pins the
-     main loop at 20 turns a second. That is the rate used here.        */
+     `380 REPEAT UNTIL TIME>T%` - pinning the loop at 20 turns a second. */
   var TICK_HZ = 20;
 
   /* line 130: X%=608 Y%=576, X1%=576 Y1%=512 */
-  var MAN_C0 = 16, MAN_R0 = 14, FLY_C0 = 15, FLY_R0 = 12;
+  var MAN_C0 = 16, MAN_R0 = 14, MON_C0 = 15, MON_R0 = 12;
 
-  /* --- PROCset_level, lines 890-990 ---------------------------------
-     PE% is the number of bricks. PA% is the fly's leash: see step().
-     (The listing really does use PA% for both this scalar and the
-     brick-position array PA%(); BBC BASIC keeps them apart.)          */
-  var LEVELS = [
-    /* F%  PE%  PA% */
-    [1, 200, 400], [2, 175, 300], [3, 150, 200], [4, 125, 150], [5, 100, 100],
-    [6,  75,  75], [7,  50,  50], [8,  40,  40], [9,  30,  30]
-  ];
-  function levelOf(F) {
-    if (F >= 10) return { PE: 20, PA: 0 };          /* line 990 */
-    var row = LEVELS[F - 1] || LEVELS[0];
-    return { PE: row[1], PA: row[2] };
+  var MAX_H = 3;                      /* how high the floor ever gets */
+  var BOOTS_TURNS = 70, FROST_TURNS = 50, AXE_SWINGS = 3;
+
+  function sign(n) { return n < 0 ? -1 : n > 0 ? 1 : 0; }
+  function rnd(n) { return (Math.random() * n) | 0; }
+
+  /* ==================================================================
+     THE MONSTERS
+
+     The fly is the original's, exactly. The other three are new, and
+     each asks a different question of the same four-sided trap:
+
+       fly      wanders on a leash. The leash is the whole difficulty
+                curve - it cannot get further from you than PA%, so as
+                PA% shrinks it is dragged onto you.
+       spider   no wandering at all. It steps straight at you, but only
+                on every second turn. You can outpace it; the cost is
+                that it never stops coming.
+       beetle   keeps close, and every fourteenth turn eats a brick
+                beside it. It destroys the thing you need, so a cellar
+                with a beetle in it is a race.
+       wasp     stands still for a turn, then crosses two squares at
+                once on a loose leash. Safe to approach on its dead
+                turn, lethal on its live one.
+
+     A monster stops for good once it is walled in, or crushed.
+     ================================================================== */
+
+  /* the original's move, lines 300-340: one random direction a turn,
+     taken only if the square is free AND the step keeps the monster
+     inside a box `leash` cells wide centred on the man */
+  function leashStep(m, g, leash) {
+    var R = 1 + rnd(4), c = m.c, r = m.r;
+    if (R === 1 && c > 0 && c > g.manC - leash && g.free(c - 1, r, m)) c--;
+    else if (R === 2 && c < COLS - 1 && c < g.manC + leash && g.free(c + 1, r, m)) c++;
+    else if (R === 3 && r > 0 && r > g.manR - leash && g.free(c, r - 1, m)) r--;
+    else if (R === 4 && r < ROWS - 1 && r < g.manR + leash && g.free(c, r + 1, m)) r++;
+    m.c = c; m.r = r;
   }
 
-  /* The leash is in graphics units; 32 of them to a cell. */
+  function greedyStep(m, g) {
+    var dc = g.manC - m.c, dr = g.manR - m.r, opts = [];
+    if (Math.abs(dc) >= Math.abs(dr)) {
+      if (dc) opts.push([sign(dc), 0]);
+      if (dr) opts.push([0, sign(dr)]);
+    } else {
+      if (dr) opts.push([0, sign(dr)]);
+      if (dc) opts.push([sign(dc), 0]);
+    }
+    for (var i = 0; i < opts.length; i++) {
+      var nc = m.c + opts[i][0], nr = m.r + opts[i][1];
+      if (g.inField(nc, nr) && g.free(nc, nr, m)) { m.c = nc; m.r = nr; return; }
+    }
+  }
+
+  var MONSTERS = {
+    fly: {
+      name: "Fly", colour: 0x3d63c4, dark: 0x1e2c5c, eye: 0x8e1208,
+      blurb: "Wanders, and never lets you get far.",
+      drone: [0, -10, 23, 1],
+      move: function (m, g) { leashStep(m, g, g.leash); }
+    },
+    spider: {
+      name: "Spider", colour: 0x6b4a2a, dark: 0x2e1e10, eye: 0xd8c020,
+      blurb: "Comes straight at you, every second turn.",
+      drone: [0, -11, 3, 1],
+      move: function (m, g) { if (++m.tick % 2 === 0) greedyStep(m, g); }
+    },
+    beetle: {
+      name: "Beetle", colour: 0x2c6a3a, dark: 0x15321c, eye: 0xe06010,
+      blurb: "Keeps close, and eats a brick every fourteen turns.",
+      drone: [0, -10, 1, 1],
+      eats: 14,
+      move: function (m, g) {
+        leashStep(m, g, g.leash * 0.7);
+        if (++m.tick % this.eats === 0) m.ate = g.devour(m);
+      }
+    },
+    wasp: {
+      name: "Wasp", colour: 0xc8a017, dark: 0x3a2c06, eye: 0x901010,
+      blurb: "Waits a turn, then crosses two squares at once.",
+      drone: [0, -9, 5, 1],
+      move: function (m, g) {
+        if (++m.tick % 2 === 0) return;
+        leashStep(m, g, g.leash * 1.6);
+        leashStep(m, g, g.leash * 1.6);
+      }
+    }
+  };
+  var MONSTER_ORDER = ["fly", "spider", "beetle", "wasp"];
+
+  /* --- PROCset_level, lines 890-990 --------------------------------- */
+  var LEVELS = [
+    [200, 400], [175, 300], [150, 200], [125, 150], [100, 100],
+    [75, 75], [50, 50], [40, 40], [30, 30]
+  ];
+
+  /* ==================================================================
+     THE DESCENT
+
+     Cellars 1 and 2 are the original, untouched. After that the curve is
+     hand-made rather than generated: one new thing at a time, and the
+     cellar it arrives in is deliberately gentle - usually a single
+     monster and plenty of bricks - so it can be learned before it is
+     combined with anything else. The pressure then comes back on.
+
+       3  a second kind of monster        10  the tar
+       4  the floor stops being level     11  the water
+       5  the beetle, and boots           12+ combinations, tightening
+       6  the wasp, and frost
+       7  trees, and the axe
+       8  marbles
+       9  the unlabelled jars
+     ================================================================== */
+  var FEATURE_AT = { slopes: 4, boots: 5, frost: 6, trees: 7, axe: 7,
+                     marbles: 8, jar: 9, tar: 10, water: 11 };
+
+  var PLAN = [
+    /*  1 */ { kinds: ["fly"], PE: 200, PA: 400, adds: [] },
+    /*  2 */ { kinds: ["fly"], PE: 175, PA: 300, adds: [] },
+    /*  3 */ { kinds: ["spider"], PE: 165, PA: 260, adds: ["spider"] },
+    /*  4 */ { kinds: ["fly"], PE: 155, PA: 220, adds: ["slopes"] },
+    /*  5 */ { kinds: ["beetle"], PE: 150, PA: 200, adds: ["beetle", "boots"] },
+    /*  6 */ { kinds: ["wasp"], PE: 145, PA: 190, adds: ["wasp", "frost"] },
+    /*  7 */ { kinds: ["fly"], PE: 145, PA: 175, adds: ["trees"] },
+    /*  8 */ { kinds: ["spider"], PE: 140, PA: 165, adds: ["marbles"] },
+    /*  9 */ { kinds: ["fly", "spider"], PE: 155, PA: 155, adds: ["jar"] },
+    /* 10 */ { kinds: ["beetle"], PE: 140, PA: 145, adds: ["tar"] },
+    /* 11 */ { kinds: ["wasp"], PE: 140, PA: 140, adds: ["water"] },
+    /* 12 */ { kinds: ["fly", "beetle"], PE: 145, PA: 130, adds: [] },
+    /* 13 */ { kinds: ["spider", "wasp"], PE: 135, PA: 125, adds: [] },
+    /* 14 */ { kinds: ["fly", "spider", "beetle"], PE: 150, PA: 120, adds: [] },
+    /* 15 */ { kinds: ["wasp", "beetle"], PE: 125, PA: 115, adds: [] },
+    /* 16 */ { kinds: ["fly", "spider", "wasp", "beetle"], PE: 160, PA: 110, adds: [] }
+  ];
+
+  /* below the plan the cellars keep coming, tightening slowly and never
+     quite running out of bricks */
+  function deepPlan(F) {
+    var n = Math.min(4, 2 + Math.floor((F - 17) / 7));
+    var kinds = [];
+    for (var i = 0; i < n; i++) kinds.push(MONSTER_ORDER[(F + i * 3) % 4]);
+    return {
+      kinds: kinds,
+      PE: Math.max(56, 120 - (F - 17) * 2) + 22 * (n - 1),
+      PA: Math.max(72, 108 - (F - 17)),
+      adds: []
+    };
+  }
+
+  function planFor(F) { return (F <= PLAN.length) ? PLAN[F - 1] : deepPlan(F); }
+  function monstersFor(F) { return planFor(F).kinds.slice(); }
+
+  function featuresFor(F) {
+    var out = {};
+    for (var k in FEATURE_AT) out[k] = F >= FEATURE_AT[k];
+    return out;
+  }
+
+  /* what turns up at exactly this level, and what to say about it */
+  var BRIEFINGS = {
+    spider:  { name: "The spider", body: "It does not wander. It comes straight at you, and takes a step on every second turn. You can out-walk it - but it never stops, and it will be behind you the whole way." },
+    beetle:  { name: "The beetle", body: "It keeps closer than the fly, and every fourteen turns it eats a brick beside it. It destroys the one thing you need. Wall it in early, or it will eat the cellar out from under you." },
+    wasp:    { name: "The wasp", body: "It stands still for a turn, then crosses two squares at once. Its dead turn is the only safe moment to get near it. Count them." },
+    slopes:  { name: "The floor is not level", body: "Climbing costs you. Going up a step takes an extra turn, shoving a line of bricks uphill takes another again, and walking downhill gives you a free step back. Read the ground before you commit to a push." },
+    boots:   { name: "Boots", body: "Two squares a turn for the next seventy turns. Nothing else speeds up. It is the only time you are genuinely faster than they are." },
+    frost:   { name: "Frost jars", body: "Everything loose in the cellar stops for fifty turns. Time enough to build a wall around something that would never otherwise hold still." },
+    trees:   { name: "Trees, and the axe", body: "Trees do not shove. Nothing moves them but an axe, and an axe is good for three swings. They hold a monster in as well as a brick does - so a tree in the right place is four bricks you did not have to push." },
+    marbles: { name: "Marbles", body: "Heavy, and they keep going. Shove one and it runs until something stops it. Uphill it slows, and if it cannot crest the rise it comes back down at you, gathering speed. Slowly it bounces off things; quickly it smashes bricks; at speed it flattens a monster - or you." },
+    jar:     { name: "Sealed jars", body: "Nobody labelled them. Half are frost. The other half have something in them that has been waiting a long time to get out." },
+    tar:     { name: "The tar", body: "Sealed in vats, and still hot. Break one - a marble will do it, so will the axe - and it runs downhill burning what it touches: trees, bricks, monsters, you. Eventually it sets, and what it leaves behind is as good as a wall." },
+    water:   { name: "The cistern", body: "Water runs further and faster than tar and finds every low corner. It puts fires out, shoves marbles along in front of it, and sweeps you and the monsters off your feet. It burns nothing - but where it takes you is not your choice." }
+  };
+  function briefingFor(F) {
+    var adds = planFor(F).adds, out = [];
+    for (var i = 0; i < adds.length; i++) if (BRIEFINGS[adds[i]]) out.push(BRIEFINGS[adds[i]]);
+    return out;
+  }
+
+  function levelOf(F, classic) {
+    if (classic) {
+      /* line 990 - and the original really does stop developing here */
+      if (F >= 10) return { PE: 20, PA: 0, kinds: ["fly"], feat: {}, adds: [] };
+      var row = LEVELS[F - 1] || LEVELS[0];
+      return { PE: row[0], PA: row[1], kinds: ["fly"], feat: {}, adds: [] };
+    }
+    var p = planFor(F);
+    return { PE: p.PE, PA: p.PA, kinds: p.kinds.slice(),
+             feat: featuresFor(F), adds: p.adds.slice() };
+  }
+
   function leashCells(PA) { return PA / 32; }
 
-  /* --- the palette shifts as you descend, lines 1000-1020 -----------
-     VDU19 remaps logical 0 (the floor) and, from level 6, logical 1
-     (the brick body). Physical colours are the BBC's own numbering.   */
+  /* --- the palette shifts as you descend, lines 1000-1020 ------------ */
   function palette(F) {
     var floor = 3;                                  /* yellow, line 150 */
     if (F >= 3) floor = 5;                          /* magenta          */
     if (F >= 6) floor = 6;                          /* cyan             */
     if (F >= 8) floor = 5;                          /* magenta again    */
-    return {
-      floor: floor,
-      brick: (F >= 6) ? 4 : 1,                      /* blue from 6, else red */
-      mortar: 7,                                    /* white, line 170  */
-      figure: 0                                     /* black, line 150  */
-    };
+    return { floor: floor, brick: (F >= 6) ? 4 : 1, mortar: 7, figure: 0 };
   }
 
   /* --- PROCbonus, lines 1110-1130 ----------------------------------- */
@@ -325,21 +520,58 @@
     return 10;
   }
 
-  function Game() {
+  /* ==================================================================
+     THE GAME
+     ================================================================== */
+  function Game(opts) {
+    this.classic = !!(opts && opts.classic);
     this.HI = 0;
     this.grid = new Uint8Array(COLS * ROWS);
+    this.height = new Uint8Array(COLS * ROWS);
+    this.item = new Uint8Array(COLS * ROWS);
+    this.fluid = new Uint8Array(COLS * ROWS);
+    this.fvol = new Uint8Array(COLS * ROWS);
+    this.burn = new Uint8Array(COLS * ROWS);
+    this.monsters = [];
+    this.marbles = [];
+    this.sources = [];
     this.reset(1);
   }
 
   Game.prototype.idx = function (c, r) { return r * COLS + c; };
-  Game.prototype.inField = function (c, r) {
-    return c >= 0 && r >= 0 && c < COLS && r < ROWS;
+  Game.prototype.inField = function (c, r) { return c >= 0 && r >= 0 && c < COLS && r < ROWS; };
+  Game.prototype.at = function (c, r) { return this.inField(c, r) ? this.grid[this.idx(c, r)] : -1; };
+  Game.prototype.h = function (c, r) { return this.inField(c, r) ? this.height[this.idx(c, r)] : 0; };
+  Game.prototype.brickAt = function (c, r) { return this.at(c, r) === BRICK; };
+
+  /* solid enough to hold a monster in. In the original only a brick
+     counted, because the win test asked POINT for colour 2 - the edge of
+     the cellar read -1 and never qualified. In the deep cellars a tree
+     or a resting marble will do as well; the cellar wall still will not. */
+  Game.prototype.solid = function (c, r) {
+    var v = this.at(c, r);
+    if (this.classic) return v === BRICK;
+    if (v === BRICK || v === TREE || v === VAT_TAR || v === VAT_WATER || v === COOLED) return true;
+    if (v === MARBLE) { var m = this.marbleAt(c, r); return !!m && m.v <= 0; }
+    return false;
   };
-  Game.prototype.brickAt = function (c, r) {
-    return this.inField(c, r) && this.grid[this.idx(c, r)] === BRICK;
+  Game.prototype.monsterAt = function (c, r, except) {
+    for (var i = 0; i < this.monsters.length; i++) {
+      var m = this.monsters[i];
+      if (m !== except && !m.gone && m.c === c && m.r === r) return m;
+    }
+    return null;
+  };
+  Game.prototype.marbleAt = function (c, r) {
+    for (var i = 0; i < this.marbles.length; i++)
+      if (this.marbles[i].c === c && this.marbles[i].r === r) return this.marbles[i];
+    return null;
+  };
+  /* a square a monster may step onto */
+  Game.prototype.free = function (c, r, except) {
+    return this.at(c, r) === EMPTY && !this.monsterAt(c, r, except);
   };
 
-  /* line 110-140 plus PROCset_level / PROCprint_bricks */
   Game.prototype.reset = function (startLevel) {
     this.F = startLevel || 1;
     this.SC = 0;
@@ -349,136 +581,623 @@
     this.sheet();
   };
 
-  /* PROCnext_sheet, line 860, and PROCprint_bricks, line 810 */
+  /* --- laying out a cellar: PROCnext_sheet (860) and
+         PROCprint_bricks (810), plus everything that came later ------ */
   Game.prototype.sheet = function () {
     if (this.SC > this.HI) this.HI = this.SC;       /* line 1030 */
-    var lv = levelOf(this.F);
+    var lv = levelOf(this.F, this.classic);
     this.PE = lv.PE;
     this.PA = lv.PA;
+    this.leash = leashCells(lv.PA);
+    this.feat = lv.feat;
     this.CO = 0;
     this.grid.fill(EMPTY);
+    this.item.fill(NOTHING);
+    this.fluid.fill(DRY);
+    this.fvol.fill(0);
+    this.burn.fill(0);
+    this.marbles.length = 0;
+    this.sources.length = 0;
+
+    /* the man's state resets with the cellar */
+    this.steps = 0;
+    this.boots = 0;
+    this.frost = 0;
+    this.axe = 0;
 
     this.manC = MAN_C0; this.manR = MAN_R0;
-    this.flyC = FLY_C0; this.flyR = FLY_R0;
 
-    /* line 820-840: PE% bricks, each dropped on a square that is not
-       already a brick. The original does not avoid the man or the fly;
-       the fly simply erases whatever it is standing on when it moves.  */
+    this.monsters = [];
+    var spots = [[MON_C0, MON_R0], [MON_C0 + 9, MON_R0 + 7],
+                 [MON_C0 - 9, MON_R0 + 6], [MON_C0 + 8, MON_R0 - 8]];
+    for (var i = 0; i < lv.kinds.length; i++) {
+      var s = spots[i % spots.length];
+      this.monsters.push(this.newMonster(lv.kinds[i],
+        Math.max(1, Math.min(COLS - 2, s[0])), Math.max(1, Math.min(ROWS - 2, s[1]))));
+    }
+
+    this.makeHeights();
+
+    /* line 820-840: PE% bricks dropped on squares that are not already
+       bricks. Squares beside a monster are left clear so nothing starts
+       walled in by luck. */
     var placed = 0, guard = 0;
-    while (placed < this.PE && guard++ < 200000) {
-      var c = BRICK_C0 + ((Math.random() * (BRICK_C1 - BRICK_C0 + 1)) | 0);
-      var r = BRICK_R0 + ((Math.random() * (BRICK_R1 - BRICK_R0 + 1)) | 0);
-      if (this.grid[this.idx(c, r)] === BRICK) continue;
-      if (c === this.flyC && r === this.flyR) continue;
+    while (placed < this.PE && guard++ < 400000) {
+      var c = BRICK_C0 + rnd(BRICK_C1 - BRICK_C0 + 1);
+      var r = BRICK_R0 + rnd(BRICK_R1 - BRICK_R0 + 1);
+      if (this.grid[this.idx(c, r)] !== EMPTY) continue;
       if (c === this.manC && r === this.manR) continue;
+      if (this.nearMonster(c, r)) continue;
       this.grid[this.idx(c, r)] = BRICK;
       placed++;
     }
     this.bricks = placed;
+
+    this.makeFurniture();
   };
 
-  /* --- one turn of the main loop, lines 200-390 ---------------------
-     dir is "left" | "right" | "up" | "down" | null.
-     Order matters and is the original's: the man moves and shoves,
-     then the fly moves, then CO% counts up, then the game is tested.  */
+  Game.prototype.newMonster = function (kind, c, r) {
+    return { kind: kind, spec: MONSTERS[kind], c: c, r: r,
+             tick: 0, trapped: false, crushed: false, gone: false, ate: false };
+  };
+
+  Game.prototype.nearMonster = function (c, r) {
+    for (var i = 0; i < this.monsters.length; i++) {
+      var m = this.monsters[i];
+      if (Math.abs(m.c - c) <= 1 && Math.abs(m.r - r) <= 1) return true;
+    }
+    return false;
+  };
+
+  /* --- the floor -----------------------------------------------------
+     A few smooth mounds. The rim stays flat so nothing can be pushed
+     uphill into the edge and stick there.                            */
+  Game.prototype.makeHeights = function () {
+    this.height.fill(0);
+    if (this.classic || !this.feat.slopes) return;
+    var mounds = 2 + rnd(3);
+    for (var k = 0; k < mounds; k++) {
+      var cx = 4 + rnd(COLS - 8), cy = 3 + rnd(ROWS - 6);
+      var rad = 4 + rnd(5), amp = 1 + rnd(MAX_H);
+      for (var r = 0; r < ROWS; r++) for (var c = 0; c < COLS; c++) {
+        var d = Math.sqrt((c - cx) * (c - cx) + (r - cy) * (r - cy));
+        if (d > rad) continue;
+        var hgt = Math.round(amp * (1 - d / rad));
+        var i = this.idx(c, r);
+        if (hgt > this.height[i]) this.height[i] = Math.min(MAX_H, hgt);
+      }
+    }
+    /* flatten the rim and the ground everyone starts on */
+    for (var c2 = 0; c2 < COLS; c2++) { this.height[this.idx(c2, 0)] = 0; this.height[this.idx(c2, ROWS - 1)] = 0; }
+    for (var r2 = 0; r2 < ROWS; r2++) { this.height[this.idx(0, r2)] = 0; this.height[this.idx(COLS - 1, r2)] = 0; }
+    this.flatten(this.manC, this.manR);
+    for (var m = 0; m < this.monsters.length; m++) this.flatten(this.monsters[m].c, this.monsters[m].r);
+  };
+  Game.prototype.flatten = function (c, r) {
+    for (var dr = -1; dr <= 1; dr++) for (var dc = -1; dc <= 1; dc++)
+      if (this.inField(c + dc, r + dr)) this.height[this.idx(c + dc, r + dr)] = 0;
+  };
+
+  /* --- trees, marbles and the things worth picking up ---------------- */
+  Game.prototype.makeFurniture = function () {
+    if (this.classic) return;
+    var f = this.feat, self = this;
+    function scatter(n, put) {
+      for (var i = 0, guard = 0; i < n && guard < 4000; guard++) {
+        var c = 2 + rnd(COLS - 4), r = 2 + rnd(ROWS - 4);
+        if (self.grid[self.idx(c, r)] !== EMPTY) continue;
+        if (self.item[self.idx(c, r)] !== NOTHING) continue;
+        if (Math.abs(c - self.manC) < 3 && Math.abs(r - self.manR) < 3) continue;
+        if (self.nearMonster(c, r)) continue;
+        put(c, r); i++;
+      }
+    }
+    if (f.trees) scatter(6 + rnd(7), function (c, r) { self.grid[self.idx(c, r)] = TREE; });
+    if (f.marbles) scatter(1 + rnd(3), function (c, r) {
+      self.grid[self.idx(c, r)] = MARBLE;
+      self.marbles.push({ c: c, r: r, dc: 0, dr: 0, v: 0 });
+    });
+    if (f.boots) scatter(1, function (c, r) { self.item[self.idx(c, r)] = BOOTS; });
+    if (f.frost) scatter(1, function (c, r) { self.item[self.idx(c, r)] = FROST; });
+    if (f.axe) scatter(1 + rnd(2), function (c, r) { self.item[self.idx(c, r)] = AXE; });
+    if (f.jar) scatter(1 + rnd(2), function (c, r) { self.item[self.idx(c, r)] = JAR; });
+    if (f.tar) scatter(1 + rnd(2), function (c, r) { self.grid[self.idx(c, r)] = VAT_TAR; });
+    if (f.water) scatter(1 + rnd(2), function (c, r) { self.grid[self.idx(c, r)] = VAT_WATER; });
+  };
+
+  /* the beetle's meal: one brick beside it, gone */
+  Game.prototype.devour = function (m) {
+    var d = [[1, 0], [-1, 0], [0, 1], [0, -1]], pick = [];
+    for (var i = 0; i < 4; i++)
+      if (this.brickAt(m.c + d[i][0], m.r + d[i][1])) pick.push(d[i]);
+    if (!pick.length) return false;
+    var p = pick[rnd(pick.length)];
+    this.grid[this.idx(m.c + p[0], m.r + p[1])] = EMPTY;
+    this.bricks--;
+    return true;
+  };
+
+  Game.prototype.isBoxed = function (m) {
+    return this.solid(m.c + 1, m.r) && this.solid(m.c - 1, m.r) &&
+           this.solid(m.c, m.r + 1) && this.solid(m.c, m.r - 1);
+  };
+  Game.prototype.loose = function () {
+    var n = 0;
+    for (var i = 0; i < this.monsters.length; i++)
+      if (!this.monsters[i].trapped && !this.monsters[i].gone) n++;
+    return n;
+  };
+  Game.prototype.canStillWin = function () {
+    if (this.classic) return this.bricks >= 4 * this.loose();
+    /* trees and marbles will hold a monster too, so only count bricks
+       against what is left loose, generously */
+    return this.bricks + this.marbles.length * 2 >= 4 * this.loose();
+  };
+
+  /* --- what a step costs --------------------------------------------
+     One step point arrives each turn (two in boots). A step on the level
+     costs one; every level of climb costs another, and shoving a line or
+     a marble costs another again. Stepping down gives a point back, so
+     you run downhill. In classic mode everything costs exactly one and
+     the whole system is invisible.                                     */
+  Game.prototype.stepCost = function (nc, nr, heavy) {
+    if (this.classic) return 1;
+    var climb = Math.max(0, this.h(nc, nr) - this.h(this.manC, this.manR));
+    return 1 + climb + (heavy ? 1 : 0);
+  };
+
+  /* ==================================================================
+     ONE TURN - lines 200-390, with everything that came later
+     ================================================================== */
   Game.prototype.step = function (dir) {
-    var ev = { moved: false, pushed: 0, lostOverEdge: 0, crunched: 0,
-               flyMoved: false, won: false, lost: false, bonus: 0 };
+    var ev = { moved: false, pushed: 0, lostOverEdge: 0, crunched: 0, crunchedBy: null,
+               eaten: 0, chopped: 0, picked: null, strained: false, rolled: [],
+               smashed: 0, crushed: [], trappedNow: [], won: false, lost: false,
+               lostTo: null, bonus: 0, stuck: false, spawned: null,
+               burst: 0, burned: 0, doused: 0, swept: 0, set: 0 };
     if (this.over || this.won) return ev;
 
-    /* ---- the man, lines 230-260 ---------------------------------- */
+    /* --- step points ------------------------------------------------
+       One a turn, two in boots, and they bank up to three. Walking on
+       the level spends one, so somebody walking steadily never has any
+       in hand: the moment the ground rises he loses a turn to it. Stand
+       still and you can wind up for a climb or a heavy shove instead. */
+    this.steps = Math.min(3, this.steps + (this.boots > 0 ? 2 : 1));
+
     var d = { left: [-1, 0], right: [1, 0], up: [0, 1], down: [0, -1] }[dir];
     if (d) {
-      var nc = this.manC + d[0], nr = this.manR + d[1];
-      if (this.inField(nc, nr)) {                   /* the bounds tests */
-        this.manC = nc; this.manR = nr;             /* he always moves  */
-        ev.moved = true;
-
-        if (this.grid[this.idx(nc, nr)] === BRICK) {
-          /* line 230: REPEAT J%=J%+32 UNTIL POINT(...)<>2 - count the
-             run of bricks starting under him and find the first square
-             that is not a brick.                                       */
-          var n = 0, cc = nc, rr = nr;
-          while (this.brickAt(cc, rr)) { n++; cc += d[0]; rr += d[1]; }
-
-          /* PROCmove_bricks, line 410: the run shifts one square into
-             that first free square. Three things can be standing there. */
-          if (!this.inField(cc, rr)) {
-            /* off the edge of the cellar. The original drew the brick
-               outside the graphics viewport, where it was clipped away
-               and never came back.                                     */
-            ev.lostOverEdge = 1;
-            this.bricks--;
-          } else if (cc === this.flyC && rr === this.flyR) {
-            /* driven straight at the fly. The brick lands on its square
-               and the fly wipes that square the moment it moves, so the
-               leading brick - and only the leading brick - is lost.     */
-            ev.crunched = 1;
-            this.bricks--;
-          } else {
-            this.grid[this.idx(cc, rr)] = BRICK;
-          }
-          this.grid[this.idx(nc, nr)] = EMPTY;      /* he stands here now */
-          ev.pushed = n;
-        }
+      /* in boots he gets through two squares in the same turn */
+      var passes = this.boots > 0 ? 2 : 1;
+      for (var pass = 0; pass < passes; pass++) {
+        if (!this.manMove(d, ev)) break;
+        if (ev.lost) return ev;
       }
     }
 
-    /* ---- the fly, lines 300-340 ----------------------------------
-       One random direction per turn. It moves only if the square is
-       not a brick AND the move keeps it inside a box of half-width
-       PA% around the man. That box is the whole of the fly's
-       intelligence: at level 1 it is 12 squares and the fly wanders,
-       at level 10 it is nothing and the fly can only close on you.   */
-    var R = 1 + ((Math.random() * 4) | 0);
-    var leash = leashCells(this.PA);
-    var fc = this.flyC, fr = this.flyR;
-    if (R === 1 && fc > 0 && fc > this.manC - leash && !this.brickAt(fc - 1, fr)) fc--;
-    else if (R === 2 && fc < COLS - 1 && fc < this.manC + leash && !this.brickAt(fc + 1, fr)) fc++;
-    else if (R === 3 && fr > 0 && fr > this.manR - leash && !this.brickAt(fc, fr - 1)) fr--;
-    else if (R === 4 && fr < ROWS - 1 && fr < this.manR + leash && !this.brickAt(fc, fr + 1)) fr++;
-    if (fc !== this.flyC || fr !== this.flyR) {
-      this.flyC = fc; this.flyR = fr;
-      ev.flyMoved = true;
+    this.settle(ev);
+    this.rollMarbles(ev);
+    if (ev.lost) return ev;
+    this.flowFluids(ev);
+    if (ev.lost) return ev;
+
+    /* ---- the monsters, lines 300-340 ------------------------------ */
+    if (this.frost > 0) this.frost--;
+    else {
+      for (var i = 0; i < this.monsters.length; i++) {
+        var m = this.monsters[i];
+        if (m.trapped || m.gone) continue;
+        m.ate = false;
+        m.spec.move(m, this);
+        if (m.ate) ev.eaten++;
+      }
     }
+    if (this.boots > 0) this.boots--;
+    this.settle(ev);
 
-    this.CO++;                                       /* line 370 */
+    this.CO++;                                      /* line 370 */
 
-    /* ---- line 380 -------------------------------------------------
-       Caught if they share a square. Trapped if all four orthogonal
-       neighbours are bricks - the edge of the cellar does NOT count,
-       so a corner is no help. Four real bricks or nothing.           */
-    if (this.manC === this.flyC && this.manR === this.flyR) {
-      ev.lost = true; this.over = true;
-      this.SC = 0;                                   /* PROCloss, line 480 */
-    } else if (this.brickAt(this.flyC + 1, this.flyR) &&
-               this.brickAt(this.flyC - 1, this.flyR) &&
-               this.brickAt(this.flyC, this.flyR + 1) &&
-               this.brickAt(this.flyC, this.flyR - 1)) {
+    /* ---- line 380 ------------------------------------------------- */
+    var caught = this.monsterAt(this.manC, this.manR);
+    if (caught && !caught.trapped) return this.die(ev, caught);
+    if (this.loose() === 0 && this.monsters.length) {
       ev.won = true; this.won = true;
-      /* PROCwin, lines 570-580. The high score is deliberately NOT
-         touched here: the original only compares it in PROCset_level
-         (line 1030), which runs on the next sheet. Since PROCloss wipes
-         SC% to zero first, a run that dies before clearing a sheet
-         contributes nothing to HI%. That is the original's behaviour.  */
+      /* PROCwin, lines 570-580. The high score is deliberately not
+         touched here: the original only compares it in PROCset_level,
+         and PROCloss wipes SC% first, so a run that dies before
+         clearing a sheet contributes nothing. */
       if (this.CO < 800) { ev.bonus = bonusFor(this.CO); this.SC += ev.bonus; }
       this.SC += this.F * 50;
+      this.SC += 100 * (this.monsters.length - 1);
+    } else if (!this.canStillWin()) {
+      ev.stuck = true;
     }
     return ev;
   };
 
-  /* called after the win has been shown - line 610 PROCnext_sheet */
+  /* --- the man's move, lines 230-260. True if he actually did
+         something, so a strained turn stops him trying again. -------- */
+  Game.prototype.manMove = function (d, ev) {
+    {
+      var nc = this.manC + d[0], nr = this.manR + d[1];
+      if (!this.inField(nc, nr)) return false;
+      {
+        var here = this.grid[this.idx(nc, nr)];
+
+        if (here === TREE || here === VAT_TAR || here === VAT_WATER) {
+          /* none of these shove. The axe is the only argument they take */
+          if (this.axe > 0 && this.steps >= 1) {
+            this.axe--; this.steps -= 1;
+            if (here === TREE) { this.grid[this.idx(nc, nr)] = EMPTY; ev.chopped = 1; }
+            else this.breakVat(nc, nr, ev);
+          } else ev.strained = true;
+
+        } else if (here === COOLED) {
+          ev.strained = true;                  /* set tar is rock now */
+
+        } else if (here === MARBLE) {
+          var mar = this.marbleAt(nc, nr);
+          var cost = this.stepCost(nc, nr, false);
+          if (this.steps < cost) ev.strained = true;
+          else {
+            this.steps -= cost;
+            /* a shove sets it rolling; how well depends on the ground */
+            var drop = this.h(nc, nr) - this.h(nc + d[0], nr + d[1]);
+            mar.dc = d[0]; mar.dr = d[1];
+            mar.v = 2 + Math.max(-1.5, drop * 0.9);
+            if (mar.v <= 0) { mar.v = 0; ev.strained = true; }
+            else ev.rolled.push(mar);
+          }
+
+        } else {
+          if (this.fluid[this.idx(nc, nr)] === TAR) { this.die(ev, { spec: { name: "Tar" } }); return false; }
+          var run = 0, cc = nc, rr = nr;
+          while (this.at(cc, rr) === BRICK) { run++; cc += d[0]; rr += d[1]; }
+          var wading = this.fluid[this.idx(nc, nr)] === WATER;
+          var cost2 = this.stepCost(nc, nr, run >= 2 || wading);
+          if (this.steps < cost2) ev.strained = true;
+          else {
+            this.steps -= cost2;
+            this.manC = nc; this.manR = nr;         /* he always advances */
+            ev.moved = true;
+            if (this.h(nc, nr) < this.h(nc - d[0], nr - d[1])) this.steps = Math.min(3, this.steps + 1);
+
+            if (run) {
+              var blocker = this.monsterAt(cc, rr);
+              if (!this.inField(cc, rr)) {
+                /* over the edge of the cellar: the original drew it outside
+                   the graphics viewport, where it was clipped and lost */
+                ev.lostOverEdge = 1; this.bricks--;
+              } else if (blocker) {
+                /* driven straight at a monster. The brick lands on its
+                   square and its redraw wipes it, so the leading brick -
+                   and only the leading brick - is destroyed. */
+                ev.crunched = 1; ev.crunchedBy = blocker; this.bricks--;
+              } else if (this.at(cc, rr) !== EMPTY) {
+                /* a tree or a marble at the end of the run stops it dead */
+                ev.lostOverEdge = 0; this.bricks--; ev.crunched = 1;
+              } else {
+                this.grid[this.idx(cc, rr)] = BRICK;
+              }
+              this.grid[this.idx(nc, nr)] = EMPTY;
+              ev.pushed = run;
+            }
+
+            /* anything lying here is picked up */
+            var it = this.item[this.idx(nc, nr)];
+            if (it !== NOTHING) {
+              this.item[this.idx(nc, nr)] = NOTHING;
+              ev.picked = this.take(it, ev);
+            }
+          }
+        }
+      }
+    }
+
+    return ev.moved || ev.chopped > 0 || !!ev.burst;
+  };
+
+  Game.prototype.die = function (ev, by) {
+    ev.lost = true; ev.lostTo = by || null;
+    this.over = true;
+    this.SC = 0;                                    /* PROCloss, line 480 */
+    return ev;
+  };
+
+  Game.prototype.take = function (it, ev) {
+    var spec = ITEMS[it];
+    if (it === BOOTS) this.boots = BOOTS_TURNS;
+    else if (it === FROST) this.frost = FROST_TURNS;
+    else if (it === AXE) this.axe += AXE_SWINGS;
+    else if (it === JAR) {
+      /* nobody labelled it */
+      if (rnd(2) === 0) { this.frost = FROST_TURNS + 20; return { key: "jar", name: "Sealed jar", got: "It was frost. Everything has stopped." }; }
+      var kind = MONSTER_ORDER[rnd(MONSTER_ORDER.length)];
+      var spot = this.farSpot();
+      var extra = this.newMonster(kind, spot[0], spot[1]);
+      this.monsters.push(extra);
+      ev.spawned = extra;
+      return { key: "jar", name: "Sealed jar", got: "It was a " + extra.spec.name.toLowerCase() + ". It was not empty." };
+    }
+    return { key: spec.key, name: spec.name, got: spec.blurb };
+  };
+
+  Game.prototype.farSpot = function () {
+    var best = [1, 1], far = -1;
+    for (var k = 0; k < 60; k++) {
+      var c = 2 + rnd(COLS - 4), r = 2 + rnd(ROWS - 4);
+      if (this.grid[this.idx(c, r)] !== EMPTY || this.monsterAt(c, r)) continue;
+      var d = Math.abs(c - this.manC) + Math.abs(r - this.manR);
+      if (d > far) { far = d; best = [c, r]; }
+    }
+    return best;
+  };
+
+  /* --- the marbles ---------------------------------------------------
+     A marble carries speed. It gains speed running downhill and loses it
+     climbing, and if it cannot crest a slope it turns round and comes
+     back at you, gathering pace. What it hits depends on how fast it is
+     going: slowly it bounces off, quickly it breaks bricks, and at speed
+     it will flatten a monster - or you.                               */
+  Game.prototype.rollMarbles = function (ev) {
+    for (var i = 0; i < this.marbles.length; i++) {
+      var m = this.marbles[i];
+      if (m.v <= 0) { m.v = 0; continue; }
+      var steps = Math.max(1, Math.min(3, Math.round(m.v)));
+      for (var s = 0; s < steps && m.v > 0; s++) {
+        var nc = m.c + m.dc, nr = m.r + m.dr;
+        var dh = this.h(nc, nr) - this.h(m.c, m.r);
+
+        if (!this.inField(nc, nr)) { this.bounce(m, 0.45); continue; }
+        if (dh > 0 && m.v <= dh) { this.bounce(m, 0.7); continue; }   /* rolls back */
+
+        var what = this.grid[this.idx(nc, nr)];
+        if (what === BRICK) {
+          if (m.v >= 3) { this.grid[this.idx(nc, nr)] = EMPTY; this.bricks--; ev.smashed++; m.v -= 1.4; this.place(m, nc, nr); }
+          else this.bounce(m, 0.45);
+          continue;
+        }
+        if (what === VAT_TAR || what === VAT_WATER) {
+          if (m.v >= 1.5) { this.breakVat(nc, nr, ev); m.v -= 0.6; }
+          else this.bounce(m, 0.4);
+          continue;
+        }
+        if (what === TREE || what === MARBLE || what === COOLED) { this.bounce(m, 0.35); continue; }
+
+        var mon = this.monsterAt(nc, nr);
+        if (mon && !mon.gone) {
+          if (m.v >= 2) {
+            mon.gone = true; mon.trapped = true; mon.crushed = true;
+            ev.crushed.push(mon);
+            this.SC += 150;
+            m.v -= 0.8;
+            this.place(m, nc, nr);
+          } else this.bounce(m, 0.4);
+          continue;
+        }
+        if (nc === this.manC && nr === this.manR) {
+          if (m.v >= 2) { this.die(ev, { spec: { name: "Marble" } }); return; }
+          m.v = 0;                                   /* he stops it dead */
+          continue;
+        }
+
+        /* clear ground */
+        this.place(m, nc, nr);
+        m.v += (dh < 0) ? (-dh * 0.55) : (-dh * 0.95);
+      }
+      m.v -= 0.16;                                   /* rolling friction */
+      if (m.v <= 0.05) { m.v = 0; m.dc = 0; m.dr = 0; }
+    }
+  };
+  Game.prototype.place = function (m, nc, nr) {
+    this.grid[this.idx(m.c, m.r)] = EMPTY;
+    m.c = nc; m.r = nr;
+    this.grid[this.idx(nc, nr)] = MARBLE;
+  };
+  Game.prototype.bounce = function (m, keep) {
+    m.dc = -m.dc; m.dr = -m.dr;
+    m.v *= keep;
+    if (m.v < 0.3) { m.v = 0; m.dc = 0; m.dr = 0; }
+  };
+
+  /* ==================================================================
+     TAR AND WATER
+
+     Both are sealed away until something breaks the vat, and then they
+     behave the way anything does on a sloping stone floor: they run to
+     the lowest ground they can reach and spread out when they can go no
+     lower. Volume is carried per square, so a burst vat drains and a
+     thin spill peters out.
+
+     Tar burns what it runs into and finally sets solid, which leaves a
+     wall you did not have to build. Water goes further, puts the tar
+     out, shoves marbles along in front of it, and sweeps whatever is
+     standing in its way one square downstream.
+     ================================================================== */
+  Game.prototype.breakVat = function (c, r, ev) {
+    var i = this.idx(c, r);
+    var kind = (this.grid[i] === VAT_TAR) ? TAR : WATER;
+    this.grid[i] = EMPTY;
+    this.sources.push({ c: c, r: r, kind: kind, left: (kind === TAR) ? 9 : 13 });
+    ev.burst = kind;
+    return kind;
+  };
+
+  Game.prototype.blocksFluid = function (c, r, kind) {
+    var v = this.at(c, r);
+    if (v === -1) return true;
+    if (v === BRICK || v === COOLED || v === VAT_TAR || v === VAT_WATER) return true;
+    if (v === TREE) return kind !== TAR;        /* tar takes the tree with it */
+    return false;                                /* MARBLE is handled by the caller */
+  };
+
+  Game.prototype.flowFluids = function (ev) {
+    if (this.classic) return;
+    var n = COLS * ROWS, i, k;
+
+    /* a burst vat keeps pouring for a while */
+    for (var si = 0; si < this.sources.length; si++) {
+      var src = this.sources[si];
+      if (src.left <= 0) continue;
+      i = this.idx(src.c, src.r);
+      if (this.fluid[i] === DRY) { this.fluid[i] = src.kind; this.fvol[i] = 0; }
+      if (this.fluid[i] === src.kind) { this.fvol[i] = Math.min(9, this.fvol[i] + 3); src.left--; }
+    }
+
+    /* highest ground first, so a spill cascades within the turn instead
+       of creeping one square a turn */
+    var cells = [];
+    for (k = 0; k < n; k++) if (this.fvol[k] > 0) cells.push(k);
+    var self = this;
+    cells.sort(function (a, b) {
+      return (self.height[b] * 16 + self.fvol[b]) - (self.height[a] * 16 + self.fvol[a]);
+    });
+
+    var D = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+    for (var ci = 0; ci < cells.length; ci++) {
+      i = cells[ci];
+      if (this.fvol[i] < 2) continue;      /* a film that thin stays put */
+      var c = i % COLS, r = (i / COLS) | 0, kind = this.fluid[i];
+      var best = null, bestLvl = this.height[i] * 4 + this.fvol[i];
+
+      var dirs = D.slice();
+      for (var t = 3; t > 0; t--) { var j = rnd(t + 1), tmp = dirs[t]; dirs[t] = dirs[j]; dirs[j] = tmp; }
+
+      for (var d = 0; d < 4; d++) {
+        var nc = c + dirs[d][0], nr = r + dirs[d][1];
+        if (!this.inField(nc, nr)) continue;
+        var ni = this.idx(nc, nr);
+
+        /* water shoves a marble along in front of it rather than stopping */
+        if (this.grid[ni] === MARBLE) {
+          if (kind === WATER && this.fvol[i] >= 3) {
+            var mar = this.marbleAt(nc, nr);
+            if (mar && mar.v <= 0) { mar.dc = dirs[d][0]; mar.dr = dirs[d][1]; mar.v = 1.6; ev.rolled.push(mar); }
+          }
+          continue;
+        }
+        if (kind === TAR && this.grid[ni] === BRICK) {
+          /* it burns through instead of going round, and spends itself
+             doing it - a course of bricks will hold, one will not */
+          this.grid[ni] = EMPTY; this.bricks--; ev.burned++;
+          this.fvol[i] = Math.max(0, this.fvol[i] - 2);
+          if (this.fvol[i] <= 0) { this.fluid[i] = DRY; break; }
+          continue;
+        }
+        if (this.blocksFluid(nc, nr, kind)) continue;
+        if (this.fluid[ni] !== DRY && this.fluid[ni] !== kind) { this.douse(i, ni, ev); continue; }
+
+        var lvl = this.height[ni] * 4 + this.fvol[ni];
+        if (lvl < bestLvl) { bestLvl = lvl; best = [nc, nr, ni, dirs[d]]; }
+      }
+
+      if (best) {
+        /* hand over half, never the lot: a square that gives away
+           everything it has just shunts the same packet along for ever
+           instead of the spill levelling out and setting */
+        var amt = Math.min((kind === WATER) ? 3 : 2, this.fvol[i] >> 1);
+        if (amt < 1) continue;
+        this.fvol[i] -= amt;
+        if (this.fluid[best[2]] === DRY) this.fluid[best[2]] = kind;
+        this.fvol[best[2]] = Math.min(9, this.fvol[best[2]] + amt);
+        this.enterFluid(best[0], best[1], kind, best[3], ev);
+        if (ev.lost) return;
+        if (this.fvol[i] <= 0) this.fluid[i] = DRY;
+      }
+    }
+
+    /* and the tar sets */
+    for (k = 0; k < n; k++) {
+      if (this.fluid[k] !== TAR) { if (this.fluid[k] === WATER) this.burn[k] = 0; continue; }
+      this.burn[k]++;
+      if (this.burn[k] > TAR_COOLS) {
+        this.fluid[k] = DRY; this.fvol[k] = 0;
+        this.grid[k] = COOLED;
+        ev.set++;
+      }
+    }
+  };
+
+  /* what happens on the square the fluid has just reached */
+  Game.prototype.enterFluid = function (c, r, kind, dir, ev) {
+    var i = this.idx(c, r), d, dd;
+    if (kind === TAR) {
+      if (this.grid[i] === TREE) { this.grid[i] = EMPTY; ev.burned++; }
+      else if (this.grid[i] === BRICK) { this.grid[i] = EMPTY; this.bricks--; ev.burned++; }
+      if (this.item[i] !== NOTHING) this.item[i] = NOTHING;
+
+      var mon = this.monsterAt(c, r);
+      if (mon && !mon.gone) {
+        mon.gone = true; mon.trapped = true; mon.crushed = true;
+        ev.crushed.push(mon); this.SC += 120;
+      }
+      /* and it will take a neighbouring vat with it, which is how a
+         cellar goes up all at once */
+      for (d = 0; d < 4; d++) {
+        dd = [[1, 0], [-1, 0], [0, 1], [0, -1]][d];
+        if (this.at(c + dd[0], r + dd[1]) === VAT_TAR) this.breakVat(c + dd[0], r + dd[1], ev);
+      }
+      if (c === this.manC && r === this.manR) { this.die(ev, { spec: { name: "Tar" } }); return; }
+
+    } else {
+      /* water sweeps whatever is standing here one square downstream */
+      var nc = c + dir[0], nr = r + dir[1];
+      var open = this.inField(nc, nr) && this.at(nc, nr) === EMPTY;
+      var m2 = this.monsterAt(c, r);
+      if (m2 && !m2.trapped && open && !this.monsterAt(nc, nr)) { m2.c = nc; m2.r = nr; ev.swept++; }
+      if (c === this.manC && r === this.manR && open) {
+        this.manC = nc; this.manR = nr; ev.swept++;
+        var hit = this.monsterAt(nc, nr);
+        if (hit && !hit.trapped) { this.die(ev, hit); return; }
+      }
+    }
+  };
+
+  /* water and tar meeting: the fire goes out and leaves rock */
+  Game.prototype.douse = function (a, b, ev) {
+    var tar = (this.fluid[a] === TAR) ? a : b;
+    var wet = (tar === a) ? b : a;
+    this.fluid[tar] = DRY; this.fvol[tar] = 0;
+    this.grid[tar] = COOLED;
+    this.fvol[wet] = Math.max(0, this.fvol[wet] - 2);
+    if (this.fvol[wet] <= 0) this.fluid[wet] = DRY;
+    ev.doused++;
+  };
+
+  Game.prototype.settle = function (ev) {
+    for (var i = 0; i < this.monsters.length; i++) {
+      var m = this.monsters[i];
+      if (!m.trapped && !m.gone && this.isBoxed(m)) { m.trapped = true; ev.trappedNow.push(m); }
+    }
+  };
+
   Game.prototype.nextSheet = function () {
     this.F++;
     this.won = false;
     this.sheet();
   };
 
-  /* --- the user-defined characters, lines 80 and 150-160 -------------
-     Eight bytes each, exactly as the original VDU23 statements.
-     224 is a solid block, used both as the eraser and as the body of a
-     brick; 228 is the mortar drawn over it in another colour; 225 is
-     the man; 226 and 227 are the fly, overlaid in two colours.        */
+  /* --- the title screen, line 190 ------------------------------------
+     PROCtitle_page reads these records and lays bricks along each run:
+     C%=1 a vertical run at x=D% from y=A% to B%, C%=0 a horizontal run
+     at y=D% from x=A% to B%. They spell FLY.                          */
+  var TITLE_DATA = [
+    [1, 192, 480, 896], [1, 224, 480, 896], [0, 896, 224, 684], [0, 768, 224, 320],
+    [1, 448, 480, 768], [0, 480, 448, 608],
+    [1, 896, 448, 704], [0, 704, 704, 1088], [1, 704, 704, 896], [1, 1088, 704, 896]
+  ];
+  function titleCells() {
+    var out = [];
+    for (var i = 0; i < TITLE_DATA.length; i++) {
+      var C = TITLE_DATA[i][0], D = TITLE_DATA[i][1], A = TITLE_DATA[i][2], B = TITLE_DATA[i][3];
+      for (var G = A; G <= B; G += 32) {
+        var X = (C === 1) ? D : G, Y = (C === 1) ? G : D;
+        out.push([(X - 96) / 32, (Y - 128) / 32]);
+      }
+    }
+    return out;
+  }
+
+  /* --- the user-defined characters, lines 80 and 150-160 ------------- */
   var UDG = {
     block: [255, 255, 255, 255, 255, 255, 255, 255],   /* 224 */
     man:   [28, 28, 8, 127, 8, 20, 34, 65],            /* 225 */
@@ -487,8 +1206,7 @@
     mortar:[255, 8, 8, 8, 255, 64, 64, 64]             /* 228 */
   };
 
-  /* --- SOUND and ENVELOPE, lines 40-70 -------------------------------
-     The four envelopes exactly as the listing declares them.          */
+  /* --- SOUND and ENVELOPE, lines 40-70 ------------------------------- */
   var ENVELOPES = {
     1: [1, -10, 20, -10, 33, 33, 33, 25, -1, -1, -2, 100, 80],
     2: [1, 4, -3, 5, 40, 20, 30, 127, -1, 0, 0, 126, 0],
@@ -508,13 +1226,46 @@
     "edge, and don't get caught or else!!"
   ];
 
+  /* --- saved games ---------------------------------------------------
+     This browser only. Every read and write is guarded: storage can be
+     absent, full, or refused outright.                                */
+  var KEY = "mutantfly.save.v2";
+  var save = {
+    read: function () {
+      try {
+        var s = JSON.parse(localStorage.getItem(KEY));
+        return (s && typeof s === "object") ? s : null;
+      } catch (e) { return null; }
+    },
+    write: function (o) { try { localStorage.setItem(KEY, JSON.stringify(o)); } catch (e) {} },
+    keep: function (level, score, best) {
+      var s = this.read() || {};
+      s.level = level; s.score = score;
+      s.best = Math.max(best || 0, s.best || 0);
+      s.deepest = Math.max(level, s.deepest || 0);
+      this.write(s);
+    },
+    end: function (best) {
+      var s = this.read() || {};
+      s.best = Math.max(best || 0, s.best || 0);
+      delete s.level; delete s.score;
+      this.write(s);
+    }
+  };
+
   root.MutantFly = {
     Game: Game,
-    COLS: COLS, ROWS: ROWS, EMPTY: EMPTY, BRICK: BRICK, TICK_HZ: TICK_HZ,
-    levelOf: levelOf, leashCells: leashCells, palette: palette,
-    bonusFor: bonusFor,
+    COLS: COLS, ROWS: ROWS, TICK_HZ: TICK_HZ, MAX_H: MAX_H,
+    EMPTY: EMPTY, BRICK: BRICK, TREE: TREE, MARBLE: MARBLE,
+    VAT_TAR: VAT_TAR, VAT_WATER: VAT_WATER, COOLED: COOLED,
+    DRY: DRY, WATER: WATER, TAR: TAR,
+    NOTHING: NOTHING, BOOTS: BOOTS, FROST: FROST, AXE: AXE, JAR: JAR, ITEMS: ITEMS,
+    levelOf: levelOf, monstersFor: monstersFor, featuresFor: featuresFor,
+    briefingFor: briefingFor, BRIEFINGS: BRIEFINGS, leashCells: leashCells, palette: palette, bonusFor: bonusFor,
+    MONSTERS: MONSTERS, MONSTER_ORDER: MONSTER_ORDER,
+    titleCells: titleCells, TITLE_DATA: TITLE_DATA,
     UDG: UDG, ENVELOPES: ENVELOPES, INSTRUCTIONS: INSTRUCTIONS,
-    /* the BBC's eight physical colours */
+    save: save,
     PHYSICAL: ["#000000", "#ff0000", "#00ff00", "#ffff00",
                "#0000ff", "#ff00ff", "#00ffff", "#ffffff"]
   };
@@ -524,22 +1275,27 @@
 <script>
 "use strict";
 /* =====================================================================
-   MUTANT FLY - 2026
-   The same game, three-dimensionally. Every rule comes from src/rules.js,
-   which is a port of John McCauley's 1985 BBC BASIC; only the presentation
-   is new. The one deliberate change is pace: the original ran its turn
-   loop at 20 a second, which in a 3D cellar reads as a blur, so a turn
-   here takes 150ms and the figures glide between squares. Scoring is
-   unaffected - the original's pressure was a count of moves, not a clock.
+   MUTANT FLY - the deep cellars
+
+   The rules are src/rules.js, a port of John McCauley's 1985 BBC BASIC.
+   This is a second presentation of them, three-dimensionally, with the
+   things the original could not afford: four kinds of monster, cellars
+   that do not stop at nine, and a game you can put down and come back to.
+
+   The one change of pace: the original ran its turn loop at twenty a
+   second, which in a 3D cellar reads as a blur, so a turn takes 150ms
+   and everything glides between squares. Scoring is untouched - the
+   original's pressure was a count of moves, not a clock.
    ===================================================================== */
 var MF = window.MutantFly;
 var COLS = MF.COLS, ROWS = MF.ROWS;
 var TURN_MS = 150;
+var $ = function (id) { return document.getElementById(id); };
+var hex = function (n) { return "#" + ("00000" + n.toString(16)).slice(-6); };
 
 /* ==================================================================
-   PROCEDURAL TEXTURES
-   Nothing is loaded from anywhere; every surface is drawn here and
-   turned into a colour map with a matching height map for relief.
+   PROCEDURAL TEXTURES - nothing is loaded; every surface is drawn
+   here and given a matching height map for relief.
    ================================================================== */
 function noiseCanvas(size, fn) {
   var c = document.createElement("canvas");
@@ -547,10 +1303,10 @@ function noiseCanvas(size, fn) {
   fn(c.getContext("2d"), size);
   return c;
 }
-function tex(canvas, repeatX, repeatY, srgb) {
+function tex(canvas, rx, ry, srgb) {
   var t = new THREE.CanvasTexture(canvas);
   t.wrapS = t.wrapT = THREE.RepeatWrapping;
-  t.repeat.set(repeatX || 1, repeatY || 1);
+  t.repeat.set(rx || 1, ry || 1);
   t.anisotropy = 8;
   if (srgb) t.encoding = THREE.sRGBEncoding;
   return t;
@@ -565,25 +1321,20 @@ function grain(g, size, amount, dark) {
   }
   g.putImageData(img, 0, 0);
 }
-
-/* --- a brick, drawn as courses with mortar and worn edges ---------- */
 function brickMaps(hue) {
   var S = 256, rows = 5, h = S / rows;
   var col = noiseCanvas(S, function (g) {
-    g.fillStyle = "#2b2521"; g.fillRect(0, 0, S, S);       /* mortar */
+    g.fillStyle = "#2b2521"; g.fillRect(0, 0, S, S);
     for (var r = 0; r < rows; r++) {
       var off = (r % 2) ? h : 0;
       for (var x = -h; x < S; x += h * 2) {
         var bx = x + off + 3, by = r * h + 3, bw = h * 2 - 6, bh = h - 6;
         var v = 0.78 + Math.random() * 0.34;
         g.fillStyle = "hsl(" + (hue.h + (Math.random() * 10 - 5)) + "," +
-                      (hue.s * (0.9 + Math.random() * 0.2)) + "%," +
-                      Math.min(70, hue.l * v) + "%)";
+                      (hue.s * (0.9 + Math.random() * 0.2)) + "%," + Math.min(70, hue.l * v) + "%)";
         g.fillRect(bx, by, bw, bh);
-        g.fillStyle = "rgba(255,255,255,.055)";
-        g.fillRect(bx, by, bw, 2);
-        g.fillStyle = "rgba(0,0,0,.16)";
-        g.fillRect(bx, by + bh - 2, bw, 2);
+        g.fillStyle = "rgba(255,255,255,.055)"; g.fillRect(bx, by, bw, 2);
+        g.fillStyle = "rgba(0,0,0,.16)"; g.fillRect(bx, by + bh - 2, bw, 2);
       }
     }
     grain(g, S, 26, true);
@@ -593,16 +1344,13 @@ function brickMaps(hue) {
     for (var r = 0; r < rows; r++) {
       var off = (r % 2) ? h : 0;
       for (var x = -h; x < S; x += h * 2) {
-        g.fillStyle = "#d8d8d8";
-        g.fillRect(x + off + 3, r * h + 3, h * 2 - 6, h - 6);
+        g.fillStyle = "#d8d8d8"; g.fillRect(x + off + 3, r * h + 3, h * 2 - 6, h - 6);
       }
     }
     grain(g, S, 40);
   });
   return { map: tex(col, 1, 1, true), bump: tex(bump, 1, 1) };
 }
-
-/* --- cellar stone, big rough blocks -------------------------------- */
 function stoneMaps() {
   var S = 512, rows = 6, h = S / rows;
   var col = noiseCanvas(S, function (g) {
@@ -610,20 +1358,14 @@ function stoneMaps() {
     for (var r = 0; r < rows; r++) {
       var off = (r % 2) ? h * 0.9 : 0;
       for (var x = -h * 2; x < S; x += h * 1.8) {
-        var v = 30 + Math.random() * 22;
-        g.fillStyle = "hsl(" + (28 + Math.random() * 12) + ",9%," + v + "%)";
-        g.beginPath();
         var bx = x + off + 4, by = r * h + 4, bw = h * 1.8 - 8, bh = h - 8;
-        g.rect(bx, by, bw, bh); g.fill();
+        g.fillStyle = "hsl(" + (28 + Math.random() * 12) + ",9%," + (30 + Math.random() * 22) + "%)";
+        g.fillRect(bx, by, bw, bh);
         g.fillStyle = "rgba(0,0,0,.25)"; g.fillRect(bx, by + bh - 3, bw, 3);
         g.fillStyle = "rgba(255,255,255,.05)"; g.fillRect(bx, by, bw, 2);
-        /* damp patches */
         if (Math.random() < 0.3) {
           g.fillStyle = "rgba(24,40,34,.20)";
-          g.beginPath();
-          g.ellipse(bx + Math.random() * bw, by + bh * 0.75,
-                    bw * 0.3, bh * 0.3, 0, 0, 6.3);
-          g.fill();
+          g.beginPath(); g.ellipse(bx + Math.random() * bw, by + bh * 0.75, bw * 0.3, bh * 0.3, 0, 0, 6.3); g.fill();
         }
       }
     }
@@ -642,20 +1384,16 @@ function stoneMaps() {
   });
   return { map: tex(col, 1, 1, true), bump: tex(bump, 1, 1) };
 }
-
-/* --- the floor: flagstones, dust, standing damp --------------------- */
 function floorMaps() {
   var S = 512, n = 4, h = S / n;
   var col = noiseCanvas(S, function (g) {
     g.fillStyle = "#0f0d0b"; g.fillRect(0, 0, S, S);
     for (var r = 0; r < n; r++) for (var c = 0; c < n; c++) {
-      var v = 15 + Math.random() * 13;
-      g.fillStyle = "hsl(" + (30 + Math.random() * 14) + ",11%," + v + "%)";
+      g.fillStyle = "hsl(" + (30 + Math.random() * 14) + ",11%," + (15 + Math.random() * 13) + "%)";
       g.fillRect(c * h + 3, r * h + 3, h - 6, h - 6);
       for (var s = 0; s < 40; s++) {
         g.fillStyle = "rgba(255,240,210," + (Math.random() * 0.035) + ")";
-        g.fillRect(c * h + Math.random() * h, r * h + Math.random() * h,
-                   Math.random() * 9, Math.random() * 3);
+        g.fillRect(c * h + Math.random() * h, r * h + Math.random() * h, Math.random() * 9, Math.random() * 3);
       }
     }
     grain(g, S, 22, true);
@@ -675,128 +1413,178 @@ function floorMaps() {
    SCENE
    ================================================================== */
 var renderer, scene, camera, clock;
-var brickMesh, wallGroup, floorMesh, manRig, flyRig, motes, debris = [];
-var torches = [], keyLight;
+var brickMesh, floorMesh, manRig, motes, debris = [], torches = [], keyLight;
 var BRICK_MAT, BRICK_TEX = {};
+var monsterRigs = [];
+var terrain, props = {}, marbleMeshes = [], cubeCam, cubeT = 0, bobT = 0;
 
 function init3D() {
-  renderer = new THREE.WebGLRenderer({
-    canvas: document.getElementById("gl"), antialias: true, powerPreference: "high-performance"
-  });
+  renderer = new THREE.WebGLRenderer({ canvas: $("gl"), antialias: true, powerPreference: "high-performance" });
   renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
   renderer.shadowMap.enabled = true;
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   renderer.outputEncoding = THREE.sRGBEncoding;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  renderer.toneMappingExposure = 1.15;
-  renderer.physicallyCorrectLights = false;
+  renderer.toneMappingExposure = 1.32;
 
   scene = new THREE.Scene();
   scene.background = new THREE.Color(0x070605);
-  scene.fog = new THREE.FogExp2(0x0b0805, 0.031);
-
+  scene.fog = new THREE.FogExp2(0x0d0a07, 0.020);
   camera = new THREE.PerspectiveCamera(50, 1, 0.1, 220);
   clock = new THREE.Clock();
 
-  scene.add(new THREE.HemisphereLight(0x2a2418, 0x090705, 0.30));
-
-  /* the lamp the player carries with him, and the only shadow caster */
-  keyLight = new THREE.SpotLight(0xffb163, 3.1, 34, 0.86, 0.55, 1.1);
+  scene.add(new THREE.HemisphereLight(0x342c1d, 0x0d0a08, 0.52));
+  keyLight = new THREE.SpotLight(0xffb163, 3.6, 40, 0.9, 0.5, 1.05);
   keyLight.castShadow = true;
   keyLight.shadow.mapSize.set(1024, 1024);
   keyLight.shadow.bias = -0.0022;
   keyLight.shadow.camera.near = 1;
-  keyLight.shadow.camera.far = 40;
+  keyLight.shadow.camera.far = 42;
   scene.add(keyLight, keyLight.target);
 
   buildCellar();
   manRig = buildMan(); scene.add(manRig);
-  flyRig = buildFly(); scene.add(flyRig);
   buildMotes();
   loadAssets();
 
   addEventListener("resize", resize);
   resize();
 }
-
 function resize() {
-  var w = innerWidth, h = innerHeight;
-  renderer.setSize(w, h, false);
-  camera.aspect = w / h;
+  renderer.setSize(innerWidth, innerHeight, false);
+  camera.aspect = innerWidth / innerHeight;
   camera.updateProjectionMatrix();
 }
 
 function buildCellar() {
+  /* the floor is a block per square, so it can rise and fall */
   var fm = floorMaps();
-  floorMesh = new THREE.Mesh(
-    new THREE.PlaneGeometry(COLS + 10, ROWS + 10),
-    new THREE.MeshStandardMaterial({ map: fm.map, bumpMap: fm.bump, bumpScale: 0.06,
-                                     roughness: 0.97, metalness: 0.02, color: 0xffffff })
-  );
-  floorMesh.rotation.x = -Math.PI / 2;
-  floorMesh.position.set(COLS / 2, 0, ROWS / 2);
-  floorMesh.receiveShadow = true;
-  scene.add(floorMesh);
+  fm.map.repeat.set(1, 1); fm.bump.repeat.set(1, 1);
+  var floorMat = new THREE.MeshStandardMaterial({ map: fm.map, bumpMap: fm.bump,
+                  bumpScale: 0.07, roughness: 0.97, metalness: 0.02 });
+  terrain = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), floorMat, COLS * ROWS);
+  terrain.receiveShadow = true;
+  terrain.castShadow = false;      /* tiles shadowing each other reads as mud */
+  scene.add(terrain);
+
+  /* an apron of dead ground so the cellar does not end in mid-air */
+  var apron = new THREE.Mesh(new THREE.PlaneGeometry(COLS + 16, ROWS + 16), floorMat.clone());
+  apron.material.map = fm.map; apron.material.color.setHex(0x6a6a6a);
+  apron.rotation.x = -Math.PI / 2;
+  apron.position.set(COLS / 2, -0.52, ROWS / 2);
+  apron.receiveShadow = true;
+  scene.add(apron);
 
   var sm = stoneMaps();
-  var wallMat = new THREE.MeshStandardMaterial({
-    map: sm.map, bumpMap: sm.bump, bumpScale: 0.11, roughness: 0.95, metalness: 0.03
-  });
-  var H = 5.2, T = 2.4;
-  wallGroup = new THREE.Group();
+  var wallMat = new THREE.MeshStandardMaterial({ map: sm.map, bumpMap: sm.bump, bumpScale: 0.11, roughness: 0.95, metalness: 0.03 });
+  var H = 5.2, T = 2.4, W = COLS, D = ROWS;
   function wall(w, d, x, z) {
     var m = new THREE.Mesh(new THREE.BoxGeometry(w, H, d), wallMat);
     m.position.set(x, H / 2, z);
     m.receiveShadow = true; m.castShadow = true;
-    wallGroup.add(m);
+    scene.add(m);
   }
-  var W = COLS, D = ROWS;
   wall(W + T * 2, T, W / 2, -T / 2);
   wall(W + T * 2, T, W / 2, D + T / 2);
   wall(T, D + T * 2, -T / 2, D / 2);
   wall(T, D + T * 2, W + T / 2, D / 2);
-  scene.add(wallGroup);
 
-  /* torches bracketed to the walls */
   var spots = [[6,-0.4],[17,-0.4],[28,-0.4],[6,ROWS+0.4],[17,ROWS+0.4],[28,ROWS+0.4],
                [-0.4,7],[-0.4,19],[COLS+0.4,7],[COLS+0.4,19]];
   var flameMat = new THREE.MeshBasicMaterial({ color: 0xffc06a, transparent: true, opacity: 0.95 });
   for (var i = 0; i < spots.length; i++) {
     var g = new THREE.Group();
     g.position.set(spots[i][0], 3.0, spots[i][1]);
-    var bracket = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.07, 0.09, 0.7, 6),
-      new THREE.MeshStandardMaterial({ color: 0x2a2018, roughness: 0.7, metalness: 0.5 })
-    );
+    var bracket = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.09, 0.7, 6),
+      new THREE.MeshStandardMaterial({ color: 0x2a2018, roughness: 0.7, metalness: 0.5 }));
     bracket.rotation.z = 0.4; g.add(bracket);
     var flame = new THREE.Mesh(new THREE.ConeGeometry(0.19, 0.62, 7), flameMat);
     flame.position.y = 0.52; g.add(flame);
     var lt = new THREE.PointLight(0xff8c2e, 1.5, 15, 1.7);
     lt.position.y = 0.5; g.add(lt);
-    torches.push({ g: g, light: lt, flame: flame, seed: Math.random() * 9 });
+    torches.push({ light: lt, flame: flame, seed: Math.random() * 9 });
     scene.add(g);
   }
 
-  /* bricks, as one instanced mesh - the level 1 sheet is 200 of them */
+  buildProps();
+
   BRICK_TEX.red = brickMaps({ h: 8, s: 46, l: 44 });
-  BRICK_TEX.blue = brickMaps({ h: 218, s: 40, l: 44 });
-  BRICK_MAT = new THREE.MeshStandardMaterial({
-    map: BRICK_TEX.red.map, bumpMap: BRICK_TEX.red.bump, bumpScale: 0.05,
-    roughness: 0.92, metalness: 0.02
-  });
-  brickMesh = new THREE.InstancedMesh(new THREE.BoxGeometry(0.94, 0.66, 0.94), BRICK_MAT, 260);
-  brickMesh.castShadow = true;
-  brickMesh.receiveShadow = true;
-  brickMesh.count = 0;
+  BRICK_TEX.blue = brickMaps({ h: 214, s: 54, l: 46 });
+  BRICK_MAT = new THREE.MeshStandardMaterial({ map: BRICK_TEX.red.map, bumpMap: BRICK_TEX.red.bump,
+                                               bumpScale: 0.05, roughness: 0.92, metalness: 0.02 });
+  brickMesh = new THREE.InstancedMesh(new THREE.BoxGeometry(0.94, 0.66, 0.94), BRICK_MAT, 460);
+  brickMesh.castShadow = true; brickMesh.receiveShadow = true; brickMesh.count = 0;
   scene.add(brickMesh);
 }
 
-/* --- the man ------------------------------------------------------- */
+/* ------------------------------------------------------------------
+   THE FURNITURE OF THE DEEP CELLARS
+   Everything here is instanced and rebuilt from the grid each turn, so
+   a cellar with three hundred things in it costs the same as an empty
+   one.
+   ------------------------------------------------------------------ */
+function inst(geo, mat, n, shadow) {
+  var m = new THREE.InstancedMesh(geo, mat, n);
+  m.castShadow = !!shadow; m.receiveShadow = true; m.count = 0;
+  m.frustumCulled = false;
+  scene.add(m);
+  return m;
+}
+function buildProps() {
+  var bark = new THREE.MeshStandardMaterial({ color: 0x3b2a1b, roughness: 0.95 });
+  var leaf = new THREE.MeshStandardMaterial({ color: 0x2f4a24, roughness: 0.9, flatShading: true });
+  var stone = new THREE.MeshStandardMaterial({ color: 0x4a4038, roughness: 0.9, metalness: 0.05 });
+  var iron = new THREE.MeshStandardMaterial({ color: 0x2b2320, roughness: 0.5, metalness: 0.7 });
+  var slag = new THREE.MeshStandardMaterial({ color: 0x14100e, roughness: 0.98 });
+
+  props.trunk = inst(new THREE.CylinderGeometry(0.13, 0.19, 1.5, 7), bark, 40, true);
+  props.crown = inst(new THREE.IcosahedronGeometry(0.62, 0), leaf, 40, true);
+  props.cooled = inst(new THREE.BoxGeometry(0.98, 0.34, 0.98), slag, 320, true);
+  props.vatT = inst(new THREE.CylinderGeometry(0.42, 0.46, 0.86, 10), iron, 12, true);
+  props.vatW = inst(new THREE.CylinderGeometry(0.42, 0.46, 0.86, 10), stone, 12, true);
+
+  props.water = inst(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshStandardMaterial({
+    color: 0x1d5a72, transparent: true, opacity: 0.66, roughness: 0.05, metalness: 0.2 }), 500, false);
+  props.tar = inst(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshStandardMaterial({
+    color: 0x090604, roughness: 0.22, metalness: 0.0,
+    emissive: 0xc4380a, emissiveIntensity: 0.26 }), 500, false);
+
+  /* marbles: few enough to be real objects, and the only thing down
+     here polished enough to show you the room in it */
+  var rt = new THREE.WebGLCubeRenderTarget(128, {
+    format: THREE.RGBFormat, generateMipmaps: true, minFilter: THREE.LinearMipmapLinearFilter });
+  cubeCam = new THREE.CubeCamera(0.4, 120, rt);
+  scene.add(cubeCam);
+  var marbleMat = new THREE.MeshStandardMaterial({
+    color: 0xdfe4ea, roughness: 0.045, metalness: 1.0, envMap: rt.texture, envMapIntensity: 1.25 });
+  for (var i = 0; i < 6; i++) {
+    var mm = new THREE.Mesh(new THREE.SphereGeometry(0.46, 30, 22), marbleMat);
+    mm.castShadow = true; mm.receiveShadow = true; mm.visible = false;
+    scene.add(mm);
+    marbleMeshes.push(mm);
+  }
+
+  /* the things worth picking up, one small floating object each */
+  var shapes = {
+    1: new THREE.BoxGeometry(0.3, 0.18, 0.44),           /* boots */
+    2: new THREE.CylinderGeometry(0.16, 0.19, 0.34, 9),  /* frost jar */
+    3: new THREE.BoxGeometry(0.09, 0.5, 0.09),           /* axe */
+    4: new THREE.CylinderGeometry(0.17, 0.17, 0.32, 9)   /* sealed jar */
+  };
+  for (var k in MF.ITEMS) {
+    var spec = MF.ITEMS[k];
+    var mat = new THREE.MeshStandardMaterial({ color: spec.colour, roughness: 0.4, metalness: 0.4,
+                                               emissive: spec.colour, emissiveIntensity: 0.28 });
+    props["item" + k] = inst(shapes[k], mat, 8, true);
+  }
+}
+
+/* --- the man -------------------------------------------------------- */
 function buildMan() {
   var g = new THREE.Group();
   var cloth = new THREE.MeshStandardMaterial({ color: 0x6d5a3f, roughness: 0.86 });
-  var skin  = new THREE.MeshStandardMaterial({ color: 0xc79b74, roughness: 0.72 });
-  var dark  = new THREE.MeshStandardMaterial({ color: 0x37301f, roughness: 0.9 });
+  var skin = new THREE.MeshStandardMaterial({ color: 0xc79b74, roughness: 0.72 });
+  var dark = new THREE.MeshStandardMaterial({ color: 0x37301f, roughness: 0.9 });
   var paper = new THREE.MeshStandardMaterial({ color: 0xd8d0bb, roughness: 0.95 });
 
   var torso = new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.30, 0.62, 10), cloth);
@@ -805,8 +1593,7 @@ function buildMan() {
   hips.position.y = 0.62; hips.scale.y = 0.75; g.add(hips);
   var head = new THREE.Mesh(new THREE.SphereGeometry(0.21, 14, 12), skin);
   head.position.y = 1.38; g.add(head);
-  var hair = new THREE.Mesh(new THREE.SphereGeometry(0.215, 14, 10,
-             0, Math.PI * 2, 0, Math.PI * 0.55), dark);
+  var hair = new THREE.Mesh(new THREE.SphereGeometry(0.215, 14, 10, 0, Math.PI * 2, 0, Math.PI * 0.55), dark);
   hair.position.y = 1.40; g.add(hair);
 
   function limb(r, len, mat) {
@@ -831,92 +1618,133 @@ function buildMan() {
   return g;
 }
 
-/* --- the fly: the size of a man ------------------------------------ */
-function buildFly() {
+/* --- the monsters ---------------------------------------------------
+   One builder, four body plans. Each has to be readable at a glance
+   from its silhouette and its colour, because in the deep cellars you
+   are reading three of them at once.                                  */
+function buildMonster(kind) {
+  var spec = MF.MONSTERS[kind];
   var g = new THREE.Group();
-  var chitin = new THREE.MeshStandardMaterial({
-    color: 0x3d63c4, roughness: 0.24, metalness: 0.66, flatShading: false
-  });
-  var chitinDark = new THREE.MeshStandardMaterial({
-    color: 0x1e2c5c, roughness: 0.36, metalness: 0.54
-  });
-  var eyeMat = new THREE.MeshStandardMaterial({
-    color: 0x8e1208, roughness: 0.22, metalness: 0.3,
-    emissive: 0x350502, emissiveIntensity: 0.9, flatShading: true
-  });
-  var wingMat = new THREE.MeshStandardMaterial({
-    color: 0xdfe9f7, transparent: true, opacity: 0.13, roughness: 0.1,
-    metalness: 0.1, side: THREE.DoubleSide, depthWrite: false
-  });
-  var body = new THREE.Group();
-  body.position.y = 0.95;
-  g.add(body);
-  /* the article promises a fly "the size of a man": it should fill its
-     square and stand as tall as he does, not swallow the cellar. */
-  g.scale.setScalar(0.63);
+  var body = new THREE.Group(); body.position.y = 0.95; g.add(body);
+  var shell = new THREE.MeshStandardMaterial({ color: spec.colour, roughness: 0.34, metalness: 0.12 });
+  var dark = new THREE.MeshStandardMaterial({ color: spec.dark, roughness: 0.44, metalness: 0.1 });
+  var eyeMat = new THREE.MeshStandardMaterial({ color: spec.eye, roughness: 0.2, metalness: 0.05,
+                                                emissive: spec.eye, emissiveIntensity: 0.45, flatShading: true });
+  var wingMat = new THREE.MeshStandardMaterial({ color: 0xdfe9f7, transparent: true, opacity: 0.13,
+                                                 roughness: 0.1, side: THREE.DoubleSide, depthWrite: false });
+  g.userData = { kind: kind, wings: [], legs: [], hover: 0.95, mats: [shell, dark, eyeMat], dimmed: false };
 
-  /* abdomen: three tapering segments */
-  var seg = [[0.44, -0.62], [0.38, -1.02], [0.26, -1.32]];
-  for (var i = 0; i < seg.length; i++) {
-    var s = new THREE.Mesh(new THREE.SphereGeometry(seg[i][0], 16, 13),
-                           i % 2 ? chitinDark : chitin);
-    s.position.set(0, -0.04 * i, seg[i][1]);
-    s.scale.set(1, 0.86, 1.12);
-    body.add(s);
+  function head(z, r, eyeR, eyeCount) {
+    var h = new THREE.Mesh(new THREE.SphereGeometry(r, 16, 13), dark);
+    h.position.z = z; body.add(h);
+    for (var e = 0; e < eyeCount; e++) {
+      var eye = new THREE.Mesh(new THREE.IcosahedronGeometry(eyeR, 1), eyeMat);
+      var side = (e % 2) ? 1 : -1, tier = Math.floor(e / 2);
+      eye.position.set(side * (r * 0.62), 0.05 + tier * 0.16, z + r * 0.4);
+      eye.scale.set(1, 1.15, 0.9);
+      body.add(eye);
+    }
   }
-  /* thorax */
-  var thorax = new THREE.Mesh(new THREE.SphereGeometry(0.52, 18, 14), chitin);
-  thorax.scale.set(1, 0.9, 1.1);
-  body.add(thorax);
-  /* head and compound eyes */
-  var head = new THREE.Mesh(new THREE.SphereGeometry(0.34, 16, 13), chitinDark);
-  head.position.z = 0.62; body.add(head);
-  for (var e = 0; e < 2; e++) {
-    var eye = new THREE.Mesh(new THREE.IcosahedronGeometry(0.26, 1), eyeMat);
-    eye.position.set(e ? 0.2 : -0.2, 0.07, 0.72);
-    eye.scale.set(1, 1.18, 0.9);
-    body.add(eye);
+  function legs(count, spreadZ, upper, lower, splay) {
+    var per = count / 2;
+    for (var L = 0; L < count; L++) {
+      var side = L < per ? -1 : 1, k = L % per;
+      var hip = new THREE.Group();
+      hip.position.set(side * 0.4, -0.12, spreadZ - k * (per > 1 ? (spreadZ * 2 / (per - 1)) : 0));
+      var u = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.04, upper, 6), dark);
+      u.position.y = -upper / 2; hip.add(u);
+      var knee = new THREE.Group(); knee.position.y = -upper;
+      var l = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.02, lower, 6), dark);
+      l.position.y = -lower / 2; knee.add(l);
+      hip.add(knee);
+      hip.rotation.z = side * splay;
+      knee.rotation.z = -side * (splay + 0.3);
+      body.add(hip);
+      g.userData.legs.push({ hip: hip, knee: knee, side: side, phase: L * 1.05 });
+    }
   }
-  /* antennae */
-  for (var a = 0; a < 2; a++) {
-    var ant = new THREE.Mesh(new THREE.CylinderGeometry(0.022, 0.014, 0.34, 5), chitinDark);
-    ant.position.set(a ? 0.1 : -0.1, 0.3, 0.78);
-    ant.rotation.set(-0.7, 0, a ? 0.3 : -0.3);
-    body.add(ant);
+  function wings(size) {
+    for (var w = 0; w < 2; w++) {
+      var sd = w ? 1 : -1;
+      var pivot = new THREE.Group();
+      pivot.position.set(sd * 0.22, 0.34, -0.1);
+      var wing = new THREE.Mesh(new THREE.CircleGeometry(size, 20, 0, Math.PI), wingMat);
+      wing.scale.set(1, 0.34, 1);
+      wing.rotation.x = -Math.PI / 2;
+      wing.position.x = sd * size * 0.95;
+      wing.rotation.z = sd * Math.PI / 2;
+      pivot.add(wing);
+      body.add(pivot);
+      g.userData.wings.push({ pivot: pivot, side: sd });
+    }
   }
-  /* six legs, two segments each */
-  g.userData.legs = [];
-  for (var L = 0; L < 6; L++) {
-    var side = L < 3 ? -1 : 1, k = L % 3;
-    var hip = new THREE.Group();
-    hip.position.set(side * 0.4, -0.12, 0.28 - k * 0.34);
-    var upper = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.04, 0.62, 6), chitinDark);
-    upper.position.y = -0.31; hip.add(upper);
-    var knee = new THREE.Group(); knee.position.y = -0.62;
-    var lower = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.02, 0.6, 6), chitinDark);
-    lower.position.y = -0.30; knee.add(lower);
-    hip.add(knee);
-    hip.rotation.z = side * 0.85;
-    knee.rotation.z = -side * 1.15;
-    body.add(hip);
-    g.userData.legs.push({ hip: hip, knee: knee, side: side, phase: L * 1.05 });
+
+  if (kind === "fly") {
+    var seg = [[0.44, -0.62], [0.38, -1.02], [0.26, -1.32]];
+    for (var i = 0; i < seg.length; i++) {
+      var s = new THREE.Mesh(new THREE.SphereGeometry(seg[i][0], 16, 13), i % 2 ? dark : shell);
+      s.position.set(0, -0.04 * i, seg[i][1]); s.scale.set(1, 0.86, 1.12); body.add(s);
+    }
+    var thorax = new THREE.Mesh(new THREE.SphereGeometry(0.52, 18, 14), shell);
+    thorax.scale.set(1, 0.9, 1.1); body.add(thorax);
+    head(0.62, 0.34, 0.26, 2);
+    for (var a = 0; a < 2; a++) {
+      var ant = new THREE.Mesh(new THREE.CylinderGeometry(0.022, 0.014, 0.34, 5), dark);
+      ant.position.set(a ? 0.1 : -0.1, 0.3, 0.78);
+      ant.rotation.set(-0.7, 0, a ? 0.3 : -0.3); body.add(ant);
+    }
+    legs(6, 0.28, 0.62, 0.6, 0.85);
+    wings(0.72);
+    g.userData.hover = 0.95;
+    g.scale.setScalar(0.63);
+
+  } else if (kind === "spider") {
+    var abd = new THREE.Mesh(new THREE.SphereGeometry(0.66, 18, 14), shell);
+    abd.position.z = -0.55; abd.scale.set(1, 0.82, 1.1); body.add(abd);
+    var ceph = new THREE.Mesh(new THREE.SphereGeometry(0.38, 14, 12), dark);
+    ceph.position.z = 0.28; ceph.scale.set(1.1, 0.75, 1); body.add(ceph);
+    head(0.5, 0.2, 0.1, 4);
+    legs(8, 0.42, 0.86, 0.9, 1.15);
+    g.userData.hover = 0.66;
+    g.scale.setScalar(0.66);
+
+  } else if (kind === "beetle") {
+    for (var e2 = 0; e2 < 2; e2++) {
+      var el = new THREE.Mesh(new THREE.SphereGeometry(0.62, 16, 12, 0, Math.PI * 2, 0, Math.PI * 0.5), shell);
+      el.position.set(e2 ? 0.09 : -0.09, -0.06, -0.28);
+      el.scale.set(0.62, 0.82, 1.25); body.add(el);
+    }
+    var under = new THREE.Mesh(new THREE.SphereGeometry(0.56, 14, 10), dark);
+    under.position.set(0, -0.2, -0.28); under.scale.set(1.05, 0.5, 1.3); body.add(under);
+    var pron = new THREE.Mesh(new THREE.SphereGeometry(0.42, 14, 10), dark);
+    pron.position.z = 0.42; pron.scale.set(1.15, 0.7, 0.9); body.add(pron);
+    head(0.76, 0.24, 0.12, 2);
+    var horn = new THREE.Mesh(new THREE.ConeGeometry(0.11, 0.62, 7), dark);
+    horn.position.set(0, 0.24, 0.92); horn.rotation.x = 1.15; body.add(horn);
+    legs(6, 0.3, 0.42, 0.4, 1.0);
+    g.userData.hover = 0.62;
+    g.scale.setScalar(0.66);
+
+  } else {
+    var bands = [[0.34, -0.6], [0.38, -0.92], [0.32, -1.22], [0.2, -1.46]];
+    for (var b = 0; b < bands.length; b++) {
+      var seg2 = new THREE.Mesh(new THREE.SphereGeometry(bands[b][0], 14, 11), b % 2 ? dark : shell);
+      seg2.position.z = bands[b][1]; seg2.scale.set(1, 0.9, 1.05); body.add(seg2);
+    }
+    var waist = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.14, 0.26, 8), dark);
+    waist.rotation.x = Math.PI / 2; waist.position.z = -0.36; body.add(waist);
+    var thx = new THREE.Mesh(new THREE.SphereGeometry(0.42, 16, 12), shell);
+    thx.scale.set(1, 0.95, 1.15); body.add(thx);
+    head(0.56, 0.28, 0.19, 2);
+    var sting = new THREE.Mesh(new THREE.ConeGeometry(0.07, 0.34, 6), dark);
+    sting.position.z = -1.66; sting.rotation.x = -Math.PI / 2; body.add(sting);
+    legs(6, 0.26, 0.5, 0.48, 0.9);
+    wings(0.82);
+    g.userData.hover = 1.05;
+    g.scale.setScalar(0.6);
   }
-  /* wings - a crisp pair plus a swept disc that reads as the blur */
-  g.userData.wings = [];
-  for (var w = 0; w < 2; w++) {
-    var sd = w ? 1 : -1;
-    var pivot = new THREE.Group();
-    pivot.position.set(sd * 0.22, 0.34, -0.1);
-    var wing = new THREE.Mesh(new THREE.CircleGeometry(0.72, 20, 0, Math.PI), wingMat);
-    wing.scale.set(1, 0.34, 1);
-    wing.rotation.x = -Math.PI / 2;
-    wing.position.x = sd * 0.68;
-    wing.rotation.z = sd * Math.PI / 2;
-    pivot.add(wing);
-    body.add(pivot);
-    g.userData.wings.push({ pivot: pivot, side: sd });
-  }
-  g.traverse(function (o) { if (o.isMesh) { o.castShadow = true; } });
+
+  g.traverse(function (o) { if (o.isMesh) o.castShadow = true; });
   g.userData.body = body;
   return g;
 }
@@ -930,78 +1758,67 @@ function buildMotes() {
   }
   var geo = new THREE.BufferGeometry();
   geo.setAttribute("position", new THREE.BufferAttribute(pos, 3));
-  motes = new THREE.Points(geo, new THREE.PointsMaterial({
-    color: 0xffcf9a, size: 0.055, transparent: true, opacity: 0.5,
-    depthWrite: false, sizeAttenuation: true
-  }));
+  motes = new THREE.Points(geo, new THREE.PointsMaterial({ color: 0xffcf9a, size: 0.055,
+    transparent: true, opacity: 0.5, depthWrite: false, sizeAttenuation: true }));
   scene.add(motes);
 }
 
-/* --- brick debris when one is crunched or lost --------------------- */
 function burst(c, r, colour) {
   var mat = new THREE.MeshStandardMaterial({ color: colour, roughness: 0.9 });
   for (var i = 0; i < 16; i++) {
     var s = 0.08 + Math.random() * 0.16;
     var m = new THREE.Mesh(new THREE.BoxGeometry(s, s * 0.7, s), mat);
-    m.position.set(c + 0.5 + (Math.random() - 0.5) * 0.6, 0.4 + Math.random() * 0.4,
-                   r + 0.5 + (Math.random() - 0.5) * 0.6);
+    m.position.set(c + 0.5 + (Math.random() - 0.5) * 0.6, 0.4 + Math.random() * 0.4, r + 0.5 + (Math.random() - 0.5) * 0.6);
     m.castShadow = true;
     scene.add(m);
-    debris.push({
-      m: m, life: 1.1 + Math.random() * 0.7,
-      v: new THREE.Vector3((Math.random() - 0.5) * 4.5, 2.2 + Math.random() * 3.4,
-                           (Math.random() - 0.5) * 4.5),
-      spin: new THREE.Vector3(Math.random() * 9, Math.random() * 9, Math.random() * 9)
-    });
+    debris.push({ m: m, life: 1.1 + Math.random() * 0.7,
+      v: new THREE.Vector3((Math.random() - 0.5) * 4.5, 2.2 + Math.random() * 3.4, (Math.random() - 0.5) * 4.5),
+      spin: new THREE.Vector3(Math.random() * 9, Math.random() * 9, Math.random() * 9) });
   }
 }
-
 
 /* ------------------------------------------------------------------
    OPTIONAL HAND-MADE MODELS
    Drop a .glb into assets/ and it takes the place of the built-in
-   geometry - assets/fly.glb and assets/man.glb. Made to suit models
-   generated with a tool like Meshy: export .glb, drop it in, reload.
-   The model is rescaled to the right height and stood on the floor,
-   so it does not matter what units it came out in. Nothing here is
-   required; with no assets present the procedural models stand.
+   geometry: fly.glb, spider.glb, beetle.glb, wasp.glb, man.glb. Made
+   to suit models generated with a tool like Meshy - export .glb, drop
+   it in, reload. Each is rescaled and stood on the floor, so it does
+   not matter what units or origin it came out with. All optional; with
+   the folder empty nothing is fetched.
    ------------------------------------------------------------------ */
-var ASSETS = { fly: "assets/fly.glb", man: "assets/man.glb" };
-var ASSET_HEIGHT = { fly: 1.7, man: 1.62 };
-
+var ASSET_HEIGHT = { fly: 1.7, spider: 1.5, beetle: 1.5, wasp: 1.6, man: 1.62 };
+var LOADED = {};
 function loadAssets() {
-  if (location.protocol === "file:") return;   /* nothing to fetch from disk */
-  if (!THREE.GLTFLoader) return;
+  if (location.protocol === "file:" || !THREE.GLTFLoader) return;
   var loader = new THREE.GLTFLoader();
-  Object.keys(ASSETS).forEach(function (key) {
-    fetch(ASSETS[key], { method: "HEAD" }).then(function (r) {
-      if (r.ok) loader.load(ASSETS[key], function (g) { adopt(key, g.scene); }, null, function () {});
+  Object.keys(ASSET_HEIGHT).forEach(function (key) {
+    var url = "assets/" + key + ".glb";
+    fetch(url, { method: "HEAD" }).then(function (r) {
+      if (!r.ok) return;
+      loader.load(url, function (gl) {
+        LOADED[key] = gl.scene;
+        if (key === "man") adopt("man", gl.scene.clone(), manRig);
+        else monsterRigs.forEach(function (rg) { if (rg.userData.kind === key) adopt(key, gl.scene.clone(), rg); });
+      }, null, function () {});
     }).catch(function () {});
   });
 }
-
-function adopt(key, model) {
-  var rig = (key === "fly") ? flyRig : manRig;
-  var host = (key === "fly") ? flyRig.userData.body : rig;
-
+function adopt(key, model, rig) {
+  var host = (key === "man") ? rig : rig.userData.body;
   var box = new THREE.Box3().setFromObject(model);
   var size = new THREE.Vector3(); box.getSize(size);
   model.scale.setScalar(ASSET_HEIGHT[key] / Math.max(0.001, size.y));
   box.setFromObject(model);
   model.position.y -= box.min.y;
   model.traverse(function (o) { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
-
   for (var i = host.children.length - 1; i >= 0; i--) host.remove(host.children[i]);
-  if (key === "fly") {
-    rig.scale.setScalar(1);
-    rig.userData.wings = [];            /* the model brings its own */
-    rig.userData.legs = [];
-    rig.userData.baseY = 0.25;          /* it still hovers */
-  } else {
+  if (key === "man") {
     rig.userData.legL = rig.userData.legR = rig.userData.armL = rig.userData.armR = null;
+  } else {
+    rig.scale.setScalar(1);
+    rig.userData.wings = []; rig.userData.legs = []; rig.userData.hover = 0.25;
   }
   host.add(model);
-  console.log("mutant-fly: using " + ASSETS[key]);
 }
 
 /* ==================================================================
@@ -1014,14 +1831,12 @@ var Beeb = {
     var AC = window.AudioContext || window.webkitAudioContext;
     if (!AC) { this.on = false; return; }
     this.ac = new AC();
-    var out = this.ac.createGain(); out.gain.value = 0.34; out.connect(this.ac.destination);
-    /* a short, dark impulse response - a brick room underground */
+    var out = this.ac.createGain(); out.gain.value = 0.32; out.connect(this.ac.destination);
     var len = Math.floor(this.ac.sampleRate * 1.5);
     var imp = this.ac.createBuffer(2, len, this.ac.sampleRate);
     for (var ch = 0; ch < 2; ch++) {
       var d = imp.getChannelData(ch);
-      for (var i = 0; i < len; i++)
-        d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 3.1) * 0.55;
+      for (var i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 3.1) * 0.55;
     }
     var cv = this.ac.createConvolver(); cv.buffer = imp;
     var wet = this.ac.createGain(); wet.gain.value = 0.34;
@@ -1097,33 +1912,154 @@ var Beeb = {
    GAME GLUE
    ================================================================== */
 var game = new MF.Game();
-var running = false, held = {}, turnAcc = 0;
-var manPos = new THREE.Vector3(), flyPos = new THREE.Vector3();
-var manWant = new THREE.Vector3(), flyWant = new THREE.Vector3();
-var manFace = 0, manFaceWant = 0, startLevel = 1;
+var mode = "title";          /* title | play | paused | won | over */
+var held = {}, turnAcc = 0;
+var manPos = new THREE.Vector3(), manWant = new THREE.Vector3();
+var manFace = 0, manFaceWant = 0;
 var PRIORITY = ["left", "right", "up", "down"];
-var bannerT = 0;
-
-var $ = function (id) { return document.getElementById(id); };
+var bannerT = 0, titleWalkT = 0;
 var plan = $("plan"), planCtx = plan.getContext("2d");
 
-/* the grid runs with row 0 at the far side, matching the original's
-   Y axis, so a cell maps to world (c, 0, ROWS-1-r) */
-function worldOf(c, r, v) { return v.set(c + 0.5, 0, (ROWS - 1 - r) + 0.5); }
+var STEP = 0.55;                       /* world height of one step of floor */
+function groundAt(c, r) {
+  if (c < 0 || r < 0 || c >= COLS || r >= ROWS) return 0;
+  return game.height[r * COLS + c] * STEP;
+}
+function worldOf(c, r, v) { return v.set(c + 0.5, groundAt(c, r), (ROWS - 1 - r) + 0.5); }
 
-function syncBricks() {
-  var m = new THREE.Matrix4(), n = 0;
-  var pal = MF.palette(game.F);
+var _m4 = new THREE.Matrix4();
+var _d = null;
+function D() { if (!_d) _d = new THREE.Object3D(); return _d; }
+
+function placeAt(mesh, n, c, r, y, sx, sy, sz, rotY) {
+  var d = D();
+  d.position.set(c + 0.5, y, (ROWS - 1 - r) + 0.5);
+  d.rotation.set(0, rotY || 0, 0);
+  d.scale.set(sx === undefined ? 1 : sx, sy === undefined ? 1 : sy, sz === undefined ? 1 : sz);
+  d.updateMatrix();
+  mesh.setMatrixAt(n, d.matrix);
+}
+
+/* the terrain only changes when the cellar does */
+function syncTerrain() {
+  var n = 0, col = new THREE.Color();
+  for (var r = 0; r < ROWS; r++) for (var c = 0; c < COLS; c++) {
+    var h = game.height[r * COLS + c] * STEP;
+    var thick = 1 + h;
+    placeAt(terrain, n, c, r, h - thick / 2, 1, thick, 1);
+    /* the low ground is darker, which is most of what tells you the
+       shape of the floor at a glance */
+    var t = 0.62 + 0.16 * (game.height[r * COLS + c]);
+    col.setRGB(t, t * 0.97, t * 0.92);
+    terrain.setColorAt(n, col);
+    n++;
+  }
+  terrain.count = n;
+  terrain.instanceMatrix.needsUpdate = true;
+  if (terrain.instanceColor) terrain.instanceColor.needsUpdate = true;
+}
+
+/* everything that can change from one turn to the next */
+function syncWorld() {
+  var counts = { trunk: 0, crown: 0, cooled: 0, vatT: 0, vatW: 0, water: 0, tar: 0,
+                 item1: 0, item2: 0, item3: 0, item4: 0 };
+  var bricks = [];
+  for (var r = 0; r < ROWS; r++) for (var c = 0; c < COLS; c++) {
+    var i = r * COLS + c, what = game.grid[i], g0 = game.height[i] * STEP;
+
+    if (what === MF.BRICK) bricks.push([c, r]);
+    else if (what === MF.TREE) {
+      placeAt(props.trunk, counts.trunk++, c, r, g0 + 0.75, 1, 1, 1, (c * 7 + r * 13) % 6);
+      placeAt(props.crown, counts.crown++, c, r, g0 + 1.62, 1, 0.9, 1, (c * 3 + r * 5) % 6);
+    } else if (what === MF.COOLED) {
+      placeAt(props.cooled, counts.cooled++, c, r, g0 + 0.17);
+    } else if (what === MF.VAT_TAR) {
+      placeAt(props.vatT, counts.vatT++, c, r, g0 + 0.43);
+    } else if (what === MF.VAT_WATER) {
+      placeAt(props.vatW, counts.vatW++, c, r, g0 + 0.43);
+    }
+
+    var it = game.item[i];
+    if (it) {
+      var key = "item" + it;
+      placeAt(props[key], counts[key]++, c, r, g0 + 0.42 + Math.sin(bobT + c + r) * 0.09,
+              1, 1, 1, bobT * 1.6);
+    }
+
+    var f = game.fluid[i], v = game.fvol[i];
+    if (f && v > 0) {
+      var depth = Math.min(0.42, 0.1 + v * 0.05);
+      var mesh = (f === MF.WATER) ? props.water : props.tar;
+      var kk = (f === MF.WATER) ? "water" : "tar";
+      placeAt(mesh, counts[kk]++, c, r, g0 + depth / 2, 0.99, depth, 0.99);
+    }
+  }
+  for (var k in counts) {
+    if (!props[k]) continue;
+    props[k].count = counts[k];
+    props[k].instanceMatrix.needsUpdate = true;
+  }
+  /* the fire breathes */
+  if (props.tar) props.tar.material.emissiveIntensity = 0.24 + Math.sin(bobT * 5.1) * 0.11;
+
+  /* marbles */
+  for (var m = 0; m < marbleMeshes.length; m++) {
+    var mar = game.marbles[m];
+    marbleMeshes[m].visible = !!mar;
+    if (!mar) continue;
+    var mp = marbleMeshes[m].userData;
+    if (!mp.pos) { mp.pos = new THREE.Vector3(); worldOf(mar.c, mar.r, mp.pos); }
+    mp.want = mp.want || new THREE.Vector3();
+    worldOf(mar.c, mar.r, mp.want);
+    mp.want.y += 0.46;
+  }
+
+  paintBricks(bricks, game.F);
+}
+
+function paintBricks(cells, level) {
+  var pal = MF.palette(level);
   var t = (pal.brick === 4) ? BRICK_TEX.blue : BRICK_TEX.red;
   if (BRICK_MAT.map !== t.map) { BRICK_MAT.map = t.map; BRICK_MAT.bumpMap = t.bump; BRICK_MAT.needsUpdate = true; }
-  for (var r = 0; r < ROWS; r++) for (var c = 0; c < COLS; c++) {
-    if (game.grid[r * COLS + c] !== MF.BRICK) continue;
-    if (n >= brickMesh.instanceMatrix.count) break;
-    m.makeTranslation(c + 0.5, 0.33, (ROWS - 1 - r) + 0.5);
-    brickMesh.setMatrixAt(n++, m);
+  var n = 0, cap = brickMesh.instanceMatrix.count;
+  for (var i = 0; i < cells.length && n < cap; i++) {
+    _m4.makeTranslation(cells[i][0] + 0.5,
+                        groundAt(cells[i][0], cells[i][1]) + 0.33,
+                        (ROWS - 1 - cells[i][1]) + 0.5);
+    brickMesh.setMatrixAt(n++, _m4);
   }
   brickMesh.count = n;
   brickMesh.instanceMatrix.needsUpdate = true;
+}
+function syncBricks() { syncWorld(); }
+
+function clearProps() {
+  for (var k in props) if (props[k]) { props[k].count = 0; props[k].instanceMatrix.needsUpdate = true; }
+  for (var i = 0; i < marbleMeshes.length; i++) marbleMeshes[i].visible = false;
+}
+
+function clearRigs() {
+  for (var i = 0; i < monsterRigs.length; i++) scene.remove(monsterRigs[i]);
+  monsterRigs.length = 0;
+}
+function makeRigs(kinds) {
+  clearRigs();
+  for (var i = 0; i < kinds.length; i++) {
+    var rig = buildMonster(kinds[i]);
+    if (LOADED[kinds[i]]) adopt(kinds[i], LOADED[kinds[i]].clone(), rig);
+    rig.userData.pos = new THREE.Vector3();
+    rig.userData.want = new THREE.Vector3();
+    scene.add(rig);
+    monsterRigs.push(rig);
+  }
+}
+function dim(rig, trapped) {
+  if (rig.userData.dimmed === trapped) return;
+  rig.userData.dimmed = trapped;
+  rig.userData.mats.forEach(function (m) {
+    m.emissiveIntensity = trapped ? 0 : 0.35;
+    m.color.multiplyScalar(trapped ? 0.42 : 1 / 0.42);
+  });
 }
 
 function drawPlan() {
@@ -1133,10 +2069,15 @@ function drawPlan() {
   planCtx.fillStyle = MF.palette(game.F).brick === 4 ? "#4a72d8" : "#b8462e";
   for (var r = 0; r < ROWS; r++) for (var c = 0; c < COLS; c++)
     if (game.grid[r * COLS + c] === MF.BRICK) planCtx.fillRect(c, ROWS - 1 - r, 1, 1);
+  for (var i = 0; i < game.monsters.length; i++) {
+    var m = game.monsters[i];
+    planCtx.fillStyle = hex(m.spec.colour);
+    planCtx.globalAlpha = m.trapped ? 0.3 : 1;
+    planCtx.fillRect(m.c, ROWS - 1 - m.r, 1, 1);
+  }
+  planCtx.globalAlpha = 1;
   planCtx.fillStyle = "#ffd27a";
   planCtx.fillRect(game.manC, ROWS - 1 - game.manR, 1, 1);
-  planCtx.fillStyle = "#7fe0ff";
-  planCtx.fillRect(game.flyC, ROWS - 1 - game.flyR, 1, 1);
 }
 
 function hud() {
@@ -1145,47 +2086,190 @@ function hud() {
   $("hBest").textContent = game.HI;
   $("hBricks").textContent = game.bricks;
   $("hMoves").textContent = game.CO;
-  $("sBricks").className = "stat right" + (game.bricks < 8 ? " crit" : game.bricks < 20 ? " warn" : "");
+  $("sBricks").className = "stat right" + (game.bricks < 4 * game.loose() + 4 ? " crit" :
+                                           game.bricks < 20 ? " warn" : "");
   $("sMoves").className = "stat right" + (game.CO >= 700 ? " crit" : game.CO >= 400 ? " warn" : "");
+  var kit = [];
+  if (game.axe > 0) kit.push("axe " + game.axe);
+  if (game.boots > 0) kit.push("boots " + game.boots);
+  if (game.frost > 0) kit.push("frost " + game.frost);
+  $("hKit").textContent = kit.length ? kit.join("  ") : "\u2014";
+  $("hKit").style.color = game.frost > 0 ? "#63c8e0" : (game.boots > 0 ? "#c8a017" : "");
+
+  var box = $("hLoose"); box.innerHTML = "";
+  for (var i = 0; i < game.monsters.length; i++) {
+    var m = game.monsters[i], el = document.createElement("i");
+    el.style.background = hex(m.spec.colour);
+    if (m.trapped) el.className = "done";
+    el.title = m.spec.name + (m.trapped ? " - walled in" : " - loose");
+    box.appendChild(el);
+  }
 }
 
-function banner(text, sub, ms) {
-  var b = $("banner");
-  b.innerHTML = text + (sub ? "<small>" + sub + "</small>" : "");
-  b.hidden = false;
-  bannerT = ms;
+function banner(big, sub, kinds, ms) {
+  var b = $("banner"), html = "";
+  if (big) html += '<div class="big">' + big + "</div>";
+  if (sub) html += '<div class="sub">' + sub + "</div>";
+  if (kinds && kinds.length) {
+    html += '<div class="who">';
+    kinds.forEach(function (k) {
+      var s = MF.MONSTERS[k];
+      html += '<span><i style="background:' + hex(s.colour) + '"></i>' + s.name + " &mdash; " + s.blurb + "</span>";
+    });
+    html += "</div>";
+  }
+  b.innerHTML = html; b.hidden = false; bannerT = ms;
 }
 
-function newSheet() {
+/* ==================================================================
+   THE TITLE SCREEN
+   Built out of the game, the way the original's was: PROCtitle_page
+   read line 190's DATA and laid bricks along each run, spelling FLY.
+   The same records build the same word in the same cellar here, with
+   one of each monster loose on it and the man standing off to the side.
+   ================================================================== */
+var titleWalkers = [];
+function enterTitle() {
+  mode = "title";
+  $("hud").hidden = true; plan.hidden = true; $("hint").hidden = true;
+  $("banner").hidden = true;
+  $("overSheet").hidden = true; $("pauseSheet").hidden = true;
+  $("titleSheet").hidden = false;
+
+  /* a flat, empty cellar with the word laid out in brick, the way
+     PROCtitle_page did it */
+  game.height.fill(0); game.item.fill(0);
+  game.fluid.fill(0); game.fvol.fill(0);
+  game.marbles.length = 0;
+  clearProps();
+  syncTerrain();
+  paintBricks(MF.titleCells(), 1);
+  makeRigs(MF.MONSTER_ORDER);
+  titleWalkers = monsterRigs.map(function (rig, i) {
+    var w = { rig: rig, c: 6 + i * 7, r: 4 + (i % 2) * 3 };
+    worldOf(w.c, w.r, rig.userData.pos);
+    rig.userData.want.copy(rig.userData.pos);
+    rig.position.copy(rig.userData.pos);
+    return w;
+  });
+  manRig.position.set(17.5, 0, ROWS - 1 - 3 + 0.5);
+  manRig.rotation.y = 0;
+
+  var s = MF.save.read() || {};
+  $("continue").hidden = !s.level;
+  if (s.level) $("continue").textContent = "Continue — cellar " + s.level;
+  $("record").textContent = s.best ? "Best " + s.best + " · deepest cellar " + (s.deepest || 1) : "";
+  game.HI = s.best || 0;
+}
+function stepTitleWalkers() {
+  var taken = {};
+  titleWalkers.forEach(function (w) { taken[w.c + "," + w.r] = 1; });
+  titleWalkers.forEach(function (w) {
+    var d = [[1, 0], [-1, 0], [0, 1], [0, -1]][(Math.random() * 4) | 0];
+    var nc = w.c + d[0], nr = w.r + d[1];
+    if (nc < 1 || nr < 1 || nc > COLS - 2 || nr > ROWS - 2) return;
+    if (taken[nc + "," + nr]) return;
+    delete taken[w.c + "," + w.r];
+    w.c = nc; w.r = nr; taken[nc + "," + nr] = 1;
+    worldOf(w.c, w.r, w.rig.userData.want);
+  });
+}
+
+/* ==================================================================
+   PLAY
+   ================================================================== */
+/* what has been explained already, remembered between visits */
+function seenBriefing(F, mark) {
+  var s = MF.save.read() || {};
+  s.seen = s.seen || {};
+  if (mark) { s.seen[F] = 1; MF.save.write(s); return false; }
+  return !!s.seen[F];
+}
+
+function enterLevel() {
+  syncTerrain();
   syncBricks();
-  worldOf(game.manC, game.manR, manWant); manPos.copy(manWant);
-  worldOf(game.flyC, game.flyR, flyWant); flyPos.copy(flyWant);
+  makeRigs(game.monsters.map(function (m) { return m.kind; }));
+  for (var i = 0; i < game.monsters.length; i++) {
+    var m = game.monsters[i], rig = monsterRigs[i];
+    worldOf(m.c, m.r, rig.userData.want);
+    rig.userData.pos.copy(rig.userData.want);
+    rig.position.copy(rig.userData.pos);
+  }
+  worldOf(game.manC, game.manR, manWant);
+  manPos.copy(manWant);
   hud(); drawPlan();
+  $("hud").hidden = false; plan.hidden = false; $("hint").hidden = false;
+  $("titleSheet").hidden = true; $("overSheet").hidden = true; $("pauseSheet").hidden = true;
+  /* anything arriving for the first time gets explained before the
+     cellar starts, not while something is chasing you */
+  var brief = MF.briefingFor(game.F);
+  if (brief.length && !seenBriefing(game.F)) { showBriefing(brief); return; }
+  beginTurns();
 }
 
-function startGame() {
+function beginTurns() {
+  $("briefSheet").hidden = true;
+  var kinds = game.monsters.map(function (m) { return m.kind; });
+  banner("CELLAR " + game.F, game.PE + " bricks",
+         kinds.filter(function (k, i) { return kinds.indexOf(k) === i; }), 2600);
+  mode = "play"; turnAcc = 0;
+}
+
+function showBriefing(list) {
+  mode = "brief";
+  seenBriefing(game.F, true);
+  $("briefKicker").textContent = "Cellar " + game.F;
+  $("briefTitle").textContent = list.length > 1 ? "Two new things" : list[0].name;
+  var ul = $("briefList"); ul.innerHTML = "";
+  list.forEach(function (b) {
+    var li = document.createElement("li");
+    li.innerHTML = '<span class="chip" style="background:#c33a26"></span>' +
+                   '<span><span class="n">' + b.name + '</span>' +
+                   '<span class="b">' + b.body + "</span></span>";
+    ul.appendChild(li);
+  });
+  $("briefSheet").hidden = false;
+}
+
+function newGame() { Beeb.wake(); game.reset(1); enterLevel(); }
+function continueGame() {
   Beeb.wake();
-  game.reset(startLevel);
-  running = true; turnAcc = 0;
-  $("titleSheet").hidden = true;
-  $("overSheet").hidden = true;
-  $("hud").hidden = false;
-  plan.hidden = false;
-  newSheet();
-  banner("CELLAR " + game.F, MF.levelOf(game.F).PE + " BRICKS", 1500);
+  var s = MF.save.read() || {};
+  game.reset(s.level || 1);
+  game.SC = s.score || 0;
+  game.HI = s.best || 0;
+  enterLevel();
+}
+function restartCellar() {
+  Beeb.wake();
+  game.over = false; game.won = false;
+  game.sheet();
+  enterLevel();
 }
 
 function turn() {
   var dir = null;
   for (var i = 0; i < PRIORITY.length; i++) if (held[PRIORITY[i]]) { dir = PRIORITY[i]; break; }
-
-  var beforeC = game.manC, beforeR = game.manR;
   var ev = game.step(dir);
 
-  Beeb.SOUND(0, -10, 23, 1);                     /* the drone, every turn */
+  /* the drone, once a turn, each kind at its own pitch - a cellar with
+     three things loose in it should sound like one */
+  for (var d = 0; d < game.monsters.length; d++) {
+    var mm = game.monsters[d];
+    if (!mm.trapped) Beeb.SOUND.apply(Beeb, mm.spec.drone);
+  }
   if (ev.pushed) Beeb.SOUND(1, 1, 3, 1);
   if (ev.lostOverEdge) { Beeb.SOUND(0, -9, 4, 2); burst(game.manC, ROWS - 1 - game.manR, 0x6a3a2c); }
-  if (ev.crunched) { Beeb.SOUND(0, -12, 5, 4); burst(game.flyC, ROWS - 1 - game.flyR, 0x8a3826); }
+  if (ev.crunched && ev.crunchedBy) {
+    Beeb.SOUND(0, -12, 5, 4);
+    burst(ev.crunchedBy.c, ROWS - 1 - ev.crunchedBy.r, 0x8a3826);
+  }
+  if (ev.eaten) Beeb.SOUND(0, -11, 2, 3);
+  for (var tn = 0; tn < ev.trappedNow.length; tn++) {
+    Beeb.SOUND(1, 1, 140, 4);
+    banner("", ev.trappedNow[tn].spec.name + " walled in", null, 1300);
+  }
 
   if (ev.moved) {
     if (dir === "left") manFaceWant = -Math.PI / 2;
@@ -1193,38 +2277,68 @@ function turn() {
     if (dir === "up") manFaceWant = Math.PI;
     if (dir === "down") manFaceWant = 0;
   }
-  if (ev.pushed || ev.moved) syncBricks();
-
+  syncBricks();
   worldOf(game.manC, game.manR, manWant);
-  worldOf(game.flyC, game.flyR, flyWant);
+  for (var k = 0; k < game.monsters.length; k++) {
+    worldOf(game.monsters[k].c, game.monsters[k].r, monsterRigs[k].userData.want);
+    dim(monsterRigs[k], game.monsters[k].trapped);
+  }
   hud(); drawPlan();
 
   if (ev.lost) {
-    running = false;
+    mode = "over";
     Beeb.SOUND(0, -14, 6, 22);
     burst(game.manC, ROWS - 1 - game.manR, 0x7a6244);
-    setTimeout(endScreen, 1400, false);
+    MF.save.end(game.HI);
+    setTimeout(function () { endScreen(ev.lostTo, false); }, 1500);
   } else if (ev.won) {
-    running = false;
+    mode = "won";
     for (var s = 1; s <= 30; s++) (function (s) {
       setTimeout(function () { Beeb.SOUND(1, 1, s * 10, 1); }, s * 20);
     })(s);
-    banner("TRAPPED", "BONUS " + ev.bonus, 2000);
+    banner("CLEARED", "bonus " + ev.bonus, null, 2200);
+    MF.save.keep(game.F + 1, game.SC, Math.max(game.HI, game.SC));
     setTimeout(function () {
+      if (mode !== "won") return;
       game.nextSheet();
-      newSheet();
-      running = true; turnAcc = 0;
-      banner("CELLAR " + game.F, MF.levelOf(game.F).PE + " BRICKS", 1500);
-    }, 2300);
+      enterLevel();
+    }, 2400);
+  } else if (ev.stuck) {
+    mode = "over";
+    banner("OUT OF BRICKS", "nothing left to build with", null, 1800);
+    setTimeout(function () { endScreen(null, true); }, 1800);
   }
 }
 
-function endScreen() {
+function endScreen(killer, stuck) {
   $("oScore").textContent = game.SC;
   $("oCellar").textContent = game.F;
   $("oBest").textContent = game.HI;
+  if (stuck) {
+    $("overKicker").textContent = "Stuck";
+    $("overTitle").textContent = "Out of bricks";
+    $("overNote").textContent = "Fewer than four bricks a monster left down here, so there is " +
+      "nothing to build a trap out of. Bricks pushed off the edge do not come back.";
+  } else {
+    $("overKicker").textContent = "Caught";
+    $("overTitle").textContent = "Curtains";
+    $("overNote").textContent = (killer ? "The " + killer.spec.name.toLowerCase() + " got you. " : "") +
+      "You get one life — that is all the dying you get.";
+  }
   $("overSheet").hidden = false;
   $("banner").hidden = true;
+}
+
+function pause(on) {
+  if (on && mode !== "play") return;
+  if (!on && mode !== "paused") return;
+  mode = on ? "paused" : "play";
+  var kinds = game.monsters.filter(function (m) { return !m.trapped; })
+                           .map(function (m) { return m.spec.name.toLowerCase(); });
+  $("pauseNote").textContent = "Cellar " + game.F + ". " + game.bricks + " bricks left, " +
+    (kinds.length ? kinds.length + " still loose: " + kinds.join(", ") + "." : "nothing loose.");
+  $("pauseSheet").hidden = !on;
+  if (!on) turnAcc = 0;
 }
 
 /* ==================================================================
@@ -1233,73 +2347,111 @@ function endScreen() {
 var KEYMAP = { "z": "left", "arrowleft": "left", "x": "right", "arrowright": "right",
                ":": "up", ";": "up", "arrowup": "up", "/": "down", "arrowdown": "down" };
 addEventListener("keydown", function (e) {
-  var a = KEYMAP[e.key.toLowerCase()];
+  var k = e.key.toLowerCase(), a = KEYMAP[k];
   if (a) { e.preventDefault(); held[a] = true; Beeb.wake(); return; }
-  if (e.key === " ") { e.preventDefault(); if (!running && !$("titleSheet").hidden) startGame(); }
-  if (e.key.toLowerCase() === "m") Beeb.on = !Beeb.on;
+  if (k === " ") {
+    e.preventDefault();
+    if (mode === "title") ($("continue").hidden ? newGame() : continueGame());
+    else if (mode === "brief") beginTurns();
+    return;
+  }
+  if (k === "p") { pause(mode === "play"); return; }
+  if (k === "r" && (mode === "play" || mode === "paused")) { restartCellar(); return; }
+  if (k === "m") { Beeb.on = !Beeb.on; return; }
+  if (k === "escape" && (mode === "play" || mode === "paused")) {
+    MF.save.keep(game.F, game.SC, Math.max(game.HI, game.SC));
+    enterTitle();
+  }
 });
 addEventListener("keyup", function (e) {
   var a = KEYMAP[e.key.toLowerCase()];
   if (a) held[a] = false;
 });
-addEventListener("blur", function () { held = {}; });
+addEventListener("blur", function () { held = {}; if (mode === "play") pause(true); });
 
 Array.prototype.forEach.call(document.querySelectorAll(".pad button[data-act]"), function (b) {
   var a = b.dataset.act;
-  var on = function (ev) { ev.preventDefault(); held[a] = true; Beeb.wake(); };
+  b.addEventListener("pointerdown", function (ev) { ev.preventDefault(); held[a] = true; Beeb.wake(); });
   var off = function () { held[a] = false; };
-  b.addEventListener("pointerdown", on);
   b.addEventListener("pointerup", off);
   b.addEventListener("pointerleave", off);
   b.addEventListener("pointercancel", off);
 });
 if (matchMedia("(hover:none)").matches) document.body.classList.add("touch");
 
-(function () {
-  var wrap = $("levels");
-  for (var i = 1; i <= 9; i++) (function (i) {
-    var b = document.createElement("button");
-    b.type = "button"; b.className = "lvl"; b.textContent = i;
-    b.setAttribute("aria-pressed", i === 1 ? "true" : "false");
-    b.addEventListener("click", function () {
-      startLevel = i;
-      Array.prototype.forEach.call(wrap.children, function (c) {
-        c.setAttribute("aria-pressed", c === b ? "true" : "false");
-      });
-    });
-    wrap.appendChild(b);
-  })(i);
-})();
-$("start").addEventListener("click", startGame);
-$("again").addEventListener("click", function () {
-  $("overSheet").hidden = true;
-  $("titleSheet").hidden = false;
-  $("hud").hidden = true;
-  plan.hidden = true;
+$("briefGo").addEventListener("click", beginTurns);
+$("start").addEventListener("click", newGame);
+$("continue").addEventListener("click", continueGame);
+$("retry").addEventListener("click", restartCellar);
+$("quit").addEventListener("click", enterTitle);
+$("resume").addEventListener("click", function () { pause(false); });
+$("restart").addEventListener("click", restartCellar);
+$("giveup").addEventListener("click", function () {
+  MF.save.keep(game.F, game.SC, Math.max(game.HI, game.SC));
+  enterTitle();
 });
+
+(function () {
+  var ul = $("bestiary");
+  MF.MONSTER_ORDER.forEach(function (k) {
+    var s = MF.MONSTERS[k], li = document.createElement("li");
+    li.innerHTML = '<span class="chip" style="background:' + hex(s.colour) + '"></span>' +
+                   '<span><span class="n">' + s.name + '</span><span class="b">' + s.blurb + "</span></span>";
+    ul.appendChild(li);
+  });
+})();
 
 /* ==================================================================
    FRAME
    ================================================================== */
 var camPos = new THREE.Vector3(), camAim = new THREE.Vector3(), tmp = new THREE.Vector3();
+var TITLE_AIM = new THREE.Vector3(17.5, 0.6, ROWS - 1 - 17 + 0.5);
 
 function frame() {
   requestAnimationFrame(frame);
   var dt = Math.min(0.05, clock.getDelta()), now = clock.elapsedTime;
 
-  if (running) {
+  if (mode === "play") {
     turnAcc += dt * 1000;
-    while (turnAcc >= TURN_MS) { turnAcc -= TURN_MS; if (running) turn(); }
+    while (turnAcc >= TURN_MS) { turnAcc -= TURN_MS; if (mode === "play") turn(); }
+  } else if (mode === "title") {
+    titleWalkT += dt * 1000;
+    if (titleWalkT > 430) { titleWalkT = 0; stepTitleWalkers(); }
   }
 
-  /* glide between squares rather than snapping */
   var k = 1 - Math.pow(0.0016, dt);
-  manPos.lerp(manWant, k);
-  flyPos.lerp(flyWant, k);
-  manFace += (function (d) { while (d > Math.PI) d -= 6.28318; while (d < -Math.PI) d += 6.28318; return d; })(manFaceWant - manFace) * Math.min(1, dt * 13);
+  bobT += dt;
 
-  manRig.position.copy(manPos);
-  manRig.rotation.y = manFace;
+  /* the marbles roll, and show the room back to you */
+  for (var mi = 0; mi < marbleMeshes.length; mi++) {
+    var mm = marbleMeshes[mi];
+    if (!mm.visible) continue;
+    var u = mm.userData;
+    if (!u.pos || !u.want) continue;
+    var moved = u.pos.distanceTo(u.want);
+    u.pos.lerp(u.want, k);
+    mm.position.copy(u.pos);
+    if (moved > 0.002) {
+      var mar = game.marbles[mi];
+      if (mar) mm.rotateOnWorldAxis(new THREE.Vector3(-mar.dr, 0, -mar.dc).normalize() || new THREE.Vector3(1, 0, 0), moved * 0.5);
+    }
+  }
+  cubeT += dt;
+  if (cubeCam && cubeT > 0.35 && mode !== "title") {
+    cubeT = 0;
+    for (var h2 = 0; h2 < marbleMeshes.length; h2++) marbleMeshes[h2].visible = false;
+    cubeCam.position.set(manPos.x, manPos.y + 1.4, manPos.z);
+    cubeCam.update(renderer, scene);
+    for (var h3 = 0; h3 < marbleMeshes.length; h3++)
+      marbleMeshes[h3].visible = !!game.marbles[h3];
+  }
+  /* rebuilt every frame so the loose items turn on the spot and the
+     fire breathes - it is under a thousand matrix writes */
+  if (mode === "play" || mode === "brief") syncWorld();
+
+  manPos.lerp(manWant, k);
+  manFace += (function (d) { while (d > Math.PI) d -= 6.28318; while (d < -Math.PI) d += 6.28318; return d; })(manFaceWant - manFace) * Math.min(1, dt * 13);
+  if (mode !== "title") { manRig.position.copy(manPos); manRig.rotation.y = manFace; }
   var speed = manPos.distanceTo(manWant);
   manRig.userData.walk += dt * (4 + speed * 26);
   if (manRig.userData.legL) {
@@ -1310,26 +2462,27 @@ function frame() {
     manRig.userData.armR.rotation.x = sw * 0.7;
   }
 
-  /* the fly hovers, tips toward where it is going, and beats its wings
-     far faster than the eye resolves */
-  flyRig.position.copy(flyPos);
-  var fb = flyRig.userData.body;
-  fb.position.y = (flyRig.userData.baseY || 0.95) + Math.sin(now * 6.4) * 0.08;
-  tmp.copy(flyWant).sub(flyPos);
-  if (tmp.lengthSq() > 0.0004) flyRig.rotation.y = Math.atan2(tmp.x, tmp.z);
-  fb.rotation.x = -Math.min(0.35, tmp.length() * 0.5);
-  for (var w = 0; w < flyRig.userData.wings.length; w++) {
-    var ww = flyRig.userData.wings[w];
-    ww.pivot.rotation.z = ww.side * (0.35 + Math.sin(now * 46 + w) * 0.75);
-    ww.pivot.rotation.x = Math.sin(now * 46 + w) * 0.28;
-  }
-  for (var g2 = 0; g2 < flyRig.userData.legs.length; g2++) {
-    var lg = flyRig.userData.legs[g2];
-    lg.hip.rotation.x = Math.sin(now * 3.2 + lg.phase) * 0.16;
-    lg.knee.rotation.x = Math.cos(now * 3.2 + lg.phase) * 0.12;
+  for (var i = 0; i < monsterRigs.length; i++) {
+    var rig = monsterRigs[i], u = rig.userData;
+    u.pos.lerp(u.want, k);
+    rig.position.copy(u.pos);
+    tmp.copy(u.want).sub(u.pos);
+    if (tmp.lengthSq() > 0.0004) rig.rotation.y = Math.atan2(tmp.x, tmp.z);
+    var alive = !(mode !== "title" && game.monsters[i] && game.monsters[i].trapped);
+    u.body.position.y = u.hover + (alive ? Math.sin(now * 6.4 + i) * 0.08 : -0.14);
+    u.body.rotation.x = alive ? -Math.min(0.35, tmp.length() * 0.5) : 0.28;
+    for (var w = 0; w < u.wings.length; w++) {
+      var ww = u.wings[w];
+      ww.pivot.rotation.z = ww.side * (alive ? 0.35 + Math.sin(now * 46 + w) * 0.75 : 1.15);
+      ww.pivot.rotation.x = alive ? Math.sin(now * 46 + w) * 0.28 : 0;
+    }
+    for (var g2 = 0; g2 < u.legs.length; g2++) {
+      var lg = u.legs[g2], amp = alive ? 0.16 : 0.02;
+      lg.hip.rotation.x = Math.sin(now * 3.2 + lg.phase) * amp;
+      lg.knee.rotation.x = Math.cos(now * 3.2 + lg.phase) * amp * 0.75;
+    }
   }
 
-  /* torchlight never sits still */
   for (var t = 0; t < torches.length; t++) {
     var tt = torches[t];
     var f = 1.15 + Math.sin(now * 11 + tt.seed) * 0.22 + Math.sin(now * 27.3 + tt.seed * 3) * 0.14;
@@ -1337,46 +2490,43 @@ function frame() {
     tt.flame.scale.set(0.85 + f * 0.2, 0.8 + f * 0.35, 0.85 + f * 0.2);
   }
 
-  /* the lamp follows the man */
-  keyLight.position.set(manPos.x - 1.6, 7.4, manPos.z - 1.2);
-  keyLight.target.position.copy(manPos);
+  var lampAt = (mode === "title") ? TITLE_AIM : manPos;
+  keyLight.position.set(lampAt.x - 1.6, 7.6, lampAt.z - 1.2);
+  keyLight.target.position.copy(lampAt);
   keyLight.target.updateMatrixWorld();
 
-  /* debris */
-  for (var i = debris.length - 1; i >= 0; i--) {
-    var d = debris[i];
-    d.life -= dt;
-    d.v.y -= 15 * dt;
-    d.m.position.addScaledVector(d.v, dt);
-    if (d.m.position.y < 0.06) { d.m.position.y = 0.06; d.v.y *= -0.32; d.v.x *= 0.7; d.v.z *= 0.7; }
-    d.m.rotation.x += d.spin.x * dt; d.m.rotation.y += d.spin.y * dt;
-    if (d.life <= 0) { scene.remove(d.m); d.m.geometry.dispose(); debris.splice(i, 1); }
+  for (var d2 = debris.length - 1; d2 >= 0; d2--) {
+    var db = debris[d2];
+    db.life -= dt; db.v.y -= 15 * dt;
+    db.m.position.addScaledVector(db.v, dt);
+    if (db.m.position.y < 0.06) { db.m.position.y = 0.06; db.v.y *= -0.32; db.v.x *= 0.7; db.v.z *= 0.7; }
+    db.m.rotation.x += db.spin.x * dt; db.m.rotation.y += db.spin.y * dt;
+    if (db.life <= 0) { scene.remove(db.m); db.m.geometry.dispose(); debris.splice(d2, 1); }
   }
+  if (motes) { motes.rotation.y = now * 0.012; motes.position.y = Math.sin(now * 0.35) * 0.16; }
 
-  /* motes drift */
-  if (motes) {
-    motes.rotation.y = now * 0.012;
-    motes.position.y = Math.sin(now * 0.35) * 0.16;
+  if (mode === "title") {
+    var a = now * 0.09;
+    camPos.set(TITLE_AIM.x + Math.sin(a) * 12, 15.5, TITLE_AIM.z + 15.5 + Math.cos(a) * 3.5);
+    camera.position.lerp(camPos, 1 - Math.pow(0.05, dt));
+    camera.lookAt(TITLE_AIM);
+  } else {
+    camAim.copy(manPos).add(tmp.set(0, 0.9, 0));
+    camPos.set(manPos.x, 16.5, manPos.z + 12.8);
+    camera.position.lerp(camPos, 1 - Math.pow(0.002, dt));
+    camera.lookAt(camAim);
   }
-
-  /* camera: raised, behind, easing after him */
-  camAim.copy(manPos).add(tmp.set(0, 0.9, 0));
-  camPos.set(manPos.x, 16.5, manPos.z + 12.8);
-  camera.position.lerp(camPos, 1 - Math.pow(0.002, dt));
-  camera.lookAt(camAim);
 
   if (bannerT > 0) { bannerT -= dt * 1000; if (bannerT <= 0) $("banner").hidden = true; }
-
   renderer.render(scene, camera);
 }
 
 if (!window.THREE) {
-  document.getElementById("titleSheet").innerHTML =
-    '<div class="card"><h1>No WebGL</h1><p class="lede">The 3D cellar could not start. ' +
-    '<a href="classic/">Play the 1985 screen instead &rarr;</a></p></div>';
+  $("titleSheet").innerHTML = '<div class="card"><h1>No WebGL</h1><p class="lede">' +
+    'The 3D cellar could not start. <a href="classic/">Play the 1985 screen instead &rarr;</a></p></div>';
 } else {
   init3D();
-  newSheet();
+  enterTitle();
   frame();
 }
 </script>

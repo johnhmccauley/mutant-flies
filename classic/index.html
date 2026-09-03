@@ -107,77 +107,267 @@
 <script>
 /* =====================================================================
    MUTANT FLY - the rules
-   Ported from the original BBC BASIC.
 
-   Source: FLY, by John Mc Cauley, (C) The Micro User. 125 lines, 10-1240,
-   detokenised from the Database Publications cassette for The Micro User
-   volume 3 issue 5 (July 1985) - the tape advertised in that issue as
-   "JULY: Fly. Take on mutant flies in this arcade spectacular."
+   Ported from the original BBC BASIC: FLY, by John Mc Cauley,
+   (C) The Micro User. 125 lines, 10-1240, detokenised from the Database
+   Publications cassette for The Micro User volume 3 issue 5, July 1985.
 
-   Everything here follows the listing rather than the magazine article,
-   which describes the game loosely and in two places incorrectly. The
-   line numbers in the comments are the original's.
+   Everything in the classic path follows the listing rather than the
+   magazine article, which describes the game loosely and in several
+   places incorrectly. Line numbers in the comments are the original's.
 
-   The original ran in MODE 1 and did all its collision detection with
-   POINT() against the screen: colour 2 meant "brick". This port keeps a
-   grid instead, but every rule below is the rule the BASIC implements.
+   Two modes:
+
+     classic  One fly, the original level table, a flat floor and
+              nothing else. This is the 1985 game and tools/test-rules.js
+              pins it there. Nothing below may change it.
+
+     deep     The same game, with the cellar getting stranger as you go
+              down. Cellars 1 and 2 are the original exactly; after that
+              one new thing arrives at a time - a second kind of monster,
+              then sloping floors, then tools, then trees, then the
+              marbles - so each can be learned on its own. The levels
+              do not stop.
    ===================================================================== */
 (function (root) {
   "use strict";
 
   /* --- geometry -----------------------------------------------------
-     The original worked in BBC graphics units: 32 units to a character
-     cell. The man was bounded by X%>96 / X%<1152 (line 230,240) and
-     Y%>128 / Y%<928 (250,260), giving a playfield 34 cells across and
-     26 down. Bricks were scattered from the PA%() table (line 100),
-     which holds 160,192,...1088 - so bricks land in the inner 30x23.  */
+     The original worked in BBC graphics units, 32 to a character cell.
+     The man was bounded by X%>96 / X%<1152 (lines 230,240) and
+     Y%>128 / Y%<928 (250,260): a playfield 34 cells across and 26 down.
+     Bricks came from the PA%() table built at line 100, which holds
+     160,192,...1088 - so they land in the inner 30x23.               */
   var COLS = 34, ROWS = 26;
-  var BRICK_C0 = 2, BRICK_C1 = 31;      /* PA%(1..30) = X 160..1088 */
-  var BRICK_R0 = 1, BRICK_R1 = 23;      /* PA%(1..23) = Y 160..864  */
+  var BRICK_C0 = 2, BRICK_C1 = 31;
+  var BRICK_R0 = 1, BRICK_R1 = 23;
 
-  var EMPTY = 0, BRICK = 1;
+  /* what can be standing on a square */
+  var EMPTY = 0, BRICK = 1, TREE = 2, MARBLE = 3,
+      VAT_TAR = 4, VAT_WATER = 5, COOLED = 6;
+
+  /* and what can be running across it. The cellars are old and things
+     have been sealed up down here for a long time. */
+  var DRY = 0, WATER = 1, TAR = 2;
+  var TAR_COOLS = 26;          /* turns a tar cell burns before it sets */
+
+  /* what can be lying on one */
+  var NOTHING = 0, BOOTS = 1, FROST = 2, AXE = 3, JAR = 4;
+  var ITEMS = {
+    1: { key: "boots", name: "Boots", blurb: "Two squares a turn for a while.", colour: 0xc8a017 },
+    2: { key: "frost", name: "Frost jar", blurb: "Everything down here stops moving.", colour: 0x63c8e0 },
+    3: { key: "axe",   name: "Axe",   blurb: "Three swings. Trees do not move any other way.", colour: 0xb0b6bd },
+    4: { key: "jar",   name: "Sealed jar", blurb: "Nobody labelled it. Could go either way.", colour: 0x9a5bc4 }
+  };
 
   /* The cassette edition has no frame limiter and runs as fast as BASIC
      manages. The disc conversion added one - `210 T%=TIME+5` with
-     `380 REPEAT UNTIL TIME>T%`, TIME being centiseconds - which pins the
-     main loop at 20 turns a second. That is the rate used here.        */
+     `380 REPEAT UNTIL TIME>T%` - pinning the loop at 20 turns a second. */
   var TICK_HZ = 20;
 
   /* line 130: X%=608 Y%=576, X1%=576 Y1%=512 */
-  var MAN_C0 = 16, MAN_R0 = 14, FLY_C0 = 15, FLY_R0 = 12;
+  var MAN_C0 = 16, MAN_R0 = 14, MON_C0 = 15, MON_R0 = 12;
 
-  /* --- PROCset_level, lines 890-990 ---------------------------------
-     PE% is the number of bricks. PA% is the fly's leash: see step().
-     (The listing really does use PA% for both this scalar and the
-     brick-position array PA%(); BBC BASIC keeps them apart.)          */
-  var LEVELS = [
-    /* F%  PE%  PA% */
-    [1, 200, 400], [2, 175, 300], [3, 150, 200], [4, 125, 150], [5, 100, 100],
-    [6,  75,  75], [7,  50,  50], [8,  40,  40], [9,  30,  30]
-  ];
-  function levelOf(F) {
-    if (F >= 10) return { PE: 20, PA: 0 };          /* line 990 */
-    var row = LEVELS[F - 1] || LEVELS[0];
-    return { PE: row[1], PA: row[2] };
+  var MAX_H = 3;                      /* how high the floor ever gets */
+  var BOOTS_TURNS = 70, FROST_TURNS = 50, AXE_SWINGS = 3;
+
+  function sign(n) { return n < 0 ? -1 : n > 0 ? 1 : 0; }
+  function rnd(n) { return (Math.random() * n) | 0; }
+
+  /* ==================================================================
+     THE MONSTERS
+
+     The fly is the original's, exactly. The other three are new, and
+     each asks a different question of the same four-sided trap:
+
+       fly      wanders on a leash. The leash is the whole difficulty
+                curve - it cannot get further from you than PA%, so as
+                PA% shrinks it is dragged onto you.
+       spider   no wandering at all. It steps straight at you, but only
+                on every second turn. You can outpace it; the cost is
+                that it never stops coming.
+       beetle   keeps close, and every fourteenth turn eats a brick
+                beside it. It destroys the thing you need, so a cellar
+                with a beetle in it is a race.
+       wasp     stands still for a turn, then crosses two squares at
+                once on a loose leash. Safe to approach on its dead
+                turn, lethal on its live one.
+
+     A monster stops for good once it is walled in, or crushed.
+     ================================================================== */
+
+  /* the original's move, lines 300-340: one random direction a turn,
+     taken only if the square is free AND the step keeps the monster
+     inside a box `leash` cells wide centred on the man */
+  function leashStep(m, g, leash) {
+    var R = 1 + rnd(4), c = m.c, r = m.r;
+    if (R === 1 && c > 0 && c > g.manC - leash && g.free(c - 1, r, m)) c--;
+    else if (R === 2 && c < COLS - 1 && c < g.manC + leash && g.free(c + 1, r, m)) c++;
+    else if (R === 3 && r > 0 && r > g.manR - leash && g.free(c, r - 1, m)) r--;
+    else if (R === 4 && r < ROWS - 1 && r < g.manR + leash && g.free(c, r + 1, m)) r++;
+    m.c = c; m.r = r;
   }
 
-  /* The leash is in graphics units; 32 of them to a cell. */
+  function greedyStep(m, g) {
+    var dc = g.manC - m.c, dr = g.manR - m.r, opts = [];
+    if (Math.abs(dc) >= Math.abs(dr)) {
+      if (dc) opts.push([sign(dc), 0]);
+      if (dr) opts.push([0, sign(dr)]);
+    } else {
+      if (dr) opts.push([0, sign(dr)]);
+      if (dc) opts.push([sign(dc), 0]);
+    }
+    for (var i = 0; i < opts.length; i++) {
+      var nc = m.c + opts[i][0], nr = m.r + opts[i][1];
+      if (g.inField(nc, nr) && g.free(nc, nr, m)) { m.c = nc; m.r = nr; return; }
+    }
+  }
+
+  var MONSTERS = {
+    fly: {
+      name: "Fly", colour: 0x3d63c4, dark: 0x1e2c5c, eye: 0x8e1208,
+      blurb: "Wanders, and never lets you get far.",
+      drone: [0, -10, 23, 1],
+      move: function (m, g) { leashStep(m, g, g.leash); }
+    },
+    spider: {
+      name: "Spider", colour: 0x6b4a2a, dark: 0x2e1e10, eye: 0xd8c020,
+      blurb: "Comes straight at you, every second turn.",
+      drone: [0, -11, 3, 1],
+      move: function (m, g) { if (++m.tick % 2 === 0) greedyStep(m, g); }
+    },
+    beetle: {
+      name: "Beetle", colour: 0x2c6a3a, dark: 0x15321c, eye: 0xe06010,
+      blurb: "Keeps close, and eats a brick every fourteen turns.",
+      drone: [0, -10, 1, 1],
+      eats: 14,
+      move: function (m, g) {
+        leashStep(m, g, g.leash * 0.7);
+        if (++m.tick % this.eats === 0) m.ate = g.devour(m);
+      }
+    },
+    wasp: {
+      name: "Wasp", colour: 0xc8a017, dark: 0x3a2c06, eye: 0x901010,
+      blurb: "Waits a turn, then crosses two squares at once.",
+      drone: [0, -9, 5, 1],
+      move: function (m, g) {
+        if (++m.tick % 2 === 0) return;
+        leashStep(m, g, g.leash * 1.6);
+        leashStep(m, g, g.leash * 1.6);
+      }
+    }
+  };
+  var MONSTER_ORDER = ["fly", "spider", "beetle", "wasp"];
+
+  /* --- PROCset_level, lines 890-990 --------------------------------- */
+  var LEVELS = [
+    [200, 400], [175, 300], [150, 200], [125, 150], [100, 100],
+    [75, 75], [50, 50], [40, 40], [30, 30]
+  ];
+
+  /* ==================================================================
+     THE DESCENT
+
+     Cellars 1 and 2 are the original, untouched. After that the curve is
+     hand-made rather than generated: one new thing at a time, and the
+     cellar it arrives in is deliberately gentle - usually a single
+     monster and plenty of bricks - so it can be learned before it is
+     combined with anything else. The pressure then comes back on.
+
+       3  a second kind of monster        10  the tar
+       4  the floor stops being level     11  the water
+       5  the beetle, and boots           12+ combinations, tightening
+       6  the wasp, and frost
+       7  trees, and the axe
+       8  marbles
+       9  the unlabelled jars
+     ================================================================== */
+  var FEATURE_AT = { slopes: 4, boots: 5, frost: 6, trees: 7, axe: 7,
+                     marbles: 8, jar: 9, tar: 10, water: 11 };
+
+  var PLAN = [
+    /*  1 */ { kinds: ["fly"], PE: 200, PA: 400, adds: [] },
+    /*  2 */ { kinds: ["fly"], PE: 175, PA: 300, adds: [] },
+    /*  3 */ { kinds: ["spider"], PE: 165, PA: 260, adds: ["spider"] },
+    /*  4 */ { kinds: ["fly"], PE: 155, PA: 220, adds: ["slopes"] },
+    /*  5 */ { kinds: ["beetle"], PE: 150, PA: 200, adds: ["beetle", "boots"] },
+    /*  6 */ { kinds: ["wasp"], PE: 145, PA: 190, adds: ["wasp", "frost"] },
+    /*  7 */ { kinds: ["fly"], PE: 145, PA: 175, adds: ["trees"] },
+    /*  8 */ { kinds: ["spider"], PE: 140, PA: 165, adds: ["marbles"] },
+    /*  9 */ { kinds: ["fly", "spider"], PE: 155, PA: 155, adds: ["jar"] },
+    /* 10 */ { kinds: ["beetle"], PE: 140, PA: 145, adds: ["tar"] },
+    /* 11 */ { kinds: ["wasp"], PE: 140, PA: 140, adds: ["water"] },
+    /* 12 */ { kinds: ["fly", "beetle"], PE: 145, PA: 130, adds: [] },
+    /* 13 */ { kinds: ["spider", "wasp"], PE: 135, PA: 125, adds: [] },
+    /* 14 */ { kinds: ["fly", "spider", "beetle"], PE: 150, PA: 120, adds: [] },
+    /* 15 */ { kinds: ["wasp", "beetle"], PE: 125, PA: 115, adds: [] },
+    /* 16 */ { kinds: ["fly", "spider", "wasp", "beetle"], PE: 160, PA: 110, adds: [] }
+  ];
+
+  /* below the plan the cellars keep coming, tightening slowly and never
+     quite running out of bricks */
+  function deepPlan(F) {
+    var n = Math.min(4, 2 + Math.floor((F - 17) / 7));
+    var kinds = [];
+    for (var i = 0; i < n; i++) kinds.push(MONSTER_ORDER[(F + i * 3) % 4]);
+    return {
+      kinds: kinds,
+      PE: Math.max(56, 120 - (F - 17) * 2) + 22 * (n - 1),
+      PA: Math.max(72, 108 - (F - 17)),
+      adds: []
+    };
+  }
+
+  function planFor(F) { return (F <= PLAN.length) ? PLAN[F - 1] : deepPlan(F); }
+  function monstersFor(F) { return planFor(F).kinds.slice(); }
+
+  function featuresFor(F) {
+    var out = {};
+    for (var k in FEATURE_AT) out[k] = F >= FEATURE_AT[k];
+    return out;
+  }
+
+  /* what turns up at exactly this level, and what to say about it */
+  var BRIEFINGS = {
+    spider:  { name: "The spider", body: "It does not wander. It comes straight at you, and takes a step on every second turn. You can out-walk it - but it never stops, and it will be behind you the whole way." },
+    beetle:  { name: "The beetle", body: "It keeps closer than the fly, and every fourteen turns it eats a brick beside it. It destroys the one thing you need. Wall it in early, or it will eat the cellar out from under you." },
+    wasp:    { name: "The wasp", body: "It stands still for a turn, then crosses two squares at once. Its dead turn is the only safe moment to get near it. Count them." },
+    slopes:  { name: "The floor is not level", body: "Climbing costs you. Going up a step takes an extra turn, shoving a line of bricks uphill takes another again, and walking downhill gives you a free step back. Read the ground before you commit to a push." },
+    boots:   { name: "Boots", body: "Two squares a turn for the next seventy turns. Nothing else speeds up. It is the only time you are genuinely faster than they are." },
+    frost:   { name: "Frost jars", body: "Everything loose in the cellar stops for fifty turns. Time enough to build a wall around something that would never otherwise hold still." },
+    trees:   { name: "Trees, and the axe", body: "Trees do not shove. Nothing moves them but an axe, and an axe is good for three swings. They hold a monster in as well as a brick does - so a tree in the right place is four bricks you did not have to push." },
+    marbles: { name: "Marbles", body: "Heavy, and they keep going. Shove one and it runs until something stops it. Uphill it slows, and if it cannot crest the rise it comes back down at you, gathering speed. Slowly it bounces off things; quickly it smashes bricks; at speed it flattens a monster - or you." },
+    jar:     { name: "Sealed jars", body: "Nobody labelled them. Half are frost. The other half have something in them that has been waiting a long time to get out." },
+    tar:     { name: "The tar", body: "Sealed in vats, and still hot. Break one - a marble will do it, so will the axe - and it runs downhill burning what it touches: trees, bricks, monsters, you. Eventually it sets, and what it leaves behind is as good as a wall." },
+    water:   { name: "The cistern", body: "Water runs further and faster than tar and finds every low corner. It puts fires out, shoves marbles along in front of it, and sweeps you and the monsters off your feet. It burns nothing - but where it takes you is not your choice." }
+  };
+  function briefingFor(F) {
+    var adds = planFor(F).adds, out = [];
+    for (var i = 0; i < adds.length; i++) if (BRIEFINGS[adds[i]]) out.push(BRIEFINGS[adds[i]]);
+    return out;
+  }
+
+  function levelOf(F, classic) {
+    if (classic) {
+      /* line 990 - and the original really does stop developing here */
+      if (F >= 10) return { PE: 20, PA: 0, kinds: ["fly"], feat: {}, adds: [] };
+      var row = LEVELS[F - 1] || LEVELS[0];
+      return { PE: row[0], PA: row[1], kinds: ["fly"], feat: {}, adds: [] };
+    }
+    var p = planFor(F);
+    return { PE: p.PE, PA: p.PA, kinds: p.kinds.slice(),
+             feat: featuresFor(F), adds: p.adds.slice() };
+  }
+
   function leashCells(PA) { return PA / 32; }
 
-  /* --- the palette shifts as you descend, lines 1000-1020 -----------
-     VDU19 remaps logical 0 (the floor) and, from level 6, logical 1
-     (the brick body). Physical colours are the BBC's own numbering.   */
+  /* --- the palette shifts as you descend, lines 1000-1020 ------------ */
   function palette(F) {
     var floor = 3;                                  /* yellow, line 150 */
     if (F >= 3) floor = 5;                          /* magenta          */
     if (F >= 6) floor = 6;                          /* cyan             */
     if (F >= 8) floor = 5;                          /* magenta again    */
-    return {
-      floor: floor,
-      brick: (F >= 6) ? 4 : 1,                      /* blue from 6, else red */
-      mortar: 7,                                    /* white, line 170  */
-      figure: 0                                     /* black, line 150  */
-    };
+    return { floor: floor, brick: (F >= 6) ? 4 : 1, mortar: 7, figure: 0 };
   }
 
   /* --- PROCbonus, lines 1110-1130 ----------------------------------- */
@@ -190,21 +380,58 @@
     return 10;
   }
 
-  function Game() {
+  /* ==================================================================
+     THE GAME
+     ================================================================== */
+  function Game(opts) {
+    this.classic = !!(opts && opts.classic);
     this.HI = 0;
     this.grid = new Uint8Array(COLS * ROWS);
+    this.height = new Uint8Array(COLS * ROWS);
+    this.item = new Uint8Array(COLS * ROWS);
+    this.fluid = new Uint8Array(COLS * ROWS);
+    this.fvol = new Uint8Array(COLS * ROWS);
+    this.burn = new Uint8Array(COLS * ROWS);
+    this.monsters = [];
+    this.marbles = [];
+    this.sources = [];
     this.reset(1);
   }
 
   Game.prototype.idx = function (c, r) { return r * COLS + c; };
-  Game.prototype.inField = function (c, r) {
-    return c >= 0 && r >= 0 && c < COLS && r < ROWS;
+  Game.prototype.inField = function (c, r) { return c >= 0 && r >= 0 && c < COLS && r < ROWS; };
+  Game.prototype.at = function (c, r) { return this.inField(c, r) ? this.grid[this.idx(c, r)] : -1; };
+  Game.prototype.h = function (c, r) { return this.inField(c, r) ? this.height[this.idx(c, r)] : 0; };
+  Game.prototype.brickAt = function (c, r) { return this.at(c, r) === BRICK; };
+
+  /* solid enough to hold a monster in. In the original only a brick
+     counted, because the win test asked POINT for colour 2 - the edge of
+     the cellar read -1 and never qualified. In the deep cellars a tree
+     or a resting marble will do as well; the cellar wall still will not. */
+  Game.prototype.solid = function (c, r) {
+    var v = this.at(c, r);
+    if (this.classic) return v === BRICK;
+    if (v === BRICK || v === TREE || v === VAT_TAR || v === VAT_WATER || v === COOLED) return true;
+    if (v === MARBLE) { var m = this.marbleAt(c, r); return !!m && m.v <= 0; }
+    return false;
   };
-  Game.prototype.brickAt = function (c, r) {
-    return this.inField(c, r) && this.grid[this.idx(c, r)] === BRICK;
+  Game.prototype.monsterAt = function (c, r, except) {
+    for (var i = 0; i < this.monsters.length; i++) {
+      var m = this.monsters[i];
+      if (m !== except && !m.gone && m.c === c && m.r === r) return m;
+    }
+    return null;
+  };
+  Game.prototype.marbleAt = function (c, r) {
+    for (var i = 0; i < this.marbles.length; i++)
+      if (this.marbles[i].c === c && this.marbles[i].r === r) return this.marbles[i];
+    return null;
+  };
+  /* a square a monster may step onto */
+  Game.prototype.free = function (c, r, except) {
+    return this.at(c, r) === EMPTY && !this.monsterAt(c, r, except);
   };
 
-  /* line 110-140 plus PROCset_level / PROCprint_bricks */
   Game.prototype.reset = function (startLevel) {
     this.F = startLevel || 1;
     this.SC = 0;
@@ -214,136 +441,623 @@
     this.sheet();
   };
 
-  /* PROCnext_sheet, line 860, and PROCprint_bricks, line 810 */
+  /* --- laying out a cellar: PROCnext_sheet (860) and
+         PROCprint_bricks (810), plus everything that came later ------ */
   Game.prototype.sheet = function () {
     if (this.SC > this.HI) this.HI = this.SC;       /* line 1030 */
-    var lv = levelOf(this.F);
+    var lv = levelOf(this.F, this.classic);
     this.PE = lv.PE;
     this.PA = lv.PA;
+    this.leash = leashCells(lv.PA);
+    this.feat = lv.feat;
     this.CO = 0;
     this.grid.fill(EMPTY);
+    this.item.fill(NOTHING);
+    this.fluid.fill(DRY);
+    this.fvol.fill(0);
+    this.burn.fill(0);
+    this.marbles.length = 0;
+    this.sources.length = 0;
+
+    /* the man's state resets with the cellar */
+    this.steps = 0;
+    this.boots = 0;
+    this.frost = 0;
+    this.axe = 0;
 
     this.manC = MAN_C0; this.manR = MAN_R0;
-    this.flyC = FLY_C0; this.flyR = FLY_R0;
 
-    /* line 820-840: PE% bricks, each dropped on a square that is not
-       already a brick. The original does not avoid the man or the fly;
-       the fly simply erases whatever it is standing on when it moves.  */
+    this.monsters = [];
+    var spots = [[MON_C0, MON_R0], [MON_C0 + 9, MON_R0 + 7],
+                 [MON_C0 - 9, MON_R0 + 6], [MON_C0 + 8, MON_R0 - 8]];
+    for (var i = 0; i < lv.kinds.length; i++) {
+      var s = spots[i % spots.length];
+      this.monsters.push(this.newMonster(lv.kinds[i],
+        Math.max(1, Math.min(COLS - 2, s[0])), Math.max(1, Math.min(ROWS - 2, s[1]))));
+    }
+
+    this.makeHeights();
+
+    /* line 820-840: PE% bricks dropped on squares that are not already
+       bricks. Squares beside a monster are left clear so nothing starts
+       walled in by luck. */
     var placed = 0, guard = 0;
-    while (placed < this.PE && guard++ < 200000) {
-      var c = BRICK_C0 + ((Math.random() * (BRICK_C1 - BRICK_C0 + 1)) | 0);
-      var r = BRICK_R0 + ((Math.random() * (BRICK_R1 - BRICK_R0 + 1)) | 0);
-      if (this.grid[this.idx(c, r)] === BRICK) continue;
-      if (c === this.flyC && r === this.flyR) continue;
+    while (placed < this.PE && guard++ < 400000) {
+      var c = BRICK_C0 + rnd(BRICK_C1 - BRICK_C0 + 1);
+      var r = BRICK_R0 + rnd(BRICK_R1 - BRICK_R0 + 1);
+      if (this.grid[this.idx(c, r)] !== EMPTY) continue;
       if (c === this.manC && r === this.manR) continue;
+      if (this.nearMonster(c, r)) continue;
       this.grid[this.idx(c, r)] = BRICK;
       placed++;
     }
     this.bricks = placed;
+
+    this.makeFurniture();
   };
 
-  /* --- one turn of the main loop, lines 200-390 ---------------------
-     dir is "left" | "right" | "up" | "down" | null.
-     Order matters and is the original's: the man moves and shoves,
-     then the fly moves, then CO% counts up, then the game is tested.  */
+  Game.prototype.newMonster = function (kind, c, r) {
+    return { kind: kind, spec: MONSTERS[kind], c: c, r: r,
+             tick: 0, trapped: false, crushed: false, gone: false, ate: false };
+  };
+
+  Game.prototype.nearMonster = function (c, r) {
+    for (var i = 0; i < this.monsters.length; i++) {
+      var m = this.monsters[i];
+      if (Math.abs(m.c - c) <= 1 && Math.abs(m.r - r) <= 1) return true;
+    }
+    return false;
+  };
+
+  /* --- the floor -----------------------------------------------------
+     A few smooth mounds. The rim stays flat so nothing can be pushed
+     uphill into the edge and stick there.                            */
+  Game.prototype.makeHeights = function () {
+    this.height.fill(0);
+    if (this.classic || !this.feat.slopes) return;
+    var mounds = 2 + rnd(3);
+    for (var k = 0; k < mounds; k++) {
+      var cx = 4 + rnd(COLS - 8), cy = 3 + rnd(ROWS - 6);
+      var rad = 4 + rnd(5), amp = 1 + rnd(MAX_H);
+      for (var r = 0; r < ROWS; r++) for (var c = 0; c < COLS; c++) {
+        var d = Math.sqrt((c - cx) * (c - cx) + (r - cy) * (r - cy));
+        if (d > rad) continue;
+        var hgt = Math.round(amp * (1 - d / rad));
+        var i = this.idx(c, r);
+        if (hgt > this.height[i]) this.height[i] = Math.min(MAX_H, hgt);
+      }
+    }
+    /* flatten the rim and the ground everyone starts on */
+    for (var c2 = 0; c2 < COLS; c2++) { this.height[this.idx(c2, 0)] = 0; this.height[this.idx(c2, ROWS - 1)] = 0; }
+    for (var r2 = 0; r2 < ROWS; r2++) { this.height[this.idx(0, r2)] = 0; this.height[this.idx(COLS - 1, r2)] = 0; }
+    this.flatten(this.manC, this.manR);
+    for (var m = 0; m < this.monsters.length; m++) this.flatten(this.monsters[m].c, this.monsters[m].r);
+  };
+  Game.prototype.flatten = function (c, r) {
+    for (var dr = -1; dr <= 1; dr++) for (var dc = -1; dc <= 1; dc++)
+      if (this.inField(c + dc, r + dr)) this.height[this.idx(c + dc, r + dr)] = 0;
+  };
+
+  /* --- trees, marbles and the things worth picking up ---------------- */
+  Game.prototype.makeFurniture = function () {
+    if (this.classic) return;
+    var f = this.feat, self = this;
+    function scatter(n, put) {
+      for (var i = 0, guard = 0; i < n && guard < 4000; guard++) {
+        var c = 2 + rnd(COLS - 4), r = 2 + rnd(ROWS - 4);
+        if (self.grid[self.idx(c, r)] !== EMPTY) continue;
+        if (self.item[self.idx(c, r)] !== NOTHING) continue;
+        if (Math.abs(c - self.manC) < 3 && Math.abs(r - self.manR) < 3) continue;
+        if (self.nearMonster(c, r)) continue;
+        put(c, r); i++;
+      }
+    }
+    if (f.trees) scatter(6 + rnd(7), function (c, r) { self.grid[self.idx(c, r)] = TREE; });
+    if (f.marbles) scatter(1 + rnd(3), function (c, r) {
+      self.grid[self.idx(c, r)] = MARBLE;
+      self.marbles.push({ c: c, r: r, dc: 0, dr: 0, v: 0 });
+    });
+    if (f.boots) scatter(1, function (c, r) { self.item[self.idx(c, r)] = BOOTS; });
+    if (f.frost) scatter(1, function (c, r) { self.item[self.idx(c, r)] = FROST; });
+    if (f.axe) scatter(1 + rnd(2), function (c, r) { self.item[self.idx(c, r)] = AXE; });
+    if (f.jar) scatter(1 + rnd(2), function (c, r) { self.item[self.idx(c, r)] = JAR; });
+    if (f.tar) scatter(1 + rnd(2), function (c, r) { self.grid[self.idx(c, r)] = VAT_TAR; });
+    if (f.water) scatter(1 + rnd(2), function (c, r) { self.grid[self.idx(c, r)] = VAT_WATER; });
+  };
+
+  /* the beetle's meal: one brick beside it, gone */
+  Game.prototype.devour = function (m) {
+    var d = [[1, 0], [-1, 0], [0, 1], [0, -1]], pick = [];
+    for (var i = 0; i < 4; i++)
+      if (this.brickAt(m.c + d[i][0], m.r + d[i][1])) pick.push(d[i]);
+    if (!pick.length) return false;
+    var p = pick[rnd(pick.length)];
+    this.grid[this.idx(m.c + p[0], m.r + p[1])] = EMPTY;
+    this.bricks--;
+    return true;
+  };
+
+  Game.prototype.isBoxed = function (m) {
+    return this.solid(m.c + 1, m.r) && this.solid(m.c - 1, m.r) &&
+           this.solid(m.c, m.r + 1) && this.solid(m.c, m.r - 1);
+  };
+  Game.prototype.loose = function () {
+    var n = 0;
+    for (var i = 0; i < this.monsters.length; i++)
+      if (!this.monsters[i].trapped && !this.monsters[i].gone) n++;
+    return n;
+  };
+  Game.prototype.canStillWin = function () {
+    if (this.classic) return this.bricks >= 4 * this.loose();
+    /* trees and marbles will hold a monster too, so only count bricks
+       against what is left loose, generously */
+    return this.bricks + this.marbles.length * 2 >= 4 * this.loose();
+  };
+
+  /* --- what a step costs --------------------------------------------
+     One step point arrives each turn (two in boots). A step on the level
+     costs one; every level of climb costs another, and shoving a line or
+     a marble costs another again. Stepping down gives a point back, so
+     you run downhill. In classic mode everything costs exactly one and
+     the whole system is invisible.                                     */
+  Game.prototype.stepCost = function (nc, nr, heavy) {
+    if (this.classic) return 1;
+    var climb = Math.max(0, this.h(nc, nr) - this.h(this.manC, this.manR));
+    return 1 + climb + (heavy ? 1 : 0);
+  };
+
+  /* ==================================================================
+     ONE TURN - lines 200-390, with everything that came later
+     ================================================================== */
   Game.prototype.step = function (dir) {
-    var ev = { moved: false, pushed: 0, lostOverEdge: 0, crunched: 0,
-               flyMoved: false, won: false, lost: false, bonus: 0 };
+    var ev = { moved: false, pushed: 0, lostOverEdge: 0, crunched: 0, crunchedBy: null,
+               eaten: 0, chopped: 0, picked: null, strained: false, rolled: [],
+               smashed: 0, crushed: [], trappedNow: [], won: false, lost: false,
+               lostTo: null, bonus: 0, stuck: false, spawned: null,
+               burst: 0, burned: 0, doused: 0, swept: 0, set: 0 };
     if (this.over || this.won) return ev;
 
-    /* ---- the man, lines 230-260 ---------------------------------- */
+    /* --- step points ------------------------------------------------
+       One a turn, two in boots, and they bank up to three. Walking on
+       the level spends one, so somebody walking steadily never has any
+       in hand: the moment the ground rises he loses a turn to it. Stand
+       still and you can wind up for a climb or a heavy shove instead. */
+    this.steps = Math.min(3, this.steps + (this.boots > 0 ? 2 : 1));
+
     var d = { left: [-1, 0], right: [1, 0], up: [0, 1], down: [0, -1] }[dir];
     if (d) {
-      var nc = this.manC + d[0], nr = this.manR + d[1];
-      if (this.inField(nc, nr)) {                   /* the bounds tests */
-        this.manC = nc; this.manR = nr;             /* he always moves  */
-        ev.moved = true;
-
-        if (this.grid[this.idx(nc, nr)] === BRICK) {
-          /* line 230: REPEAT J%=J%+32 UNTIL POINT(...)<>2 - count the
-             run of bricks starting under him and find the first square
-             that is not a brick.                                       */
-          var n = 0, cc = nc, rr = nr;
-          while (this.brickAt(cc, rr)) { n++; cc += d[0]; rr += d[1]; }
-
-          /* PROCmove_bricks, line 410: the run shifts one square into
-             that first free square. Three things can be standing there. */
-          if (!this.inField(cc, rr)) {
-            /* off the edge of the cellar. The original drew the brick
-               outside the graphics viewport, where it was clipped away
-               and never came back.                                     */
-            ev.lostOverEdge = 1;
-            this.bricks--;
-          } else if (cc === this.flyC && rr === this.flyR) {
-            /* driven straight at the fly. The brick lands on its square
-               and the fly wipes that square the moment it moves, so the
-               leading brick - and only the leading brick - is lost.     */
-            ev.crunched = 1;
-            this.bricks--;
-          } else {
-            this.grid[this.idx(cc, rr)] = BRICK;
-          }
-          this.grid[this.idx(nc, nr)] = EMPTY;      /* he stands here now */
-          ev.pushed = n;
-        }
+      /* in boots he gets through two squares in the same turn */
+      var passes = this.boots > 0 ? 2 : 1;
+      for (var pass = 0; pass < passes; pass++) {
+        if (!this.manMove(d, ev)) break;
+        if (ev.lost) return ev;
       }
     }
 
-    /* ---- the fly, lines 300-340 ----------------------------------
-       One random direction per turn. It moves only if the square is
-       not a brick AND the move keeps it inside a box of half-width
-       PA% around the man. That box is the whole of the fly's
-       intelligence: at level 1 it is 12 squares and the fly wanders,
-       at level 10 it is nothing and the fly can only close on you.   */
-    var R = 1 + ((Math.random() * 4) | 0);
-    var leash = leashCells(this.PA);
-    var fc = this.flyC, fr = this.flyR;
-    if (R === 1 && fc > 0 && fc > this.manC - leash && !this.brickAt(fc - 1, fr)) fc--;
-    else if (R === 2 && fc < COLS - 1 && fc < this.manC + leash && !this.brickAt(fc + 1, fr)) fc++;
-    else if (R === 3 && fr > 0 && fr > this.manR - leash && !this.brickAt(fc, fr - 1)) fr--;
-    else if (R === 4 && fr < ROWS - 1 && fr < this.manR + leash && !this.brickAt(fc, fr + 1)) fr++;
-    if (fc !== this.flyC || fr !== this.flyR) {
-      this.flyC = fc; this.flyR = fr;
-      ev.flyMoved = true;
+    this.settle(ev);
+    this.rollMarbles(ev);
+    if (ev.lost) return ev;
+    this.flowFluids(ev);
+    if (ev.lost) return ev;
+
+    /* ---- the monsters, lines 300-340 ------------------------------ */
+    if (this.frost > 0) this.frost--;
+    else {
+      for (var i = 0; i < this.monsters.length; i++) {
+        var m = this.monsters[i];
+        if (m.trapped || m.gone) continue;
+        m.ate = false;
+        m.spec.move(m, this);
+        if (m.ate) ev.eaten++;
+      }
     }
+    if (this.boots > 0) this.boots--;
+    this.settle(ev);
 
-    this.CO++;                                       /* line 370 */
+    this.CO++;                                      /* line 370 */
 
-    /* ---- line 380 -------------------------------------------------
-       Caught if they share a square. Trapped if all four orthogonal
-       neighbours are bricks - the edge of the cellar does NOT count,
-       so a corner is no help. Four real bricks or nothing.           */
-    if (this.manC === this.flyC && this.manR === this.flyR) {
-      ev.lost = true; this.over = true;
-      this.SC = 0;                                   /* PROCloss, line 480 */
-    } else if (this.brickAt(this.flyC + 1, this.flyR) &&
-               this.brickAt(this.flyC - 1, this.flyR) &&
-               this.brickAt(this.flyC, this.flyR + 1) &&
-               this.brickAt(this.flyC, this.flyR - 1)) {
+    /* ---- line 380 ------------------------------------------------- */
+    var caught = this.monsterAt(this.manC, this.manR);
+    if (caught && !caught.trapped) return this.die(ev, caught);
+    if (this.loose() === 0 && this.monsters.length) {
       ev.won = true; this.won = true;
-      /* PROCwin, lines 570-580. The high score is deliberately NOT
-         touched here: the original only compares it in PROCset_level
-         (line 1030), which runs on the next sheet. Since PROCloss wipes
-         SC% to zero first, a run that dies before clearing a sheet
-         contributes nothing to HI%. That is the original's behaviour.  */
+      /* PROCwin, lines 570-580. The high score is deliberately not
+         touched here: the original only compares it in PROCset_level,
+         and PROCloss wipes SC% first, so a run that dies before
+         clearing a sheet contributes nothing. */
       if (this.CO < 800) { ev.bonus = bonusFor(this.CO); this.SC += ev.bonus; }
       this.SC += this.F * 50;
+      this.SC += 100 * (this.monsters.length - 1);
+    } else if (!this.canStillWin()) {
+      ev.stuck = true;
     }
     return ev;
   };
 
-  /* called after the win has been shown - line 610 PROCnext_sheet */
+  /* --- the man's move, lines 230-260. True if he actually did
+         something, so a strained turn stops him trying again. -------- */
+  Game.prototype.manMove = function (d, ev) {
+    {
+      var nc = this.manC + d[0], nr = this.manR + d[1];
+      if (!this.inField(nc, nr)) return false;
+      {
+        var here = this.grid[this.idx(nc, nr)];
+
+        if (here === TREE || here === VAT_TAR || here === VAT_WATER) {
+          /* none of these shove. The axe is the only argument they take */
+          if (this.axe > 0 && this.steps >= 1) {
+            this.axe--; this.steps -= 1;
+            if (here === TREE) { this.grid[this.idx(nc, nr)] = EMPTY; ev.chopped = 1; }
+            else this.breakVat(nc, nr, ev);
+          } else ev.strained = true;
+
+        } else if (here === COOLED) {
+          ev.strained = true;                  /* set tar is rock now */
+
+        } else if (here === MARBLE) {
+          var mar = this.marbleAt(nc, nr);
+          var cost = this.stepCost(nc, nr, false);
+          if (this.steps < cost) ev.strained = true;
+          else {
+            this.steps -= cost;
+            /* a shove sets it rolling; how well depends on the ground */
+            var drop = this.h(nc, nr) - this.h(nc + d[0], nr + d[1]);
+            mar.dc = d[0]; mar.dr = d[1];
+            mar.v = 2 + Math.max(-1.5, drop * 0.9);
+            if (mar.v <= 0) { mar.v = 0; ev.strained = true; }
+            else ev.rolled.push(mar);
+          }
+
+        } else {
+          if (this.fluid[this.idx(nc, nr)] === TAR) { this.die(ev, { spec: { name: "Tar" } }); return false; }
+          var run = 0, cc = nc, rr = nr;
+          while (this.at(cc, rr) === BRICK) { run++; cc += d[0]; rr += d[1]; }
+          var wading = this.fluid[this.idx(nc, nr)] === WATER;
+          var cost2 = this.stepCost(nc, nr, run >= 2 || wading);
+          if (this.steps < cost2) ev.strained = true;
+          else {
+            this.steps -= cost2;
+            this.manC = nc; this.manR = nr;         /* he always advances */
+            ev.moved = true;
+            if (this.h(nc, nr) < this.h(nc - d[0], nr - d[1])) this.steps = Math.min(3, this.steps + 1);
+
+            if (run) {
+              var blocker = this.monsterAt(cc, rr);
+              if (!this.inField(cc, rr)) {
+                /* over the edge of the cellar: the original drew it outside
+                   the graphics viewport, where it was clipped and lost */
+                ev.lostOverEdge = 1; this.bricks--;
+              } else if (blocker) {
+                /* driven straight at a monster. The brick lands on its
+                   square and its redraw wipes it, so the leading brick -
+                   and only the leading brick - is destroyed. */
+                ev.crunched = 1; ev.crunchedBy = blocker; this.bricks--;
+              } else if (this.at(cc, rr) !== EMPTY) {
+                /* a tree or a marble at the end of the run stops it dead */
+                ev.lostOverEdge = 0; this.bricks--; ev.crunched = 1;
+              } else {
+                this.grid[this.idx(cc, rr)] = BRICK;
+              }
+              this.grid[this.idx(nc, nr)] = EMPTY;
+              ev.pushed = run;
+            }
+
+            /* anything lying here is picked up */
+            var it = this.item[this.idx(nc, nr)];
+            if (it !== NOTHING) {
+              this.item[this.idx(nc, nr)] = NOTHING;
+              ev.picked = this.take(it, ev);
+            }
+          }
+        }
+      }
+    }
+
+    return ev.moved || ev.chopped > 0 || !!ev.burst;
+  };
+
+  Game.prototype.die = function (ev, by) {
+    ev.lost = true; ev.lostTo = by || null;
+    this.over = true;
+    this.SC = 0;                                    /* PROCloss, line 480 */
+    return ev;
+  };
+
+  Game.prototype.take = function (it, ev) {
+    var spec = ITEMS[it];
+    if (it === BOOTS) this.boots = BOOTS_TURNS;
+    else if (it === FROST) this.frost = FROST_TURNS;
+    else if (it === AXE) this.axe += AXE_SWINGS;
+    else if (it === JAR) {
+      /* nobody labelled it */
+      if (rnd(2) === 0) { this.frost = FROST_TURNS + 20; return { key: "jar", name: "Sealed jar", got: "It was frost. Everything has stopped." }; }
+      var kind = MONSTER_ORDER[rnd(MONSTER_ORDER.length)];
+      var spot = this.farSpot();
+      var extra = this.newMonster(kind, spot[0], spot[1]);
+      this.monsters.push(extra);
+      ev.spawned = extra;
+      return { key: "jar", name: "Sealed jar", got: "It was a " + extra.spec.name.toLowerCase() + ". It was not empty." };
+    }
+    return { key: spec.key, name: spec.name, got: spec.blurb };
+  };
+
+  Game.prototype.farSpot = function () {
+    var best = [1, 1], far = -1;
+    for (var k = 0; k < 60; k++) {
+      var c = 2 + rnd(COLS - 4), r = 2 + rnd(ROWS - 4);
+      if (this.grid[this.idx(c, r)] !== EMPTY || this.monsterAt(c, r)) continue;
+      var d = Math.abs(c - this.manC) + Math.abs(r - this.manR);
+      if (d > far) { far = d; best = [c, r]; }
+    }
+    return best;
+  };
+
+  /* --- the marbles ---------------------------------------------------
+     A marble carries speed. It gains speed running downhill and loses it
+     climbing, and if it cannot crest a slope it turns round and comes
+     back at you, gathering pace. What it hits depends on how fast it is
+     going: slowly it bounces off, quickly it breaks bricks, and at speed
+     it will flatten a monster - or you.                               */
+  Game.prototype.rollMarbles = function (ev) {
+    for (var i = 0; i < this.marbles.length; i++) {
+      var m = this.marbles[i];
+      if (m.v <= 0) { m.v = 0; continue; }
+      var steps = Math.max(1, Math.min(3, Math.round(m.v)));
+      for (var s = 0; s < steps && m.v > 0; s++) {
+        var nc = m.c + m.dc, nr = m.r + m.dr;
+        var dh = this.h(nc, nr) - this.h(m.c, m.r);
+
+        if (!this.inField(nc, nr)) { this.bounce(m, 0.45); continue; }
+        if (dh > 0 && m.v <= dh) { this.bounce(m, 0.7); continue; }   /* rolls back */
+
+        var what = this.grid[this.idx(nc, nr)];
+        if (what === BRICK) {
+          if (m.v >= 3) { this.grid[this.idx(nc, nr)] = EMPTY; this.bricks--; ev.smashed++; m.v -= 1.4; this.place(m, nc, nr); }
+          else this.bounce(m, 0.45);
+          continue;
+        }
+        if (what === VAT_TAR || what === VAT_WATER) {
+          if (m.v >= 1.5) { this.breakVat(nc, nr, ev); m.v -= 0.6; }
+          else this.bounce(m, 0.4);
+          continue;
+        }
+        if (what === TREE || what === MARBLE || what === COOLED) { this.bounce(m, 0.35); continue; }
+
+        var mon = this.monsterAt(nc, nr);
+        if (mon && !mon.gone) {
+          if (m.v >= 2) {
+            mon.gone = true; mon.trapped = true; mon.crushed = true;
+            ev.crushed.push(mon);
+            this.SC += 150;
+            m.v -= 0.8;
+            this.place(m, nc, nr);
+          } else this.bounce(m, 0.4);
+          continue;
+        }
+        if (nc === this.manC && nr === this.manR) {
+          if (m.v >= 2) { this.die(ev, { spec: { name: "Marble" } }); return; }
+          m.v = 0;                                   /* he stops it dead */
+          continue;
+        }
+
+        /* clear ground */
+        this.place(m, nc, nr);
+        m.v += (dh < 0) ? (-dh * 0.55) : (-dh * 0.95);
+      }
+      m.v -= 0.16;                                   /* rolling friction */
+      if (m.v <= 0.05) { m.v = 0; m.dc = 0; m.dr = 0; }
+    }
+  };
+  Game.prototype.place = function (m, nc, nr) {
+    this.grid[this.idx(m.c, m.r)] = EMPTY;
+    m.c = nc; m.r = nr;
+    this.grid[this.idx(nc, nr)] = MARBLE;
+  };
+  Game.prototype.bounce = function (m, keep) {
+    m.dc = -m.dc; m.dr = -m.dr;
+    m.v *= keep;
+    if (m.v < 0.3) { m.v = 0; m.dc = 0; m.dr = 0; }
+  };
+
+  /* ==================================================================
+     TAR AND WATER
+
+     Both are sealed away until something breaks the vat, and then they
+     behave the way anything does on a sloping stone floor: they run to
+     the lowest ground they can reach and spread out when they can go no
+     lower. Volume is carried per square, so a burst vat drains and a
+     thin spill peters out.
+
+     Tar burns what it runs into and finally sets solid, which leaves a
+     wall you did not have to build. Water goes further, puts the tar
+     out, shoves marbles along in front of it, and sweeps whatever is
+     standing in its way one square downstream.
+     ================================================================== */
+  Game.prototype.breakVat = function (c, r, ev) {
+    var i = this.idx(c, r);
+    var kind = (this.grid[i] === VAT_TAR) ? TAR : WATER;
+    this.grid[i] = EMPTY;
+    this.sources.push({ c: c, r: r, kind: kind, left: (kind === TAR) ? 9 : 13 });
+    ev.burst = kind;
+    return kind;
+  };
+
+  Game.prototype.blocksFluid = function (c, r, kind) {
+    var v = this.at(c, r);
+    if (v === -1) return true;
+    if (v === BRICK || v === COOLED || v === VAT_TAR || v === VAT_WATER) return true;
+    if (v === TREE) return kind !== TAR;        /* tar takes the tree with it */
+    return false;                                /* MARBLE is handled by the caller */
+  };
+
+  Game.prototype.flowFluids = function (ev) {
+    if (this.classic) return;
+    var n = COLS * ROWS, i, k;
+
+    /* a burst vat keeps pouring for a while */
+    for (var si = 0; si < this.sources.length; si++) {
+      var src = this.sources[si];
+      if (src.left <= 0) continue;
+      i = this.idx(src.c, src.r);
+      if (this.fluid[i] === DRY) { this.fluid[i] = src.kind; this.fvol[i] = 0; }
+      if (this.fluid[i] === src.kind) { this.fvol[i] = Math.min(9, this.fvol[i] + 3); src.left--; }
+    }
+
+    /* highest ground first, so a spill cascades within the turn instead
+       of creeping one square a turn */
+    var cells = [];
+    for (k = 0; k < n; k++) if (this.fvol[k] > 0) cells.push(k);
+    var self = this;
+    cells.sort(function (a, b) {
+      return (self.height[b] * 16 + self.fvol[b]) - (self.height[a] * 16 + self.fvol[a]);
+    });
+
+    var D = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+    for (var ci = 0; ci < cells.length; ci++) {
+      i = cells[ci];
+      if (this.fvol[i] < 2) continue;      /* a film that thin stays put */
+      var c = i % COLS, r = (i / COLS) | 0, kind = this.fluid[i];
+      var best = null, bestLvl = this.height[i] * 4 + this.fvol[i];
+
+      var dirs = D.slice();
+      for (var t = 3; t > 0; t--) { var j = rnd(t + 1), tmp = dirs[t]; dirs[t] = dirs[j]; dirs[j] = tmp; }
+
+      for (var d = 0; d < 4; d++) {
+        var nc = c + dirs[d][0], nr = r + dirs[d][1];
+        if (!this.inField(nc, nr)) continue;
+        var ni = this.idx(nc, nr);
+
+        /* water shoves a marble along in front of it rather than stopping */
+        if (this.grid[ni] === MARBLE) {
+          if (kind === WATER && this.fvol[i] >= 3) {
+            var mar = this.marbleAt(nc, nr);
+            if (mar && mar.v <= 0) { mar.dc = dirs[d][0]; mar.dr = dirs[d][1]; mar.v = 1.6; ev.rolled.push(mar); }
+          }
+          continue;
+        }
+        if (kind === TAR && this.grid[ni] === BRICK) {
+          /* it burns through instead of going round, and spends itself
+             doing it - a course of bricks will hold, one will not */
+          this.grid[ni] = EMPTY; this.bricks--; ev.burned++;
+          this.fvol[i] = Math.max(0, this.fvol[i] - 2);
+          if (this.fvol[i] <= 0) { this.fluid[i] = DRY; break; }
+          continue;
+        }
+        if (this.blocksFluid(nc, nr, kind)) continue;
+        if (this.fluid[ni] !== DRY && this.fluid[ni] !== kind) { this.douse(i, ni, ev); continue; }
+
+        var lvl = this.height[ni] * 4 + this.fvol[ni];
+        if (lvl < bestLvl) { bestLvl = lvl; best = [nc, nr, ni, dirs[d]]; }
+      }
+
+      if (best) {
+        /* hand over half, never the lot: a square that gives away
+           everything it has just shunts the same packet along for ever
+           instead of the spill levelling out and setting */
+        var amt = Math.min((kind === WATER) ? 3 : 2, this.fvol[i] >> 1);
+        if (amt < 1) continue;
+        this.fvol[i] -= amt;
+        if (this.fluid[best[2]] === DRY) this.fluid[best[2]] = kind;
+        this.fvol[best[2]] = Math.min(9, this.fvol[best[2]] + amt);
+        this.enterFluid(best[0], best[1], kind, best[3], ev);
+        if (ev.lost) return;
+        if (this.fvol[i] <= 0) this.fluid[i] = DRY;
+      }
+    }
+
+    /* and the tar sets */
+    for (k = 0; k < n; k++) {
+      if (this.fluid[k] !== TAR) { if (this.fluid[k] === WATER) this.burn[k] = 0; continue; }
+      this.burn[k]++;
+      if (this.burn[k] > TAR_COOLS) {
+        this.fluid[k] = DRY; this.fvol[k] = 0;
+        this.grid[k] = COOLED;
+        ev.set++;
+      }
+    }
+  };
+
+  /* what happens on the square the fluid has just reached */
+  Game.prototype.enterFluid = function (c, r, kind, dir, ev) {
+    var i = this.idx(c, r), d, dd;
+    if (kind === TAR) {
+      if (this.grid[i] === TREE) { this.grid[i] = EMPTY; ev.burned++; }
+      else if (this.grid[i] === BRICK) { this.grid[i] = EMPTY; this.bricks--; ev.burned++; }
+      if (this.item[i] !== NOTHING) this.item[i] = NOTHING;
+
+      var mon = this.monsterAt(c, r);
+      if (mon && !mon.gone) {
+        mon.gone = true; mon.trapped = true; mon.crushed = true;
+        ev.crushed.push(mon); this.SC += 120;
+      }
+      /* and it will take a neighbouring vat with it, which is how a
+         cellar goes up all at once */
+      for (d = 0; d < 4; d++) {
+        dd = [[1, 0], [-1, 0], [0, 1], [0, -1]][d];
+        if (this.at(c + dd[0], r + dd[1]) === VAT_TAR) this.breakVat(c + dd[0], r + dd[1], ev);
+      }
+      if (c === this.manC && r === this.manR) { this.die(ev, { spec: { name: "Tar" } }); return; }
+
+    } else {
+      /* water sweeps whatever is standing here one square downstream */
+      var nc = c + dir[0], nr = r + dir[1];
+      var open = this.inField(nc, nr) && this.at(nc, nr) === EMPTY;
+      var m2 = this.monsterAt(c, r);
+      if (m2 && !m2.trapped && open && !this.monsterAt(nc, nr)) { m2.c = nc; m2.r = nr; ev.swept++; }
+      if (c === this.manC && r === this.manR && open) {
+        this.manC = nc; this.manR = nr; ev.swept++;
+        var hit = this.monsterAt(nc, nr);
+        if (hit && !hit.trapped) { this.die(ev, hit); return; }
+      }
+    }
+  };
+
+  /* water and tar meeting: the fire goes out and leaves rock */
+  Game.prototype.douse = function (a, b, ev) {
+    var tar = (this.fluid[a] === TAR) ? a : b;
+    var wet = (tar === a) ? b : a;
+    this.fluid[tar] = DRY; this.fvol[tar] = 0;
+    this.grid[tar] = COOLED;
+    this.fvol[wet] = Math.max(0, this.fvol[wet] - 2);
+    if (this.fvol[wet] <= 0) this.fluid[wet] = DRY;
+    ev.doused++;
+  };
+
+  Game.prototype.settle = function (ev) {
+    for (var i = 0; i < this.monsters.length; i++) {
+      var m = this.monsters[i];
+      if (!m.trapped && !m.gone && this.isBoxed(m)) { m.trapped = true; ev.trappedNow.push(m); }
+    }
+  };
+
   Game.prototype.nextSheet = function () {
     this.F++;
     this.won = false;
     this.sheet();
   };
 
-  /* --- the user-defined characters, lines 80 and 150-160 -------------
-     Eight bytes each, exactly as the original VDU23 statements.
-     224 is a solid block, used both as the eraser and as the body of a
-     brick; 228 is the mortar drawn over it in another colour; 225 is
-     the man; 226 and 227 are the fly, overlaid in two colours.        */
+  /* --- the title screen, line 190 ------------------------------------
+     PROCtitle_page reads these records and lays bricks along each run:
+     C%=1 a vertical run at x=D% from y=A% to B%, C%=0 a horizontal run
+     at y=D% from x=A% to B%. They spell FLY.                          */
+  var TITLE_DATA = [
+    [1, 192, 480, 896], [1, 224, 480, 896], [0, 896, 224, 684], [0, 768, 224, 320],
+    [1, 448, 480, 768], [0, 480, 448, 608],
+    [1, 896, 448, 704], [0, 704, 704, 1088], [1, 704, 704, 896], [1, 1088, 704, 896]
+  ];
+  function titleCells() {
+    var out = [];
+    for (var i = 0; i < TITLE_DATA.length; i++) {
+      var C = TITLE_DATA[i][0], D = TITLE_DATA[i][1], A = TITLE_DATA[i][2], B = TITLE_DATA[i][3];
+      for (var G = A; G <= B; G += 32) {
+        var X = (C === 1) ? D : G, Y = (C === 1) ? G : D;
+        out.push([(X - 96) / 32, (Y - 128) / 32]);
+      }
+    }
+    return out;
+  }
+
+  /* --- the user-defined characters, lines 80 and 150-160 ------------- */
   var UDG = {
     block: [255, 255, 255, 255, 255, 255, 255, 255],   /* 224 */
     man:   [28, 28, 8, 127, 8, 20, 34, 65],            /* 225 */
@@ -352,8 +1066,7 @@
     mortar:[255, 8, 8, 8, 255, 64, 64, 64]             /* 228 */
   };
 
-  /* --- SOUND and ENVELOPE, lines 40-70 -------------------------------
-     The four envelopes exactly as the listing declares them.          */
+  /* --- SOUND and ENVELOPE, lines 40-70 ------------------------------- */
   var ENVELOPES = {
     1: [1, -10, 20, -10, 33, 33, 33, 25, -1, -1, -2, 100, 80],
     2: [1, 4, -3, 5, 40, 20, 30, 127, -1, 0, 0, 126, 0],
@@ -373,13 +1086,46 @@
     "edge, and don't get caught or else!!"
   ];
 
+  /* --- saved games ---------------------------------------------------
+     This browser only. Every read and write is guarded: storage can be
+     absent, full, or refused outright.                                */
+  var KEY = "mutantfly.save.v2";
+  var save = {
+    read: function () {
+      try {
+        var s = JSON.parse(localStorage.getItem(KEY));
+        return (s && typeof s === "object") ? s : null;
+      } catch (e) { return null; }
+    },
+    write: function (o) { try { localStorage.setItem(KEY, JSON.stringify(o)); } catch (e) {} },
+    keep: function (level, score, best) {
+      var s = this.read() || {};
+      s.level = level; s.score = score;
+      s.best = Math.max(best || 0, s.best || 0);
+      s.deepest = Math.max(level, s.deepest || 0);
+      this.write(s);
+    },
+    end: function (best) {
+      var s = this.read() || {};
+      s.best = Math.max(best || 0, s.best || 0);
+      delete s.level; delete s.score;
+      this.write(s);
+    }
+  };
+
   root.MutantFly = {
     Game: Game,
-    COLS: COLS, ROWS: ROWS, EMPTY: EMPTY, BRICK: BRICK, TICK_HZ: TICK_HZ,
-    levelOf: levelOf, leashCells: leashCells, palette: palette,
-    bonusFor: bonusFor,
+    COLS: COLS, ROWS: ROWS, TICK_HZ: TICK_HZ, MAX_H: MAX_H,
+    EMPTY: EMPTY, BRICK: BRICK, TREE: TREE, MARBLE: MARBLE,
+    VAT_TAR: VAT_TAR, VAT_WATER: VAT_WATER, COOLED: COOLED,
+    DRY: DRY, WATER: WATER, TAR: TAR,
+    NOTHING: NOTHING, BOOTS: BOOTS, FROST: FROST, AXE: AXE, JAR: JAR, ITEMS: ITEMS,
+    levelOf: levelOf, monstersFor: monstersFor, featuresFor: featuresFor,
+    briefingFor: briefingFor, BRIEFINGS: BRIEFINGS, leashCells: leashCells, palette: palette, bonusFor: bonusFor,
+    MONSTERS: MONSTERS, MONSTER_ORDER: MONSTER_ORDER,
+    titleCells: titleCells, TITLE_DATA: TITLE_DATA,
     UDG: UDG, ENVELOPES: ENVELOPES, INSTRUCTIONS: INSTRUCTIONS,
-    /* the BBC's eight physical colours */
+    save: save,
     PHYSICAL: ["#000000", "#ff0000", "#00ff00", "#ffff00",
                "#0000ff", "#ff00ff", "#00ffff", "#ffffff"]
   };
@@ -644,30 +1390,14 @@ var Beeb = {
 /* ====================================================================
    SCREENS
    ==================================================================== */
-var game = new MF.Game();
+var game = new MF.Game({ classic: true });
 var mode = "instructions";   /* instructions -> title -> play -> won/lost */
 var startLevel = 1, blink = 0, msgT = 0, titleFly = {c:18, r:16};
 
-/* line 190 DATA: runs of bricks that spell FLY on the title screen.
-   Each record is C%,D%,A%,B% - C%=1 draws a vertical run at x=D% from
-   y=A% to B%, C%=0 a horizontal run at y=D% from x=A% to B%.          */
-var TITLE_DATA = [
-  [1,192,480,896],[1,224,480,896],[0,896,224,684],[0,768,224,320],
-  [1,448,480,768],[0,480,448,608],
-  [1,896,448,704],[0,704,704,1088],[1,704,704,896],[1,1088,704,896]
-];
-function titleBricks(){
-  var out = [];
-  for(var i=0;i<TITLE_DATA.length;i++){
-    var C = TITLE_DATA[i][0], D = TITLE_DATA[i][1], A = TITLE_DATA[i][2], B = TITLE_DATA[i][3];
-    for(var G=A; G<=B; G+=32){
-      var X = (C === 1) ? D : G, Y = (C === 1) ? G : D;
-      out.push([X/32, 31 - Y/32]);
-    }
-  }
-  return out;
-}
-var TITLE_CELLS = titleBricks();
+/* line 190 DATA - the runs of bricks that spell FLY. The records live
+   in rules.js now; they arrive as playfield (column,row) pairs, which
+   on this screen are character (3+c, 27-r). */
+var TITLE_CELLS = MF.titleCells().map(function (p) { return [3 + p[0], 27 - p[1]]; });
 
 /* PROCFL, line 1070: a fly loose on the title screen while it waits */
 function stepTitleFly(){
@@ -736,8 +1466,8 @@ function drawPlay(){
     if(game.grid[r*MF.COLS+c] === MF.BRICK) drawBrickAt(cellX(c), cellY(r), p);
 
   udg(MF.UDG.man, cellX(game.manC), cellY(game.manR), PHYS[p.figure]);
-  udg(MF.UDG.fly,   cellX(game.flyC), cellY(game.flyR), PHYS[p.figure]);
-  udg(MF.UDG.flyHi, cellX(game.flyC), cellY(game.flyR), PHYS[p.mortar]);
+  udg(MF.UDG.fly,   cellX(game.monsters[0].c), cellY(game.monsters[0].r), PHYS[p.figure]);
+  udg(MF.UDG.flyHi, cellX(game.monsters[0].c), cellY(game.monsters[0].r), PHYS[p.mortar]);
 
   /* line 1040 - the status line, on a floor-coloured band */
   ctx.fillStyle = PHYS[p.floor]; ctx.fillRect(0, 8, 320, 8);

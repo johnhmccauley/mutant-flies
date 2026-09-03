@@ -31,6 +31,12 @@ jobs:
       - name: Check the ported rules still match the 1985 original
         run: node tools/test-rules.js
 
+      - name: Check the monsters
+        run: node tools/test-monsters.js
+
+      - name: Check the cellar furniture
+        run: node tools/test-elements.js
+
       - uses: actions/configure-pages@v5
         with:
           enablement: true

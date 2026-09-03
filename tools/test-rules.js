@@ -17,14 +17,18 @@ function ok(name, got, want) {
 }
 
 function bare(level) {
-  const g = new MF.Game();
+  const g = new MF.Game({ classic: true });
   g.reset(level || 1);
   g.grid.fill(MF.EMPTY);
   g.bricks = 0;
   g.manC = 10; g.manR = 10;
-  g.flyC = 25; g.flyR = 20;
+  g.monsters.length = 1;
+  fly(g).c = 25; fly(g).r = 20; fly(g).trapped = false;
   return g;
 }
+const fly = (g) => g.monsters[0];
+/* PA% is the leash in graphics units; g.leash is it in cells */
+const leash = (g, PA) => { g.PA = PA; g.leash = MF.leashCells(PA); };
 const put = (g, c, r) => { g.grid[r * MF.COLS + c] = MF.BRICK; g.bricks++; };
 const isBrick = (g, c, r) => g.grid[r * MF.COLS + c] === MF.BRICK;
 
@@ -60,18 +64,18 @@ const isBrick = (g, c, r) => g.grid[r * MF.COLS + c] === MF.BRICK;
 {
   /* driven straight at the fly: the head brick lands on its square and
      the fly's redraw wipes it. Exactly one brick, and the fly is unhurt. */
-  const g = bare(); g.flyC = 13; g.flyR = 10;
+  const g = bare(); fly(g).c = 13; fly(g).r = 10;
   put(g, 11, 10); put(g, 12, 10);
-  const before = g.flyC;
+  const before = fly(g).c;
   g.step("right");
   ok("bricks driven at the fly cost exactly one brick, fly unharmed (line 350/360)",
-     [g.bricks, g.manC, g.flyC === before || g.flyC === before, isBrick(g, 12, 10)],
+     [g.bricks, g.manC, fly(g).c === before || fly(g).c === before, isBrick(g, 12, 10)],
      [1, 11, true, true]);
 }
 
 /* --- line 380: the win test ------------------------------------------ */
 {
-  const g = bare(); g.flyC = 15; g.flyR = 15; g.PA = 0;
+  const g = bare(); fly(g).c = 15; fly(g).r = 15; leash(g, 0);
   put(g, 16, 15); put(g, 14, 15); put(g, 15, 16); put(g, 15, 14);
   const ev = g.step(null);
   ok("four bricks around the fly wins the sheet", [ev.won, g.won], [true, true]);
@@ -79,14 +83,14 @@ const isBrick = (g, c, r) => g.grid[r * MF.COLS + c] === MF.BRICK;
 {
   /* a fly in the corner has two neighbours off the field, where POINT
      returns -1, so the original could never trap it there */
-  const g = bare(); g.flyC = 0; g.flyR = 0; g.PA = 0; g.manC = 20; g.manR = 20;
+  const g = bare(); fly(g).c = 0; fly(g).r = 0; leash(g, 0); g.manC = 20; g.manR = 20;
   put(g, 1, 0); put(g, 0, 1);
   const ev = g.step(null);
   ok("the cellar edge does NOT count as a wall - a cornered fly is not trapped",
      ev.won, false);
 }
 {
-  const g = bare(); g.flyC = 15; g.flyR = 15; g.PA = 0;
+  const g = bare(); fly(g).c = 15; fly(g).r = 15; leash(g, 0);
   put(g, 16, 15); put(g, 14, 15); put(g, 15, 16);
   const ev = g.step(null);
   ok("three bricks is not enough", ev.won, false);
@@ -94,7 +98,7 @@ const isBrick = (g, c, r) => g.grid[r * MF.COLS + c] === MF.BRICK;
 
 /* --- line 380/390 + PROCloss: caught --------------------------------- */
 {
-  const g = bare(); g.manC = 10; g.manR = 10; g.flyC = 11; g.flyR = 10; g.PA = 0;
+  const g = bare(); g.manC = 10; g.manR = 10; fly(g).c = 11; fly(g).r = 10; leash(g, 0);
   g.SC = 999;
   const ev = g.step("right");           /* he walks straight into it */
   ok("walking onto the fly is death, and the score is wiped (line 480)",
@@ -104,7 +108,7 @@ const isBrick = (g, c, r) => g.grid[r * MF.COLS + c] === MF.BRICK;
   /* dying before a sheet is cleared must leave the high score alone,
      because PROCloss zeroes SC% before PROCset_level ever compares it */
   const g = bare(); g.HI = 0; g.SC = 500;
-  g.manC = 10; g.manR = 10; g.flyC = 11; g.flyR = 10; g.PA = 0;
+  g.manC = 10; g.manR = 10; fly(g).c = 11; fly(g).r = 10; leash(g, 0);
   g.step("right");
   ok("a death contributes nothing to the high score (line 1030)", g.HI, 0);
 }
@@ -112,13 +116,13 @@ const isBrick = (g, c, r) => g.grid[r * MF.COLS + c] === MF.BRICK;
 /* --- lines 300-340: PA% is a leash, not a chase ---------------------- */
 {
   /* with PA%=0 the fly can only take steps that close on the man */
-  const g = bare(); g.PA = 0; g.manC = 10; g.manR = 10; g.flyC = 20; g.flyR = 10;
+  const g = bare(); leash(g, 0); g.manC = 10; g.manR = 10; fly(g).c = 20; fly(g).r = 10;
   let closed = 0, opened = 0;
   for (let i = 0; i < 400; i++) {
-    const d0 = Math.abs(g.flyC - g.manC) + Math.abs(g.flyR - g.manR);
+    const d0 = Math.abs(fly(g).c - g.manC) + Math.abs(fly(g).r - g.manR);
     if (d0 === 0) break;
     g.step(null);
-    const d1 = Math.abs(g.flyC - g.manC) + Math.abs(g.flyR - g.manR);
+    const d1 = Math.abs(fly(g).c - g.manC) + Math.abs(fly(g).r - g.manR);
     if (d1 < d0) closed++; else if (d1 > d0) opened++;
   }
   ok("leash 0: the fly never moves away from the man", opened, 0);
@@ -126,12 +130,12 @@ const isBrick = (g, c, r) => g.grid[r * MF.COLS + c] === MF.BRICK;
 }
 {
   /* with the level 1 leash it must stay inside a 12.5-cell box */
-  const g = bare(); g.PA = 400; g.manC = 17; g.manR = 13; g.flyC = 17; g.flyR = 13;
+  const g = bare(); leash(g, 400); g.manC = 17; g.manR = 13; fly(g).c = 17; fly(g).r = 13;
   let worst = 0;
   for (let i = 0; i < 3000; i++) {
     g.step(null);
     if (g.over || g.won) { g.over = false; g.won = false; g.manC = 17; g.manR = 13; continue; }
-    worst = Math.max(worst, Math.abs(g.flyC - g.manC), Math.abs(g.flyR - g.manR));
+    worst = Math.max(worst, Math.abs(fly(g).c - g.manC), Math.abs(fly(g).r - g.manR));
   }
   ok("leash 400: the fly stays within 12.5 squares of the man", worst <= 13, true);
 }
@@ -139,7 +143,7 @@ const isBrick = (g, c, r) => g.grid[r * MF.COLS + c] === MF.BRICK;
 /* --- PROCset_level / PROCbonus --------------------------------------- */
 {
   const table = [];
-  for (let F = 1; F <= 10; F++) { const l = MF.levelOf(F); table.push([l.PE, l.PA]); }
+  for (let F = 1; F <= 10; F++) { const l = MF.levelOf(F, true); table.push([l.PE, l.PA]); }
   ok("the level table (lines 900-990)", table,
      [[200,400],[175,300],[150,200],[125,150],[100,100],[75,75],[50,50],[40,40],[30,30],[20,0]]);
 }
@@ -147,8 +151,8 @@ ok("bonus bands (line 1120)",
    [100, 101, 399, 400, 499, 500, 599, 600, 699, 700].map(MF.bonusFor),
    [300, 200, 200, 150, 150, 100, 100, 50, 50, 10]);
 {
-  const g = bare(3); g.CO = 0; g.SC = 0; g.PA = 0;
-  g.flyC = 15; g.flyR = 15;
+  const g = bare(3); g.CO = 0; g.SC = 0; leash(g, 0);
+  fly(g).c = 15; fly(g).r = 15;
   put(g, 16, 15); put(g, 14, 15); put(g, 15, 16); put(g, 15, 14);
   const ev = g.step(null);
   ok("win pays the bonus plus F%*50 (lines 570-580)", [ev.bonus, g.SC], [300, 300 + 150]);
@@ -156,10 +160,10 @@ ok("bonus bands (line 1120)",
 
 /* --- PROCprint_bricks ------------------------------------------------- */
 {
-  const g = new MF.Game();
+  const g = new MF.Game({ classic: true });
   for (let F = 1; F <= 10; F++) {
     g.F = F; g.sheet();
-    if (g.bricks !== MF.levelOf(F).PE) { fail++; console.log("  FAIL  level " + F + " laid " + g.bricks + " bricks"); }
+    if (g.bricks !== MF.levelOf(F, true).PE) { fail++; console.log("  FAIL  level " + F + " laid " + g.bricks + " bricks"); }
   }
   ok("every level lays exactly PE% bricks", true, true);
 }

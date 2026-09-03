@@ -8,10 +8,10 @@ in three dimensions.
 
 ### ▶ Play: <https://johnhmccauley.github.io/mutant-flies/>
 
-- **[The 3D cellar](https://johnhmccauley.github.io/mutant-flies/)** — torchlight, stone, and a fly the size of a man.
-- **[The 1985 screen](https://johnhmccauley.github.io/mutant-flies/classic/)** — MODE 1, four colours, the author's own characters.
+- **[The deep cellars](https://johnhmccauley.github.io/mutant-flies/)** — the game in three dimensions, going down for ever.
+- **[The 1985 screen](https://johnhmccauley.github.io/mutant-flies/classic/)** — MODE 1, four colours, the author's own characters, nothing added.
 
-Both run the same rules, ported line by line from the original BASIC.
+Both run the same rule engine, ported line by line from the original BASIC.
 
 ---
 
@@ -54,7 +54,10 @@ only wall it in.
 5. **Touching the fly is the end.** One life, and dying wipes your score before
    the high score is ever compared, so a death scores nothing. That is the
    original's behaviour, not a bug in the port.
-6. Nine starting levels; it keeps going past nine.
+6. One life. Dying is the end of the run.
+
+The original's own level table, which the 1985 screen still uses exactly
+(pick your starting level 1&ndash;9 there):
 
 | Level | Bricks (`PE%`) | Leash (`PA%`) | | Level | Bricks | Leash |
 |---|---|---|---|---|---|---|
@@ -64,7 +67,9 @@ only wall it in.
 | 4 | 125 | 150 | | 9 | 30 | 30 |
 | 5 | 100 | 100 | | 10+ | 20 | 0 |
 
-At `PA%=0` the fly can only ever step toward you.
+At `PA%=0` the fly can only ever step toward you — which is why the original
+stops developing at cellar 10 and was never meant to be played past it. The
+deep cellars take over the curve from there; see **The descent** below.
 
 ## Controls
 
@@ -72,10 +77,12 @@ At `PA%=0` the fly can only ever step toward you.
 |---|---|
 | `Z` `X` `:` `/` | left, right, up, down — as printed in 1985 |
 | `←` `→` `↑` `↓` | also |
-| `1`–`9` | starting level |
+| `1`–`9` | starting level, on the 1985 screen |
+| `P` `R` `M` | pause, restart the cellar, sound — in the deep cellars |
 
 The 1985 screen adds `S`/`Q` for sound and quiet, the BBC convention. On a
-phone, both versions have a touch pad.
+phone, both versions have a touch pad. The deep cellars start at 1 and are
+resumed from your last cleared cellar.
 
 ## What is faithful
 
@@ -120,7 +127,7 @@ src/font.js           an 8x8 character set
 original/FLY.bas      the 1985 listing, detokenised
 original/FLY.bbc      the same, still tokenised
 assets/               optional .glb models - see assets/README.md
-tools/                build and checks
+tools/                build, checks and the level plan
 ```
 
 Both pages are self-contained: `tools/build.js` inlines `src/` into them, so
@@ -128,27 +135,65 @@ each HTML file runs from disk, from a server, or on its own.
 
 ## Better models
 
-The 3D fly and man are built from primitives in code, so the game needs no
-downloads. If you would rather use modelled or AI-generated art — Meshy and the
-like export `.glb` — drop `fly.glb` or `man.glb` into `assets/` and the game
-picks them up, rescaling and standing them on the floor for you. See
-[assets/README.md](assets/README.md).
+Every monster is built from primitives in code, so the game needs no downloads.
+If you would rather use modelled or AI-generated art — Meshy and the like export
+`.glb` — drop `fly.glb`, `spider.glb`, `beetle.glb`, `wasp.glb` or `man.glb`
+into `assets/` and the game picks them up, rescaling and standing them on the
+floor for you. See [assets/README.md](assets/README.md).
+
+The marbles reflect the cellar for real: a cube camera re-renders the scene
+from the player's position a few times a second and feeds it to the marble
+material as an environment map. It is not path tracing — nothing in WebGL is,
+at sixty frames a second — but the reflection is the actual room.
 
 ## Working on it
 
 ```bash
-node tools/build.js       # inline src/ into the pages (run after editing src/)
-node tools/check.js       # geometry, syntax, markup, inlined copies in sync
-node tools/test-rules.js  # 17 assertions against the original's behaviour
+node tools/build.js          # inline src/ into the pages (run after editing src/)
+node tools/check.js          # geometry, syntax, markup, inlined copies in sync
+node tools/test-rules.js     # 17 assertions pinning the port to the 1985 listing
+node tools/test-monsters.js  # 29 on the monsters, the endless levels, the saves
+node tools/test-elements.js  # 45 on slopes, trees, marbles, items, tar and water
+node tools/plan.js           # print the descent
 ```
 
-Every push to `main` republishes the site, and the two checks gate the deploy.
+Ninety-one assertions in all, and every push to `main` runs the lot before
+republishing the site. `test-rules.js` is the important one: nothing added
+to the deep cellars is allowed to change what happens in the 1985 game.
+
+## The descent
+
+Cellars 1 and 2 are the original, untouched. After that the curve is
+hand-made: one new thing at a time, arriving in a deliberately gentle
+cellar — usually a single monster and plenty of bricks — so it can be
+learned before it is combined with anything else. A screen explains
+anything new before the cellar starts.
+
+| | arrives | |
+|---|---|---|
+| **Spider** | 3 | No wandering. Comes straight at you, every second turn. |
+| **Sloping floors** | 4 | Climbing costs a turn; shoving uphill costs another; downhill gives one back. |
+| **Beetle**, **boots** | 5 | It eats a brick every fourteen turns. Boots give you two squares a turn. |
+| **Wasp**, **frost jars** | 6 | Still for a turn, then two squares at once. Frost stops everything for fifty turns. |
+| **Trees and the axe** | 7 | Trees only move for an axe, and an axe is good for three swings. A tree walls a monster in as well as a brick. |
+| **Marbles** | 8 | Heavy and they keep going. Uphill they come back at you. Slowly they bounce, quickly they smash bricks, at speed they flatten a monster — or you. |
+| **Sealed jars** | 9 | Half are frost. The other half are not. |
+| **The tar** | 10 | Break a vat and it runs downhill burning everything, then sets into a wall you did not have to build. |
+| **The cistern** | 11 | Water runs further, puts the tar out, shoves marbles along, and sweeps you off your feet. |
+| | 12+ | Combinations, tightening. It does not stop. |
+
+Progress is saved in your browser after every cellar cleared, so you can
+put it down and pick it up.
 
 ## Versions
 
 - **v1** — the game, recreated from the article, playable locally.
 - **v2** — published to the web.
 - **v3** — the original recovered and properly ported, plus a 3D cellar.
+- **v4** — four kinds of monster, endless hand-crafted cellars, saved games,
+  and a title screen built out of the game the way the original's was.
+- **v5** — sloping floors, trees and the axe, rolling marbles with real
+  reflections, and tar and water that flow.
 
 ## Credit and copyright
 
