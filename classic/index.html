@@ -144,7 +144,7 @@
 
   /* what can be standing on a square */
   var EMPTY = 0, BRICK = 1, TREE = 2, MARBLE = 3,
-      VAT_TAR = 4, VAT_WATER = 5, COOLED = 6, CHOPPER = 7;
+      VAT_TAR = 4, VAT_WATER = 5, COOLED = 6, CHOPPER = 7, ROCK = 8;
 
   /* and what can be running across it. The cellars are old and things
      have been sealed up down here for a long time. */
@@ -179,6 +179,64 @@
     if (what === COOLED) return 0.30;       /* set tar is rough              */
     return 0.16;                            /* bare stone                    */
   }
+  /* ------------------------------------------------------------------
+     Marbles have mass, and it is the same number as their size.
+
+     Gravity does not care: a heavy marble and a light one gain the same
+     speed down the same slope, which is why the height terms below have
+     no mass in them at all. Everything else does care.
+
+       starting one   a shove is a fixed push, so a heavy marble leaves
+                      slowly - v = push / mass
+       keeping going  rolling resistance mostly cancels against weight,
+                      but not quite, so the heavy ones coast further
+       hitting things what breaks a brick or a monster is momentum,
+                      mass times speed - a big marble at walking pace
+                      does what a small one has to sprint to manage
+       the lip        a step stops a small wheel and not a large one, so
+                      what matters is the lip against the marble's own
+                      size, not its weight
+
+     A size-1 marble behaves exactly as marbles did before any of this.
+     ------------------------------------------------------------------ */
+  /* ------------------------------------------------------------------
+     ROCKS
+
+     A brick you can shift with one hand. A rock takes both, and it is
+     worth four bricks of effort. There is eight bricks' worth of shove
+     in a man, so: eight bricks, or two rocks, or one rock and four
+     bricks, and nothing past that. A robot has more in it and manages
+     three rocks.
+
+     None of which applies on the first floor down, where the blocks are
+     not brick at all but old brown timber. Wood is light: there is no
+     limit on how many you can shove at once, which is exactly how the
+     1985 game behaved and is now the reason why. It burns, though, and
+     tar goes through a stack of it in no time.
+
+     Nothing destroys a rock. A beetle cannot eat one, tar will not burn
+     through one, a marble comes off it. Which makes rocks the only
+     permanent thing in the cellar: bad news when one is in your way,
+     and the best wall you will ever get when it is not. There are never
+     many - a tenth of the bricks at the outside.
+     ------------------------------------------------------------------ */
+  var ROCK_WEIGHT = 4, PUSH_POWER = 8;
+
+  var GRAV = 1.0, LIP = 0.9;
+  /* turns a brick stands up to a pool of tar leaning on it */
+  var CHAR_THROUGH = 30;
+  /* how fast tar works at what is in its way. Flowing tar is hotter than
+     a pool that has been sitting sealed up, and timber is timber. */
+  var BURN_WOOD = 12, BURN_BRICK = 3;
+  function massOf(m) { return m.size || 1; }
+  function shoveSpeed(m) { return 1 / (0.6 + 0.4 * massOf(m)); }
+  function coast(m) { return 0.55 + 0.45 / massOf(m); }
+  function momentum(m) { return m.v * massOf(m); }
+  /* how fast it has to be going to ride over the lip where the floor ends */
+  function lipSpeed(m) {
+    return Math.sqrt(2 * GRAV * LIP * (2 / (1 + massOf(m))));
+  }
+
   var BOOTS_TURNS = 70, FROST_TURNS = 50, SAW_USES = 3;
 
   function sign(n) { return n < 0 ? -1 : n > 0 ? 1 : 0; }
@@ -186,11 +244,22 @@
   /* Live randomness - what a monster does this turn. Never used to lay a
      cellar out, or the same cellar would come out different every time
      you walked back into it. */
-  function rnd(n) { return (Math.random() * n) | 0; }
+  /* Live chance - deliberately NOT the seeded generator, so the same
+     cellar plays differently every time. `luck` swaps in a fixed stream
+     for the harness, because ranking strategies against each other on a
+     measure that wobbles by four wins between identical runs is not
+     ranking anything. Play always uses Math.random. */
+  var chance = Math.random;
+  function rnd(n) { return (chance() * n) | 0; }
+  function luck(fn) { chance = fn || Math.random; }
 
   /* Laying a cellar out uses this instead: mulberry32, seeded from the
      run and the level, so cellar 7 of a given run is always the same
      cellar. Come back to a saved game and it is where you left it. */
+  function clamp(v, lo, hi) { return v < lo ? lo : (v > hi ? hi : v); }
+
+  var DROP = 0, WALL = 1;
+
   function mulberry32(a) {
     return function () {
       a |= 0; a = (a + 0x6D2B79F5) | 0;
@@ -232,16 +301,17 @@
      taken only if the square is free AND the step keeps the monster
      inside a box `leash` cells wide centred on the man */
   function leashStep(m, g, leash) {
-    var R = 1 + rnd(4), c = m.c, r = m.r;
-    if (R === 1 && c > 0 && c > g.manC - leash && g.free(c - 1, r, m)) c--;
-    else if (R === 2 && c < COLS - 1 && c < g.manC + leash && g.free(c + 1, r, m)) c++;
-    else if (R === 3 && r > 0 && r > g.manR - leash && g.free(c, r - 1, m)) r--;
-    else if (R === 4 && r < ROWS - 1 && r < g.manR + leash && g.free(c, r + 1, m)) r++;
+    var R = 1 + rnd(4), c = m.c, r = m.r, p = g.prey(m);
+    if (R === 1 && c > 0 && c > p.c - leash && g.free(c - 1, r, m)) c--;
+    else if (R === 2 && c < COLS - 1 && c < p.c + leash && g.free(c + 1, r, m)) c++;
+    else if (R === 3 && r > 0 && r > p.r - leash && g.free(c, r - 1, m)) r--;
+    else if (R === 4 && r < ROWS - 1 && r < p.r + leash && g.free(c, r + 1, m)) r++;
     m.c = c; m.r = r;
   }
 
   function greedyStep(m, g) {
-    var dc = g.manC - m.c, dr = g.manR - m.r, opts = [];
+    var p = g.prey(m);
+    var dc = p.c - m.c, dr = p.r - m.r, opts = [];
     if (Math.abs(dc) >= Math.abs(dr)) {
       if (dc) opts.push([sign(dc), 0]);
       if (dr) opts.push([0, sign(dr)]);
@@ -294,7 +364,82 @@
       }
     }
   };
-  var MONSTER_ORDER = ["fly", "spider", "beetle", "wasp"];
+  /* ------------------------------------------------------------------
+     THE SNAKE
+
+     Everything else down here is one thing in one place. A snake is a
+     line of them, and cutting it does not kill it - it makes two.
+
+     Drive a brick through the middle and you get two snakes half the
+     length. Cut it a quarter of the way along and you get a quarter and
+     three quarters, and both start growing back towards what the whole
+     one was. The long piece grows faster, because there is more of it
+     doing the growing, so the half you were pleased about is the half
+     that comes back first. A piece shorter than two squares has not
+     enough of itself left and dies.
+
+     The head is the exception: shove a brick at the head and it takes
+     it off you, the way everything else down here does. You have to get
+     at its back to cut it, which means getting past it first.
+
+     Which makes it the one monster where the obvious move is the wrong
+     one. Walling it in is the only thing that really finishes it, and
+     it is long, so that takes a corridor rather than a corner.
+     ------------------------------------------------------------------ */
+  var GROW_COST = 26;          /* growth points a new square costs */
+
+  function snakeStep(m, g) {
+    var p = g.prey(m), opts = [];
+    var dc = p.c - m.c, dr = p.r - m.r;
+    if (Math.abs(dc) >= Math.abs(dr)) {
+      if (dc) opts.push([sign(dc), 0]);
+      if (dr) opts.push([0, sign(dr)]);
+    } else {
+      if (dr) opts.push([0, sign(dr)]);
+      if (dc) opts.push([sign(dc), 0]);
+    }
+    opts.push([1, 0], [-1, 0], [0, 1], [0, -1]);
+    for (var i = 0; i < opts.length; i++) {
+      var nc = m.c + opts[i][0], nr = m.r + opts[i][1];
+      if (!g.inField(nc, nr) || !g.free(nc, nr, m)) continue;
+      if (g.isPartOf(m, nc, nr)) continue;         /* it will not eat itself */
+      m.body.unshift([nc, nr]);
+      m.body.pop();
+      m.c = nc; m.r = nr;
+      return;
+    }
+  }
+
+  /* longer means faster: a three-quarter snake is back to full length
+     in a third of the time a quarter-length one manages */
+  function snakeGrow(m, g) {
+    if (m.body.length >= m.full) return;
+    m.growth = (m.growth || 0) + m.body.length;
+    if (m.growth < GROW_COST) return;
+    m.growth -= GROW_COST;
+    var tail = m.body[m.body.length - 1];
+    var before = m.body[m.body.length - 2] || tail;
+    var away = [[tail[0] - before[0], tail[1] - before[1]],
+                [1, 0], [-1, 0], [0, 1], [0, -1]];
+    for (var i = 0; i < away.length; i++) {
+      if (!away[i][0] && !away[i][1]) continue;
+      var nc = tail[0] + away[i][0], nr = tail[1] + away[i][1];
+      if (!g.inField(nc, nr) || !g.free(nc, nr, m)) continue;
+      if (g.isPartOf(m, nc, nr)) continue;
+      m.body.push([nc, nr]);
+      return;
+    }
+  }
+
+  MONSTERS.snake = {
+    name: "Snake", colour: 0x4c8a2e, dark: 0x1d3a12, eye: 0xf0d030,
+    blurb: "A line of it. Cut it and you have two.",
+    drone: [0, -12, 9, 1],
+    size: "long",
+    move: function (m, g) { snakeStep(m, g); snakeGrow(m, g); }
+  };
+
+  var MONSTER_ORDER = ["fly", "spider", "beetle", "wasp", "snake"];
 
   /* --- PROCset_level, lines 890-990 --------------------------------- */
   var LEVELS = [
@@ -319,12 +464,12 @@
        8  marbles
        9  the unlabelled jars
      ================================================================== */
-  var FEATURE_AT = { slopes: 4, boots: 5, frost: 6, trees: 7, saw: 7,
+  var FEATURE_AT = { walls: 2, snake: 12, rocks: 15, robots: 16, slopes: 4, boots: 5, frost: 6, trees: 7, saw: 7,
                      marbles: 8, jar: 9, tar: 10, water: 11, choppers: 13 };
 
   var PLAN = [
     /*  1 */ { kinds: ["fly"], PE: 200, PA: 400, adds: [] },
-    /*  2 */ { kinds: ["fly"], PE: 175, PA: 300, adds: [] },
+    /*  2 */ { kinds: ["fly"], PE: 175, PA: 300, adds: ["walls"] },
     /*  3 */ { kinds: ["spider"], PE: 165, PA: 260, adds: ["spider"] },
     /*  4 */ { kinds: ["fly"], PE: 155, PA: 220, adds: ["slopes"] },
     /*  5 */ { kinds: ["beetle"], PE: 150, PA: 200, adds: ["beetle", "boots"] },
@@ -334,11 +479,11 @@
     /*  9 */ { kinds: ["beetle"], PE: 140, PA: 155, adds: ["jar"] },
     /* 10 */ { kinds: ["fly", "spider"], PE: 170, PA: 150, adds: ["company", "tar"] },
     /* 11 */ { kinds: ["wasp", "beetle"], PE: 165, PA: 145, adds: ["water"] },
-    /* 12 */ { kinds: ["fly", "beetle"], PE: 160, PA: 135, adds: [] },
+    /* 12 */ { kinds: ["snake"], PE: 170, PA: 135, adds: ["snake"] },
     /* 13 */ { kinds: ["spider", "wasp"], PE: 160, PA: 130, adds: ["choppers"] },
-    /* 14 */ { kinds: ["fly", "spider", "beetle"], PE: 175, PA: 125, adds: [] },
-    /* 15 */ { kinds: ["wasp", "beetle"], PE: 150, PA: 118, adds: [] },
-    /* 16 */ { kinds: ["fly", "spider", "wasp", "beetle"], PE: 185, PA: 110, adds: [] }
+    /* 14 */ { kinds: ["snake", "spider"], PE: 180, PA: 125, adds: [] },
+    /* 15 */ { kinds: ["wasp", "beetle"], PE: 150, PA: 118, adds: ["rocks"] },
+    /* 16 */ { kinds: ["fly", "spider", "wasp", "beetle"], PE: 185, PA: 110, adds: ["robots"] }
   ];
 
   /* below the plan the cellars keep coming, tightening slowly and never
@@ -366,6 +511,10 @@
 
   /* what turns up at exactly this level, and what to say about it */
   var BRIEFINGS = {
+    walls:   { name: "The edge of the cellar", body: "Cellar one had nothing round it - the floor stopped, and a brick shoved over the side was gone. Some of these have proper stone walls instead. A brick driven into good stone stops dead, and stone counts as a side: back something into a stone corner and two bricks will hold it where four would have been needed. Learn to tell them apart before you walk into a gap. Nothing over the side comes back, including you." },
+    snake:   { name: "The snake", body: "It comes at you without stopping, and it is not one square but a line of them. Shove a brick at its head and it takes the brick off you. Get at its back and the brick goes through - but that does not kill it, it cuts it, and what you get is two snakes, one either side of the cut. Cut it in the middle and you get two halves. Cut it near the head and you get a short one and a long one, and the long one grows back fastest. A piece shorter than two squares dies. Walling it in is the only thing that actually finishes it - and it is long, so you will want a corridor, not a corner." },
+    rocks:   { name: "Rocks", body: "Bricks with ideas. A rock is four bricks' worth of shove, and there is only so much of you: two rocks at once, or one rock and four bricks, and past that you will not move it at all. In exchange nothing down here can destroy one. A beetle cannot eat it, tar will not burn through it, a marble comes straight off it. A rock in the wrong place is there for good - and a rock in the right place is one side of a trap that nothing can take away from you." },
+    robots:  { name: "Robots", body: "Somebody was down here before you with machinery, and some of it still works. One turns up on its own, stands about for a while and wanders off if you ignore it. Walk into it and it starts, and then it plays: fetching bricks and building walls the way you would, until its charge runs out. It has more in it than you do - three rocks at once, and the big ones more - and while it is working a monster will go for whichever of you is nearer. That is the real reason to start one. It is also why you get it back in pieces." },
     spider:  { name: "The spider", body: "It does not wander. It comes straight at you, and takes a step on every second turn. You can out-walk it - but it never stops, and it will be behind you the whole way." },
     beetle:  { name: "The beetle", body: "It keeps closer than the fly, and every fourteen turns it eats a brick beside it. It destroys the one thing you need. Wall it in early, or it will eat the cellar out from under you." },
     wasp:    { name: "The wasp", body: "It stands still for a turn, then crosses two squares at once. Its dead turn is the only safe moment to get near it. Count them." },
@@ -424,6 +573,8 @@
      ================================================================== */
   function Game(opts) {
     this.classic = !!(opts && opts.classic);
+    this.edge = { W: new Uint8Array(ROWS), E: new Uint8Array(ROWS),
+                  S: new Uint8Array(COLS), N: new Uint8Array(COLS) };
     this.HI = 0;
     this.seed = (opts && opts.seed) || ((Math.random() * 0x7FFFFFFF) | 0);
     this.variant = {};          /* bumped by regenerate(), per level */
@@ -432,9 +583,12 @@
     this.item = new Uint8Array(COLS * ROWS);
     this.fluid = new Uint8Array(COLS * ROWS);
     this.fvol = new Uint8Array(COLS * ROWS);
+    this.sealed = new Uint8Array(COLS * ROWS);
+    this.gnaw = new Uint8Array(COLS * ROWS);
     this.burn = new Uint8Array(COLS * ROWS);
     this.stress = new Uint8Array(COLS * ROWS);   /* how hard a tree is leaning */
     this.monsters = [];
+    this.robots = [];
     this.marbles = [];
     this.sources = [];
     this.reset(1);
@@ -453,6 +607,7 @@
   Game.prototype.solid = function (c, r) {
     var v = this.at(c, r);
     if (this.classic) return v === BRICK;
+    if (v === ROCK) return true;
     if (v === BRICK || v === TREE || v === VAT_TAR || v === VAT_WATER ||
         v === COOLED || v === CHOPPER) return true;
     if (v === MARBLE) { var m = this.marbleAt(c, r); return !!m && m.v <= 0; }
@@ -460,6 +615,7 @@
   };
   /* every square a monster is lying on */
   Game.prototype.cellsOf = function (m) {
+    if (m.body) return m.body;
     return (m.spec.size === 2 && m.tc !== undefined)
       ? [[m.c, m.r], [m.tc, m.tr]] : [[m.c, m.r]];
   };
@@ -515,6 +671,197 @@
      where the marbles have rolled to. So a cellar is a place you can
      learn, and still a different problem each time you go down.
      -------------------------------------------------------------------- */
+  /* ==================================================================
+     ROBOTS
+
+     Somebody was down here before you with machinery, and some of it
+     still works. A robot turns up on its own, stands there for a while,
+     and wanders off again if you leave it alone. Walk into one and it
+     starts, and from then on it plays: it fetches bricks and builds
+     walls exactly the way you would, for as long as its charge lasts.
+
+     It is worth having for two reasons. It has more in it than you do -
+     three rocks at once where you manage two, and the big ones more
+     than that - and a monster goes for whatever is nearest, so a
+     working robot is also something else for it to be interested in.
+     That is the trade: it does half your work and takes half the heat,
+     right up until the thing catches it, because a monster will take a
+     robot apart. Nothing can shove one over the edge, at least - it is
+     heavy, and it knows where the floor stops.
+
+     Bigger is better on both counts: it shoves more and it lasts longer.
+     ================================================================== */
+  var ROBOT_EVERY = 90;        /* roughly one turn in this many, when free */
+
+  Game.prototype.robotAt = function (c, r) {
+    for (var i = 0; i < this.robots.length; i++) {
+      var b = this.robots[i];
+      if (!b.gone && b.c === c && b.r === r) return b;
+    }
+    return null;
+  };
+
+  Game.prototype.spawnRobot = function (ev) {
+    if (this.classic || !this.feat.robots) return;
+    for (var i = 0; i < this.robots.length; i++) if (!this.robots[i].gone) return;
+    if (rnd(ROBOT_EVERY) !== 0) return;
+    var spot = this.openSpot([[this.manC, this.manR]], 4);
+    if (!spot) return;
+    var size = 1 + rnd(3);
+    this.robots.push({
+      c: spot[0], r: spot[1], size: size,
+      running: false,
+      power: 8 + size * 4,          /* three rocks at the smallest */
+      life: 25 + size * 15,
+      wait: 16 + rnd(14),           /* how long it stands about for */
+      gone: false
+    });
+    ev.robotCame = this.robots[this.robots.length - 1];
+  };
+
+  /* the robot's own shove. Same arithmetic as a man's, a bigger budget,
+     and no interest in picking anything up. */
+  Game.prototype.robotMove = function (b, d, ev) {
+    var nc = b.c + d[0], nr = b.r + d[1];
+    if (!this.inField(nc, nr)) return false;      /* it knows where the floor stops */
+    if (this.monsterAt(nc, nr) || this.robotAt(nc, nr)) return false;
+    if (nc === this.manC && nr === this.manR) return false;
+    var here = this.grid[this.idx(nc, nr)];
+    if (this.fluid[this.idx(nc, nr)] === TAR) { b.gone = true; ev.robotDied = b; return false; }
+    if (here !== EMPTY && here !== BRICK && here !== ROCK) return false;
+
+    if (here === EMPTY) { b.c = nc; b.r = nr; return true; }
+
+    var line = [], cc = nc, rr = nr, weight = 0;
+    for (;;) {
+      var pc = this.at(cc, rr);
+      if (pc !== BRICK && pc !== ROCK) break;
+      line.push(pc);
+      weight += (pc === ROCK) ? ROCK_WEIGHT : 1;
+      cc += d[0]; rr += d[1];
+    }
+    if (weight > b.power) return false;
+    if (!this.inField(cc, rr)) return false;      /* it will not shove one over */
+    if (this.at(cc, rr) !== EMPTY) return false;
+    if (this.monsterAt(cc, rr) || this.robotAt(cc, rr)) return false;
+    if (cc === this.manC && rr === this.manR) return false;
+    for (var q = line.length - 1; q >= 0; q--) {
+      var fc = nc + d[0] * q, fr = nr + d[1] * q;
+      this.grid[this.idx(fc + d[0], fr + d[1])] = line[q];
+    }
+    this.grid[this.idx(nc, nr)] = EMPTY;
+    b.c = nc; b.r = nr;
+    ev.pushed = (ev.pushed || 0) + line.length;
+    return true;
+  };
+
+  Game.prototype.runRobots = function (ev) {
+    if (this.classic) return;
+    var BOT = root.MutantBot;
+    for (var i = 0; i < this.robots.length; i++) {
+      var b = this.robots[i];
+      if (b.gone) continue;
+
+      /* anything loose standing on it takes it apart */
+      var killer = this.monsterAt(b.c, b.r) || null;
+      if (!killer) {
+        for (var k = 0; k < this.monsters.length; k++) {
+          var m = this.monsters[k];
+          if (m.gone || m.trapped) continue;
+          var cs = this.cellsOf(m);
+          for (var q2 = 0; q2 < cs.length; q2++)
+            if (Math.abs(cs[q2][0] - b.c) + Math.abs(cs[q2][1] - b.r) === 0) killer = m;
+        }
+      }
+      if (killer) { b.gone = true; ev.robotDied = b; continue; }
+
+      if (!b.running) {
+        if (--b.wait <= 0) { b.gone = true; ev.robotLeft = b; }
+        continue;
+      }
+      if (--b.life <= 0) { b.gone = true; ev.robotLeft = b; continue; }
+      if (!BOT) continue;
+      var dir = BOT.think(this, b);
+      if (!dir) continue;
+      var d = { left: [-1, 0], right: [1, 0], up: [0, 1], down: [0, -1] }[dir];
+      if (d) this.robotMove(b, d, ev);
+    }
+  };
+
+  /* --------------------------------------------------------------
+     Who a monster is tethered to.
+
+     One on one it is always the man - that is the original rule. But
+     the moment a robot is running there are two things down here worth
+     chasing, and a monster goes for whichever is nearer. Which is what
+     makes a robot worth starting: it is a decoy as much as a spare
+     pair of hands, and it buys you the far side of the cellar.
+     -------------------------------------------------------------- */
+  /* ==================================================================
+     THE EDGE OF THE CELLAR
+
+     In 1985 there was only one kind of edge, and it was not really an
+     edge at all: the brick was drawn outside the graphics viewport,
+     clipped, and gone. Down here that is a DROP - the floor simply
+     stops, a brick shoved over it is lost, and it is no help whatever
+     for walling something in, because there is nothing there to wall
+     against. You can walk off one, too.
+
+     The other kind is a WALL: good stone, a brick driven into it stops
+     dead, and it counts as a side. Which is what makes the corners
+     worth having - a monster backed into a stone corner needs two
+     bricks instead of four.
+
+     Cellar one is all drop, exactly as it was.
+     ================================================================== */
+  Game.prototype.makeEdges = function () {
+    var sides = [["W", ROWS], ["E", ROWS], ["S", COLS], ["N", COLS]];
+    for (var s = 0; s < sides.length; s++) {
+      var key = sides[s][0], n = sides[s][1];
+      var a = this.edge[key];
+      if (a.length !== n) a = this.edge[key] = new Uint8Array(n);
+      a.fill(DROP);
+      if (this.classic || !this.feat.walls) continue;
+      /* runs, not a speckle: a stretch of good stone then a stretch of
+         nothing, so a wall is long enough to back something into */
+      var c = 0;
+      var stone = this.grnd(2) === 0;
+      while (c < n) {
+        var run = 3 + this.grnd(7);
+        for (var k = 0; k < run && c < n; k++, c++) if (stone) a[c] = WALL;
+        stone = !stone;
+      }
+    }
+  };
+
+  /* what is just outside the field at (c,r) - only ever asked of a
+     square one step off the edge, so a corner never comes up */
+  Game.prototype.edgeAt = function (c, r) {
+    if (c < 0) return this.edge.W[clamp(r, 0, ROWS - 1)];
+    if (c >= COLS) return this.edge.E[clamp(r, 0, ROWS - 1)];
+    if (r < 0) return this.edge.S[clamp(c, 0, COLS - 1)];
+    if (r >= ROWS) return this.edge.N[clamp(c, 0, COLS - 1)];
+    return DROP;
+  };
+
+  /* what an actor can move in one push, in bricks. A rock is four. */
+  Game.prototype.pushPower = function (who) {
+    if (who && who.power) return who.power;
+    return PUSH_POWER;
+  };
+
+  Game.prototype.prey = function (m) {
+    var bc = this.manC, br = this.manR;
+    var bd = Math.abs(bc - m.c) + Math.abs(br - m.r);
+    for (var i = 0; i < this.robots.length; i++) {
+      var b = this.robots[i];
+      if (!b.running || b.gone) continue;
+      var d = Math.abs(b.c - m.c) + Math.abs(b.r - m.r);
+      if (d < bd) { bd = d; bc = b.c; br = b.r; }
+    }
+    return { c: bc, r: br };
+  };
+
   Game.prototype.sheet = function () {
     if (this.SC > this.HI) this.HI = this.SC;       /* line 1030 */
     this.rng = mulberry32(mix(this.seed, this.F, this.variant[this.F] || 0));
@@ -523,11 +870,16 @@
     this.PA = lv.PA;
     this.leash = leashCells(lv.PA);
     this.feat = lv.feat;
+    /* the top cellar is stacked with old timber rather than brick: no
+       limit on a shove, and it burns like nothing else down here */
+    this.wood = this.classic || this.F === 1;
     this.CO = 0;
     this.grid.fill(EMPTY);
     this.item.fill(NOTHING);
     this.fluid.fill(DRY);
     this.fvol.fill(0);
+    this.sealed.fill(0);
+    this.gnaw.fill(0);
     this.burn.fill(0);
     this.stress.fill(0);
     this.marbles.length = 0;
@@ -539,11 +891,13 @@
     this.frost = 0;
     this.saw = 0;
 
+    this.makeEdges();
     this.makeHeights();
     this.makeFurniture();
 
     /* now the movable parts, dealt fresh */
     this.monsters = [];
+    this.robots = [];
     if (this.classic) {
       this.manC = MAN_C0; this.manR = MAN_R0;       /* line 130 */
       this.monsters.push(this.newMonster(lv.kinds[0], MON_C0, MON_R0));
@@ -559,7 +913,8 @@
       for (var mb = 0; mb < this.marbleCount; mb++) {
         var ms = this.openSpot([[this.manC, this.manR]], 3);
         this.grid[this.idx(ms[0], ms[1])] = MARBLE;
-        this.marbles.push({ c: ms[0], r: ms[1], dc: 0, dr: 0, v: 0 });
+        /* not all the same size, and size is mass */
+        this.marbles.push({ c: ms[0], r: ms[1], dc: 0, dr: 0, v: 0, size: 1 + this.grnd(3) });
       }
     }
 
@@ -651,6 +1006,29 @@
 
        The tail needs a square it actually fits on. Dropping it blindly
        behind the head buried it in whatever was already there. */
+    if (!this.classic && MONSTERS[kind].size === "long") {
+      /* lay it out one square at a time, wandering, so it starts curled
+         up somewhere rather than as a ruler across the room */
+      m.full = 4 + this.grnd(4);
+      m.growth = 0;
+      m.body = [[c, r]];
+      var DD = [[-1, 0], [1, 0], [0, -1], [0, 1]];
+      while (m.body.length < m.full) {
+        var last = m.body[m.body.length - 1], put = false;
+        for (var t = 0; t < 8 && !put; t++) {
+          var e = DD[this.grnd(4)];
+          var bc = last[0] + e[0], br = last[1] + e[1];
+          if (!this.inField(bc, br)) continue;
+          if (this.grid[this.idx(bc, br)] !== EMPTY) continue;
+          if (this.monsterAt(bc, br) || this.isPartOf(m, bc, br)) continue;
+          if (bc === this.manC && br === this.manR) continue;
+          m.body.push([bc, br]); put = true;
+        }
+        if (!put) break;
+      }
+      m.full = Math.max(2, m.body.length);
+      return m;
+    }
     if (!this.classic && MONSTERS[kind].size === 2) {
       var D = [[-1, 0], [1, 0], [0, -1], [0, 1]];
       for (var d = 0; d < 4; d++) {
@@ -750,8 +1128,115 @@
     if (f.saw) scatter(2 + self.grnd(2), function (c, r) { self.item[self.idx(c, r)] = SAW; });
     if (f.jar) scatter(2 + self.grnd(3), function (c, r) { self.item[self.idx(c, r)] = JAR; });
     if (f.choppers) scatter(2 + self.grnd(3), function (c, r) { self.grid[self.idx(c, r)] = CHOPPER; });
-    if (f.tar) scatter(2 + self.grnd(2), function (c, r) { self.grid[self.idx(c, r)] = VAT_TAR; });
-    if (f.water) scatter(2 + self.grnd(2), function (c, r) { self.grid[self.idx(c, r)] = VAT_WATER; });
+    if (f.tar) scatter(1 + self.grnd(2), function (c, r) { self.grid[self.idx(c, r)] = VAT_TAR; });
+    if (f.water) scatter(1 + self.grnd(2), function (c, r) { self.grid[self.idx(c, r)] = VAT_WATER; });
+    /* a tenth of the bricks, at the outside */
+    if (f.rocks) {
+      var want = 3 + this.grnd(Math.max(1, Math.floor(this.PE * 0.1) - 2));
+      scatter(want, function (c, r) { self.grid[self.idx(c, r)] = ROCK; });
+    }
+    if (f.tar) this.makePools(TAR, 1 + this.grnd(2));
+    if (f.water) this.makePools(WATER, 1 + this.grnd(2));
+  };
+
+  /* ------------------------------------------------------------------
+     Pools.
+
+     A vat is a thing somebody built. A pool is what happens when it
+     leaks and the last people down here bricked round it to keep it
+     where it was. It sits behind a course of brickwork doing nothing at
+     all - and it goes on doing nothing until you take a brick out of
+     the wall holding it in, at which point it is somebody else's floor.
+
+     Sealed fluid does not flow. Water never will while the ring holds.
+     Tar is not so obliging: it works away at the brickwork the whole
+     time, and it will burn its own way out - it just takes a while. So
+     a pool of tar is a fuse rather than a lock, and the question is
+     only whether you open it where you want it or let it choose.
+     Open the ring anywhere and the whole pool wakes up at once.
+     ------------------------------------------------------------------ */
+  Game.prototype.makePools = function (kind, howMany) {
+    for (var n = 0; n < howMany; n++) {
+      for (var tries = 0; tries < 60; tries++) {
+        var cx = 4 + this.grnd(COLS - 8), cy = 4 + this.grnd(ROWS - 8);
+        var rad = 1;
+        var clear = true;
+        for (var r = cy - rad - 1; r <= cy + rad + 1 && clear; r++)
+          for (var c = cx - rad - 1; c <= cx + rad + 1 && clear; c++) {
+            if (c < 1 || r < 1 || c >= COLS - 1 || r >= ROWS - 1) clear = false;
+            else if (this.grid[this.idx(c, r)] !== EMPTY) clear = false;
+          }
+        if (!clear) continue;
+        for (var r2 = cy - rad - 1; r2 <= cy + rad + 1; r2++)
+          for (var c2 = cx - rad - 1; c2 <= cx + rad + 1; c2++) {
+            var i = this.idx(c2, r2);
+            var inside = Math.abs(c2 - cx) <= rad && Math.abs(r2 - cy) <= rad;
+            if (inside) {
+              this.fluid[i] = kind;
+              this.fvol[i] = (kind === TAR) ? 7 : 9;
+              this.sealed[i] = 1;
+            } else {
+              this.grid[i] = BRICK;
+              this.bricks++;
+            }
+          }
+        break;
+      }
+    }
+  };
+
+  /* has anything opened a pool? If so the whole of it goes at once */
+  Game.prototype.checkSeals = function (ev) {
+    if (this.classic) return;
+    var n = COLS * ROWS, i, hit = [];
+
+    /* sealed tar chars the bricks holding it in. Slowly - but it is the
+       one thing down here that is working while you are not. */
+    for (i = 0; i < n; i++) {
+      if (!this.sealed[i] || this.fluid[i] !== TAR) continue;
+      var tc = i % COLS, tr = (i / COLS) | 0;
+      for (var td = 0; td < 4; td++) {
+        var te = [[1, 0], [-1, 0], [0, 1], [0, -1]][td];
+        var xc = tc + te[0], xr = tr + te[1];
+        if (!this.inField(xc, xr)) continue;
+        var xi = this.idx(xc, xr);
+        if (this.grid[xi] !== BRICK) continue;
+        this.gnaw[xi] = Math.min(255, this.gnaw[xi] + (this.wood ? 4 : 1));   /* sealed: slower */
+        if (this.gnaw[xi] >= CHAR_THROUGH) {
+          this.grid[xi] = EMPTY; this.bricks--; this.gnaw[xi] = 0;
+          ev.burned++;
+        }
+      }
+    }
+
+    for (i = 0; i < n; i++) {
+      if (!this.sealed[i]) continue;
+      var c = i % COLS, r = (i / COLS) | 0;
+      for (var d = 0; d < 4; d++) {
+        var dd = [[1, 0], [-1, 0], [0, 1], [0, -1]][d];
+        var nc = c + dd[0], nr = r + dd[1];
+        if (!this.inField(nc, nr)) { hit.push(i); break; }
+        var ni = this.idx(nc, nr);
+        if (this.sealed[ni]) continue;
+        if (this.grid[ni] === EMPTY) { hit.push(i); break; }
+      }
+    }
+    if (!hit.length) return;
+    var q = hit.slice(), head = 0;
+    for (var h = 0; h < q.length; h++) this.sealed[q[h]] = 0;
+    while (head < q.length) {
+      var j = q[head++], jc = j % COLS, jr = (j / COLS) | 0;
+      for (var d2 = 0; d2 < 4; d2++) {
+        var e = [[1, 0], [-1, 0], [0, 1], [0, -1]][d2];
+        var mc = jc + e[0], mr = jr + e[1];
+        if (!this.inField(mc, mr)) continue;
+        var mi = this.idx(mc, mr);
+        if (!this.sealed[mi]) continue;
+        this.sealed[mi] = 0;
+        q.push(mi);
+      }
+    }
+    ev.spilled = (ev.spilled || 0) + 1;
   };
 
   /* --- bricks run downhill -------------------------------------------
@@ -819,6 +1304,7 @@
     var D = [[1, 0], [-1, 0], [0, 1], [0, -1]], pick = [];
     for (var i = 0; i < cells.length; i++) for (var d = 0; d < 4; d++) {
       var nc = cells[i][0] + D[d][0], nr = cells[i][1] + D[d][1];
+      /* a beetle cannot get its jaws round a rock */
       if (this.inField(nc, nr) && this.grid[this.idx(nc, nr)] === BRICK) pick.push([nc, nr]);
     }
     if (!pick.length) return false;
@@ -859,12 +1345,57 @@
       for (var d = 0; d < 4; d++) {
         var nc = cs[i][0] + D[d][0], nr = cs[i][1] + D[d][1];
         if (this.isPartOf(m, nc, nr)) continue;      /* its own other end */
-        /* Outside the playfield POINT read -1, never colour 2, so the
-           cellar edge is no help at all - a cornered monster can never
-           be walled in. That is the original's rule and it stands. */
-        if (!this.inField(nc, nr)) return false;
+        /* Outside the playfield POINT read -1, never colour 2, so in
+           1985 the cellar edge was no help at all and a cornered
+           monster could never be walled in. That stands in the classic
+           game and always will. Down here it does not: the cellar has
+           four good stone walls and it was always odd that you could
+           not back something into one. A corner now costs two bricks
+           instead of four, which is what makes the corners worth
+           fighting over. */
+        if (!this.inField(nc, nr)) {
+          if (this.classic) return false;
+          if (this.edgeAt(nc, nr) !== WALL) return false;   /* a drop holds nothing in */
+          continue;
+        }
         if (!this.solid(nc, nr)) return false;
       }
+    }
+    return true;
+  };
+
+  /* ------------------------------------------------------------------
+     Cutting one. The square goes to whatever did the cutting; what was
+     on either side of it becomes a snake in its own right, and anything
+     left shorter than two squares dies. Both survivors go on trying to
+     get back to the length the whole one was.
+     ------------------------------------------------------------------ */
+  Game.prototype.cutSnake = function (m, c, r, ev) {
+    var k = -1;
+    for (var i = 0; i < m.body.length; i++)
+      if (m.body[i][0] === c && m.body[i][1] === r) { k = i; break; }
+    if (k < 0) return false;
+    var front = m.body.slice(0, k), back = m.body.slice(k + 1);
+    var full = m.full;
+    ev.cut = (ev.cut || 0) + 1;
+    this.SC += 60;
+
+    if (front.length >= 2) {
+      m.body = front;
+      m.c = front[0][0]; m.r = front[0][1];
+      m.growth = 0;
+    } else {
+      m.gone = true; m.trapped = true;
+      ev.crushed.push(m);
+    }
+    if (back.length >= 2) {
+      var other = this.newMonster("snake", back[0][0], back[0][1]);
+      other.body = back;
+      other.full = full;
+      other.growth = 0;
+      this.monsters.push(other);
+      ev.split = ev.split || [];
+      ev.split.push(other);
     }
     return true;
   };
@@ -912,7 +1443,8 @@
      ONE TURN - lines 200-390, with everything that came later
      ================================================================== */
   Game.prototype.step = function (dir) {
-    var ev = { moved: false, pushed: 0, lostOverEdge: 0, crunched: 0, crunchedBy: null,
+    var ev = { moved: false, pushed: 0, lostOverEdge: 0, overTheEdge: [], fell: false,
+               robotCame: null, robotStarted: null, robotLeft: null, robotDied: null, crunched: 0, crunchedBy: null,
                eaten: 0, chopped: 0, picked: null, strained: false, rolled: [],
                smashed: 0, crushed: [], trappedNow: [], won: false, lost: false,
                lostTo: null, bonus: 0, stuck: false, spawned: null,
@@ -942,6 +1474,9 @@
     this.settle(ev);
     this.rollMarbles(ev);
     if (ev.lost) return ev;
+    this.runRobots(ev);
+    this.spawnRobot(ev);
+    this.checkSeals(ev);
     this.flowFluids(ev);
     if (ev.lost) return ev;
 
@@ -984,9 +1519,24 @@
   Game.prototype.manMove = function (d, ev) {
     {
       var nc = this.manC + d[0], nr = this.manR + d[1];
-      if (!this.inField(nc, nr)) return false;
+      if (!this.inField(nc, nr)) {
+        /* Stone you simply walk into. A drop you walk off, once. */
+        if (this.classic || this.edgeAt(nc, nr) === WALL) return false;
+        this.die(ev, { spec: { name: "The drop" } });
+        ev.fell = true;
+        return false;
+      }
       {
         var here = this.grid[this.idx(nc, nr)];
+
+        var bot = this.robotAt(nc, nr);
+        if (bot) {
+          /* a shove is how you switch one on. It costs the turn, and
+             from here it plays by itself until the charge runs out */
+          if (!bot.running) { bot.running = true; ev.robotStarted = bot; }
+          ev.blocked = true;
+          return false;
+        }
 
         if (here === TREE || here === VAT_TAR || here === VAT_WATER) {
           /* none of these shove. The axe is the only argument they take */
@@ -1008,17 +1558,33 @@
             /* a shove sets it rolling; how well depends on the ground */
             var drop = this.h(nc, nr) - this.h(nc + d[0], nr + d[1]);
             mar.dc = d[0]; mar.dr = d[1];
-            mar.v = 2 + Math.max(-1.5, drop * 0.9);
+            mar.v = (2 + Math.max(-1.5, drop * 0.9)) * shoveSpeed(mar) * 1.0;
             if (mar.v <= 0) { mar.v = 0; ev.strained = true; }
             else ev.rolled.push(mar);
           }
 
         } else {
           if (this.fluid[this.idx(nc, nr)] === TAR) { this.die(ev, { spec: { name: "Tar" } }); return false; }
-          var run = 0, cc = nc, rr = nr;
-          while (this.at(cc, rr) === BRICK) { run++; cc += d[0]; rr += d[1]; }
+          /* The line can be bricks, rocks, or both, so it is gathered
+             rather than counted - and it has to be shifted a square at a
+             time, because the pieces are no longer interchangeable. */
+          var line = [], cc = nc, rr = nr, weight = 0;
+          for (;;) {
+            var pc = this.at(cc, rr);
+            if (pc !== BRICK && pc !== ROCK) break;
+            line.push(pc);
+            weight += (pc === ROCK) ? ROCK_WEIGHT : 1;
+            cc += d[0]; rr += d[1];
+          }
+          var run = line.length;
           var wading = this.fluid[this.idx(nc, nr)] === WATER;
-          var cost2 = this.stepCost(nc, nr, run >= 2 || wading);
+          var cost2 = this.stepCost(nc, nr, weight >= 2 || wading);
+          if (!this.wood && weight > this.pushPower()) {
+            /* more than there is in his arms. He does not even move */
+            ev.blocked = true;
+            ev.tooHeavy = true;
+            return false;
+          }
           if (this.steps < cost2) ev.strained = true;
           else {
             this.steps -= cost2;
@@ -1029,26 +1595,68 @@
             if (run) {
               var blocker = this.monsterAt(cc, rr);
               var beyond = this.at(cc, rr);
+              var lead = line[line.length - 1];      /* what is at the sharp end */
+              if (this.robotAt(cc, rr)) {
+                /* it weighs what it weighs and it is not going over any
+                   edge on your account */
+                ev.blocked = true;
+                this.manC -= d[0]; this.manR -= d[1];
+                this.steps += cost2;
+                ev.moved = false;
+                return false;
+              }
 
               if (!this.inField(cc, rr)) {
-                if (this.classic) {
+                if (lead === ROCK) {
+                  /* it goes over, and it is not coming back either */
+                  ev.lostOverEdge = 1;
+                  line.pop();
+                } else if (this.classic || this.edgeAt(cc, rr) === DROP) {
                   /* 1985: the brick was drawn outside the graphics
-                     viewport, clipped away, and never came back */
+                     viewport, clipped away, and never came back. Down
+                     here the floor just stops, which comes to the same
+                     thing - you can hear it land. */
                   ev.lostOverEdge = 1; this.bricks--;
                 } else {
-                  /* down here a wall is a wall. It stops the line, nothing
-                     is lost, and nothing moves - including him. */
+                  /* good stone. It stops the line, nothing is lost, and
+                     nothing moves - including him. */
                   ev.blocked = true;
                   this.manC -= d[0]; this.manR -= d[1];
                   this.steps += cost2;
                   ev.moved = false;
                   return false;
                 }
+              } else if (blocker && lead === ROCK) {
+                /* nothing eats a rock. Either it has nowhere to go and the
+                   rock finishes it, or the rock does not move at all */
+                if (!this.canRetreat(blocker, cc, rr)) {
+                  this.grid[this.idx(cc, rr)] = ROCK;
+                  blocker.gone = true; blocker.trapped = true;
+                  blocker.crushed = true; blocker.crushedAt = [cc, rr];
+                  ev.squashed.push(blocker);
+                  this.SC += 250;
+                  line.pop();
+                } else {
+                  ev.blocked = true;
+                  this.manC -= d[0]; this.manR -= d[1];
+                  this.steps += cost2;
+                  ev.moved = false;
+                  return false;
+                }
+              } else if (blocker && blocker.body) {
+                if (blocker.body[0][0] === cc && blocker.body[0][1] === rr) {
+                  /* straight at the head. It takes the brick off you the
+                     way anything else down here would */
+                  ev.crunched = 1; ev.crunchedBy = blocker; this.bricks--;
+                  line.pop();
+                } else {
+                  /* anywhere behind the head and it is a cut, not a kill */
+                  this.cutSnake(blocker, cc, rr, ev);
+                }
               } else if (blocker) {
                 if (!this.canRetreat(blocker, cc, rr)) {
                   /* it has nowhere left to go. The brick goes in, and what
                      was lying across two squares is now lying across one. */
-                  this.grid[this.idx(cc, rr)] = BRICK;
                   blocker.gone = true; blocker.trapped = true;
                   blocker.crushed = true; blocker.crushedAt = [cc, rr];
                   ev.squashed.push(blocker);
@@ -1059,11 +1667,21 @@
                      so the leading brick - and only the leading brick - is
                      destroyed. */
                   ev.crunched = 1; ev.crunchedBy = blocker; this.bricks--;
+                  line.pop();
                 }
               } else if (beyond === CHOPPER) {
+                if (lead === ROCK) {
+                  /* the machinery is not that good */
+                  ev.blocked = true;
+                  this.manC -= d[0]; this.manR -= d[1];
+                  this.steps += cost2;
+                  ev.moved = false;
+                  return false;
+                }
                 /* the one thing left down here that still takes bricks
                    off you - it comes out the far side as splinters */
                 ev.chopped_brick = 1; this.bricks--;
+                line.pop();
               } else if (beyond !== EMPTY) {
                 /* a tree, a marble, set tar: the line simply stops, and so
                    does he. Cut the tree down first. */
@@ -1072,8 +1690,12 @@
                 this.steps += cost2;
                 ev.moved = false;
                 return false;
-              } else {
-                this.grid[this.idx(cc, rr)] = BRICK;
+              }
+              /* shift what is left of the line one square along, from the
+                 far end back, so nothing overwrites its neighbour */
+              for (var q = line.length - 1; q >= 0; q--) {
+                var fc = nc + d[0] * q, fr = nr + d[1] * q;
+                this.grid[this.idx(fc + d[0], fr + d[1])] = line[q];
               }
               this.grid[this.idx(nc, nr)] = EMPTY;
               ev.pushed = run;
@@ -1143,35 +1765,60 @@
         var nc = m.c + m.dc, nr = m.r + m.dr;
         var dh = this.h(nc, nr) - this.h(m.c, m.r);
 
-        if (!this.inField(nc, nr)) { this.bounce(m, 0.45); continue; }
+        if (!this.inField(nc, nr)) {
+          if (this.classic || this.edgeAt(nc, nr) === WALL) { this.bounce(m, 0.45); continue; }
+          /* No wall here, only the lip the floor ends in. Fast enough and
+             it rides over and is gone; short of that it clouts the lip
+             and comes back slower - and rougher ground robs it of more
+             on the way back. */
+          if (m.v >= lipSpeed(m)) {
+            this.grid[this.idx(m.c, m.r)] = EMPTY;
+            m.gone = true; m.v = 0;
+            ev.overTheEdge.push(m);
+            break;
+          }
+          var mu = frictionOn(this.grid[this.idx(m.c, m.r)], this.fluid[this.idx(m.c, m.r)]);
+          this.bounce(m, Math.max(0.15, 0.5 - mu));
+          continue;
+        }
         if (dh > 0 && m.v <= dh) { this.bounce(m, 0.7); continue; }   /* rolls back */
 
         var what = this.grid[this.idx(nc, nr)];
         if (what === BRICK) {
-          if (m.v >= 3) { this.grid[this.idx(nc, nr)] = EMPTY; this.bricks--; ev.smashed++; m.v -= 1.4; this.place(m, nc, nr); }
+          if (momentum(m) >= 3) { this.grid[this.idx(nc, nr)] = EMPTY; this.bricks--; ev.smashed++; m.v -= 1.4 / massOf(m); this.place(m, nc, nr); }
           else this.bounce(m, 0.45);
           continue;
         }
         if (what === VAT_TAR || what === VAT_WATER) {
-          if (m.v >= 1.5) { this.breakVat(nc, nr, ev); m.v -= 0.6; }
+          if (momentum(m) >= 1.5) { this.breakVat(nc, nr, ev); m.v -= 0.6 / massOf(m); }
           else this.bounce(m, 0.4);
           continue;
         }
+        if (what === ROCK) { this.bounce(m, 0.3); continue; }   /* it does not give */
         if (what === TREE || what === MARBLE || what === COOLED || what === CHOPPER) { this.bounce(m, 0.35); continue; }
 
         var mon = this.monsterAt(nc, nr);
+        if (mon && mon.body && !mon.gone) {
+          /* a marble has no respect for which end it hits */
+          if (momentum(m) >= 2) {
+            this.cutSnake(mon, nc, nr, ev);
+            m.v -= 0.8 / massOf(m);
+            this.place(m, nc, nr);
+          } else this.bounce(m, 0.4);
+          continue;
+        }
         if (mon && !mon.gone) {
-          if (m.v >= 2) {
+          if (momentum(m) >= 2) {
             mon.gone = true; mon.trapped = true; mon.crushed = true;
             ev.crushed.push(mon);
             this.SC += 150;
-            m.v -= 0.8;
+            m.v -= 0.8 / massOf(m);
             this.place(m, nc, nr);
           } else this.bounce(m, 0.4);
           continue;
         }
         if (nc === this.manC && nr === this.manR) {
-          if (m.v >= 2) { this.die(ev, { spec: { name: "Marble" } }); return; }
+          if (momentum(m) >= 2) { this.die(ev, { spec: { name: "Marble" } }); return; }
           m.v = 0;                                   /* he stops it dead */
           continue;
         }
@@ -1180,7 +1827,7 @@
            going up - then friction for the square it has arrived on. */
         this.place(m, nc, nr);
         m.v += (dh < 0) ? (-dh * 0.55) : (-dh * 0.95);
-        m.v -= frictionOn(this.grid[this.idx(nc, nr)], this.fluid[this.idx(nc, nr)]);
+        m.v -= frictionOn(this.grid[this.idx(nc, nr)], this.fluid[this.idx(nc, nr)]) * coast(m);
         if (m.v <= 0.05) { m.v = 0; m.dc = 0; m.dr = 0; }
       }
       if (m.v <= 0.05) { m.v = 0; m.dc = 0; m.dr = 0; }
@@ -1223,7 +1870,7 @@
   Game.prototype.blocksFluid = function (c, r, kind) {
     var v = this.at(c, r);
     if (v === -1) return true;
-    if (v === BRICK || v === COOLED || v === VAT_TAR || v === VAT_WATER || v === CHOPPER) return true;
+    if (v === BRICK || v === ROCK || v === COOLED || v === VAT_TAR || v === VAT_WATER || v === CHOPPER) return true;
     if (v === TREE) return kind !== TAR;        /* tar takes the tree with it */
     return false;                                /* MARBLE is handled by the caller */
   };
@@ -1244,7 +1891,7 @@
     /* highest ground first, so a spill cascades within the turn instead
        of creeping one square a turn */
     var cells = [];
-    for (k = 0; k < n; k++) if (this.fvol[k] > 0) cells.push(k);
+    for (k = 0; k < n; k++) if (this.fvol[k] > 0 && !this.sealed[k]) cells.push(k);
     var self = this;
     cells.sort(function (a, b) {
       return (self.height[b] * 16 + self.fvol[b]) - (self.height[a] * 16 + self.fvol[a]);
@@ -1273,11 +1920,19 @@
           }
           continue;
         }
+        if (kind === TAR && this.grid[ni] === ROCK) continue;   /* it will not burn */
         if (kind === TAR && this.grid[ni] === BRICK) {
-          /* it burns through instead of going round, and spends itself
-             doing it - a course of bricks will hold, one will not */
+          /* It burns through rather than going round, but not at once.
+             Timber goes in a few turns, brick takes long enough that a
+             course of it is worth building, and stone never does - so
+             what a wall is made of decides whether it is a wall or a
+             delay. It spends itself getting through, too, which is why
+             two courses hold where one does not. */
+          this.gnaw[ni] += this.wood ? BURN_WOOD : BURN_BRICK;
+          if (this.gnaw[ni] < CHAR_THROUGH) continue;
+          this.gnaw[ni] = 0;
           this.grid[ni] = EMPTY; this.bricks--; ev.burned++;
-          this.fvol[i] = Math.max(0, this.fvol[i] - 2);
+          this.fvol[i] = Math.max(0, this.fvol[i] - (this.wood ? 1 : 2));
           if (this.fvol[i] <= 0) { this.fluid[i] = DRY; break; }
           continue;
         }
@@ -1303,8 +1958,10 @@
       }
     }
 
-    /* and the tar sets */
+    /* and the tar sets - unless it is still sealed in, in which case it
+       is not exposed to anything and just goes on working at the wall */
     for (k = 0; k < n; k++) {
+      if (this.sealed[k]) continue;
       if (this.fluid[k] !== TAR) { if (this.fluid[k] === WATER) this.burn[k] = 0; continue; }
       this.burn[k]++;
       if (this.burn[k] > TAR_COOLS) {
@@ -1466,10 +2123,11 @@
     COLS: COLS, ROWS: ROWS, TICK_HZ: TICK_HZ, MAX_H: MAX_H,
     EMPTY: EMPTY, BRICK: BRICK, TREE: TREE, MARBLE: MARBLE,
     VAT_TAR: VAT_TAR, VAT_WATER: VAT_WATER, COOLED: COOLED, CHOPPER: CHOPPER,
+    ROCK: ROCK, ROCK_WEIGHT: ROCK_WEIGHT, PUSH_POWER: PUSH_POWER,
     DRY: DRY, WATER: WATER, TAR: TAR,
     NOTHING: NOTHING, BOOTS: BOOTS, FROST: FROST, SAW: SAW, JAR: JAR, ITEMS: ITEMS,
     levelOf: levelOf, monstersFor: monstersFor, featuresFor: featuresFor,
-    briefingFor: briefingFor, BRIEFINGS: BRIEFINGS, leashCells: leashCells, palette: palette, bonusFor: bonusFor,
+    DROP: DROP, WALL: WALL, luck: luck, briefingFor: briefingFor, BRIEFINGS: BRIEFINGS, leashCells: leashCells, palette: palette, bonusFor: bonusFor,
     MONSTERS: MONSTERS, MONSTER_ORDER: MONSTER_ORDER,
     titleCells: titleCells, TITLE_DATA: TITLE_DATA,
     UDG: UDG, ENVELOPES: ENVELOPES, INSTRUCTIONS: INSTRUCTIONS,

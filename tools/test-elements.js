@@ -11,6 +11,17 @@ global.window = global;
 require("../src/rules.js");
 const MF = global.MutantFly;
 
+/* Play used to run on live Math.random, so a test could pass on the
+   luck of the draw and fail on the next run - which is how the water
+   shoving a marble came and went. Pin the stream. TEST_LUCK sweeps it,
+   so a test that only works for one run of the dice still gets caught. */
+const LUCK = parseInt(process.env.TEST_LUCK, 10) || 20250903;
+MF.luck(MF.mulberry32(LUCK));
+/* and the cellar itself: an unseeded Game picks its seed off
+   Math.random, so half of what looked like flaky play was a different
+   room every run */
+const SEED = LUCK ^ 0x51ed;
+
 let pass = 0, fail = 0;
 function ok(name, got, want) {
   const g = JSON.stringify(got), w = JSON.stringify(want);
@@ -21,11 +32,11 @@ const I = (c, r) => r * MF.COLS + c;
 
 /* a cellar with nothing in it, so each test can furnish its own */
 function bare(level) {
-  const g = new MF.Game();
+  const g = new MF.Game({ seed: SEED });
   g.F = level || 12;
   g.sheet();
   g.grid.fill(MF.EMPTY);
-  g.fluid.fill(MF.DRY); g.fvol.fill(0); g.burn.fill(0);
+  g.fluid.fill(MF.DRY); g.fvol.fill(0); g.burn.fill(0); g.sealed.fill(0);
   g.height.fill(0);
   g.item.fill(MF.NOTHING);
   g.marbles.length = 0;
@@ -74,7 +85,7 @@ const marble = (g, c, r) => { g.grid[I(c, r)] = MF.MARBLE; const m = { c, r, dc:
   ok("stepping down hands a step back", [g.manC, g.steps >= 2], [11, true]);
 }
 {
-  const g = new MF.Game({ classic: true });
+  const g = new MF.Game({ classic: true, seed: SEED });
   g.sheet();
   let flat = true;
   for (let i = 0; i < g.height.length; i++) if (g.height[i] !== 0) flat = false;
@@ -115,7 +126,7 @@ const marble = (g, c, r) => { g.grid[I(c, r)] = MF.MARBLE; const m = { c, r, dc:
 }
 {
   /* but not in 1985 - there, only colour 2 counted */
-  const g = new MF.Game({ classic: true });
+  const g = new MF.Game({ classic: true, seed: SEED });
   g.sheet(); g.grid.fill(MF.EMPTY); g.bricks = 0;
   g.monsters[0].c = 15; g.monsters[0].r = 15; g.monsters[0].trapped = false;
   g.manC = 2; g.manR = 2; g.leash = 0;
@@ -298,8 +309,10 @@ function settle(g, turns) {
   put(g, 13, 10); put(g, 14, 10, MF.TREE);
   g.grid[I(12, 10)] = MF.VAT_TAR;
   g.breakVat(12, 10, { burst: 0 });
-  const ev = settle(g, 20);
-  ok("tar burns the bricks and the trees it reaches", ev.burned > 0, true);
+  const early = settle(g, 8);
+  const late = settle(g, 60);
+  ok("tar burns the bricks and the trees it reaches, but not at once",
+     [early.burned > 0, late.burned > 0], [false, true]);
 }
 {
   const g = bare();
@@ -381,7 +394,7 @@ function settle(g, turns) {
 
 /* ================= none of it in 1985 ============================= */
 {
-  const g = new MF.Game({ classic: true });
+  const g = new MF.Game({ classic: true, seed: SEED });
   let found = 0;
   for (let F = 1; F <= 20; F++) {
     g.F = F; g.sheet();
@@ -463,7 +476,7 @@ function settle(g, turns) {
 {
   /* the classic fly is one square: VDU226 and 227 are drawn at the same
      position in two colours, not on two cells */
-  const g = new MF.Game({ classic: true });
+  const g = new MF.Game({ classic: true, seed: SEED });
   g.sheet();
   ok("the 1985 fly is one square", g.cellsOf(g.monsters[0]).length, 1);
 }
@@ -497,19 +510,79 @@ function settle(g, turns) {
      [ev.blocked, g.grid[I(13, 10)], g.grid[I(11, 10)]], [false, MF.BRICK, MF.EMPTY]);
 }
 {
-  /* the cellar wall holds the line instead of eating it */
+  /* good stone holds the line instead of eating it */
   const g = bare();
+  g.edge.E.fill(MF.WALL);
   g.manC = MF.COLS - 3;
   put(g, MF.COLS - 2, 10); put(g, MF.COLS - 1, 10);
   const before = g.bricks;
   g.steps = 3;
   const ev = g.step("right");
-  ok("a wall stops a shove without taking a brick",
+  ok("a stone wall stops a shove without taking a brick",
      [ev.blocked, ev.lostOverEdge, g.bricks, g.manC], [true, 0, before, MF.COLS - 3]);
 }
 {
+  /* but where the floor just stops, it goes over and is gone */
+  const g = bare();
+  g.edge.E.fill(MF.DROP);
+  g.manC = MF.COLS - 3;
+  put(g, MF.COLS - 2, 10); put(g, MF.COLS - 1, 10);
+  const before = g.bricks;
+  g.steps = 3;
+  const ev = g.step("right");
+  ok("a brick shoved over a drop is lost",
+     [ev.lostOverEdge, g.bricks, g.manC], [1, before - 1, MF.COLS - 2]);
+}
+{
+  /* stone counts as a side, so a corner is worth two bricks */
+  const g = bare();
+  g.edge.E.fill(MF.WALL); g.edge.N.fill(MF.WALL);
+  const m = monster(g, "spider", MF.COLS - 1, MF.ROWS - 1);
+  const cornered = g.isBoxed(m);
+  put(g, MF.COLS - 2, MF.ROWS - 1); put(g, MF.COLS - 1, MF.ROWS - 2);
+  ok("two bricks wall a monster into a stone corner",
+     [cornered, g.isBoxed(m)], [false, true]);
+}
+{
+  /* the same corner made of nothing holds nothing */
+  const g = bare();
+  g.edge.E.fill(MF.DROP); g.edge.N.fill(MF.DROP);
+  const m = monster(g, "spider", MF.COLS - 1, MF.ROWS - 1);
+  put(g, MF.COLS - 2, MF.ROWS - 1); put(g, MF.COLS - 1, MF.ROWS - 2);
+  ok("a corner of two drops holds nothing in", g.isBoxed(m), false);
+}
+{
+  /* and you can walk off one */
+  const g = bare();
+  g.edge.E.fill(MF.DROP);
+  g.manC = MF.COLS - 1; g.manR = 10;
+  g.steps = 3;
+  const ev = g.step("right");
+  ok("walking off a drop kills you", [ev.fell, ev.lost], [true, true]);
+}
+{
+  const g = bare();
+  g.edge.E.fill(MF.WALL);
+  g.manC = MF.COLS - 1; g.manR = 10;
+  g.steps = 3;
+  const ev = g.step("right");
+  ok("walking into stone does not", [!!ev.fell, !!ev.lost], [false, false]);
+}
+{
+  /* cellar one is exactly as it was: no stone anywhere */
+  const g = new MF.Game({ seed: 4 });
+  g.F = 1; g.sheet();
+  let stone = 0;
+  for (const k of ["W", "E", "S", "N"]) for (const v of g.edge[k]) if (v === MF.WALL) stone++;
+  const g2 = new MF.Game({ seed: 4 });
+  g2.F = 2; g2.sheet();
+  let stone2 = 0;
+  for (const k of ["W", "E", "S", "N"]) for (const v of g2.edge[k]) if (v === MF.WALL) stone2++;
+  ok("cellar one is all drop, cellar two is not", [stone, stone2 > 0], [0, true]);
+}
+{
   /* but 1985 still loses it over the edge, which is the whole point */
-  const g = new MF.Game({ classic: true });
+  const g = new MF.Game({ classic: true, seed: SEED });
   g.sheet(); g.grid.fill(MF.EMPTY); g.bricks = 0;
   g.manC = MF.COLS - 2; g.manR = 10;
   g.monsters[0].c = 2; g.monsters[0].r = 2;
@@ -548,7 +621,7 @@ function settle(g, turns) {
 {
   /* every rise is a slope you can walk, never a cliff */
   let steepest = 0;
-  const g = new MF.Game();
+  const g = new MF.Game({ seed: SEED });
   for (let F = 4; F <= 24; F++) {
     g.F = F; g.sheet();
     for (let r = 0; r < MF.ROWS; r++) for (let c = 0; c < MF.COLS; c++) {
@@ -564,7 +637,7 @@ function settle(g, turns) {
 }
 {
   /* and there is actually some ground to slope */
-  const g = new MF.Game();
+  const g = new MF.Game({ seed: SEED });
   let raised = 0, total = 0;
   for (let F = 4; F <= 20; F++) {
     g.F = F; g.sheet();
@@ -574,7 +647,7 @@ function settle(g, turns) {
 }
 {
   /* nothing is left mid-slide when the cellar opens */
-  const g = new MF.Game();
+  const g = new MF.Game({ seed: SEED });
   let restless = 0;
   for (let F = 4; F <= 24; F++) { g.F = F; g.sheet(); if (g.slideBricks(null)) restless++; }
   ok("bricks have found their level before play starts", restless, 0);
@@ -632,7 +705,7 @@ function settle(g, turns) {
 }
 {
   /* and none of it happens in 1985 */
-  const g = new MF.Game({ classic: true });
+  const g = new MF.Game({ classic: true, seed: SEED });
   g.sheet();
   ok("the classic cellar has no slopes and nothing slides",
      [g.slideBricks(null), Math.max.apply(null, Array.from(g.height))], [0, 0]);
@@ -903,7 +976,7 @@ function placeOf(g) {
 }
 {
   /* and a whole cellar must survive being played blind */
-  const g = new MF.Game();
+  const g = new MF.Game({ seed: SEED });
   let crashed = null;
   try {
     for (let F = 1; F <= 20; F++) {
@@ -915,6 +988,346 @@ function placeOf(g) {
     }
   } catch (e) { crashed = e.message; }
   ok("twenty cellars can be played through without throwing", crashed, null);
+}
+
+
+/* ---- pools: liquid behind brickwork ------------------------------- */
+{
+  const g = bare();
+  g.makePools(MF.WATER, 1);
+  let sealed = 0, ring = 0;
+  for (let i = 0; i < MF.COLS * MF.ROWS; i++) {
+    if (g.sealed[i]) sealed++;
+    if (g.grid[i] === MF.BRICK) ring++;
+  }
+  ok("a pool is liquid inside a ring of brick", [sealed, ring], [9, 16]);
+}
+{
+  /* while the ring holds, it does not move */
+  const g = bare();
+  g.makePools(MF.WATER, 1);
+  const before = g.fvol.slice();
+  for (let t = 0; t < 25; t++) g.step(null);
+  let same = true;
+  for (let i = 0; i < before.length; i++) if (before[i] !== g.fvol[i]) same = false;
+  ok("water behind a sound ring stays put", same, true);
+}
+{
+  /* take one brick out and the whole pool wakes up */
+  const g = bare();
+  g.makePools(MF.WATER, 1);
+  let pc = -1, pr = -1;
+  for (let r = 0; r < MF.ROWS; r++) for (let c = 0; c < MF.COLS; c++)
+    if (g.sealed[I(c, r)] && pc < 0) { pc = c; pr = r; }
+  /* the brick due north of the pool's top-left cell is part of the ring */
+  g.grid[I(pc, pr - 1)] = MF.EMPTY;
+  g.step(null);
+  let stillSealed = 0;
+  for (let i = 0; i < g.sealed.length; i++) if (g.sealed[i]) stillSealed++;
+  ok("opening the ring anywhere releases all of it", stillSealed, 0);
+}
+{
+  /* tar burns its own way out, given long enough */
+  const g = bare();
+  g.makePools(MF.TAR, 1);
+  let held = true;
+  for (let t = 0; t < 12; t++) { g.step(null); }
+  for (let i = 0; i < g.sealed.length; i++) if (!g.sealed[i] && g.fluid[i] === MF.TAR) held = false;
+  let out = false;
+  for (let t = 0; t < 200 && !out; t++) {
+    g.step(null);
+    for (let i = 0; i < g.sealed.length; i++) if (!g.sealed[i] && g.fluid[i] === MF.TAR) out = true;
+  }
+  ok("tar holds for a while, then burns out on its own", [held, out], [true, true]);
+}
+
+/* ---- marbles have mass ------------------------------------------- */
+{
+  const small = { c: 5, r: 5, dc: 1, dr: 0, v: 1.2, size: 1 };
+  const big   = { c: 5, r: 5, dc: 1, dr: 0, v: 1.2, size: 3 };
+  const g = bare();
+  g.edge.E.fill(MF.DROP);
+  const run = (mar) => {
+    const h = bare();
+    h.edge.E.fill(MF.DROP);
+    h.marbles.push(mar);
+    mar.c = MF.COLS - 2; mar.r = 10;
+    h.grid[I(mar.c, mar.r)] = MF.MARBLE;
+    h.step(null);
+    return !!mar.gone;
+  };
+  ok("the same speed carries a big marble over the lip and not a small one",
+     [run(small), run(big)], [false, true]);
+}
+{
+  /* momentum breaks bricks, so a heavy one does it slowly */
+  const g = bare();
+  const mar = { c: 10, r: 10, dc: 1, dr: 0, v: 1.1, size: 3 };
+  g.marbles.push(mar); g.grid[I(10, 10)] = MF.MARBLE;
+  put(g, 11, 10);
+  const ev = g.step(null);
+  ok("a heavy marble smashes a brick at a speed a light one bounces off",
+     [ev.smashed, g.bricks], [1, 0]);
+}
+{
+  const g = bare();
+  const mar = { c: 10, r: 10, dc: 1, dr: 0, v: 1.1, size: 1 };
+  g.marbles.push(mar); g.grid[I(10, 10)] = MF.MARBLE;
+  put(g, 11, 10);
+  const ev = g.step(null);
+  ok("and the light one leaves it standing",
+     [ev.smashed, g.grid[I(11, 10)]], [0, MF.BRICK]);
+}
+
+/* ---- rocks -------------------------------------------------------- */
+{
+  const g = bare();
+  g.manC = 10; g.manR = 10;
+  g.grid[I(11, 10)] = MF.ROCK;
+  g.steps = 3;
+  const ev = g.step("right");
+  ok("one rock shoves", [ev.blocked, g.grid[I(12, 10)], g.grid[I(11, 10)]],
+     [false, MF.ROCK, MF.EMPTY]);
+}
+{
+  const g = bare();
+  g.manC = 10; g.manR = 10;
+  g.grid[I(11, 10)] = MF.ROCK; g.grid[I(12, 10)] = MF.ROCK;
+  g.steps = 3;
+  const ev = g.step("right");
+  ok("two rocks is exactly all he has",
+     [ev.blocked, g.grid[I(13, 10)], g.grid[I(12, 10)]], [false, MF.ROCK, MF.ROCK]);
+}
+{
+  const g = bare();
+  g.manC = 10; g.manR = 10;
+  for (const c of [11, 12, 13]) g.grid[I(c, 10)] = MF.ROCK;
+  g.steps = 3;
+  const ev = g.step("right");
+  ok("three is more than there is in him",
+     [ev.blocked, !!ev.tooHeavy, g.manC], [true, true, 10]);
+}
+{
+  /* a rock and four bricks is the other way to spend eight */
+  const g = bare();
+  g.manC = 10; g.manR = 10;
+  g.grid[I(11, 10)] = MF.ROCK;
+  for (const c of [12, 13, 14, 15]) put(g, c, 10);
+  g.steps = 3;
+  const ev = g.step("right");
+  ok("a rock and four bricks goes",
+     [ev.blocked, g.grid[I(12, 10)], g.grid[I(16, 10)]], [false, MF.ROCK, MF.BRICK]);
+}
+{
+  const g = bare();
+  g.manC = 10; g.manR = 10;
+  g.grid[I(11, 10)] = MF.ROCK;
+  for (const c of [12, 13, 14, 15, 16]) put(g, c, 10);
+  const ev = (g.steps = 3, g.step("right"));
+  ok("a rock and five is one too many", [ev.blocked, !!ev.tooHeavy], [true, true]);
+}
+{
+  const g = bare();
+  g.manC = 10; g.manR = 10;
+  for (let c = 11; c <= 18; c++) put(g, c, 10);
+  g.steps = 3;
+  const ev = g.step("right");
+  ok("eight bricks is the most he can move", [ev.blocked, ev.pushed], [false, 8]);
+}
+{
+  const g = bare();
+  g.manC = 10; g.manR = 10;
+  for (let c = 11; c <= 19; c++) put(g, c, 10);
+  g.steps = 3;
+  const ev = g.step("right");
+  ok("nine is not", [ev.blocked, !!ev.tooHeavy], [true, true]);
+}
+{
+  /* the 1985 game never had a limit and still does not */
+  const g = new MF.Game({ classic: true, seed: SEED });
+  g.sheet(); g.grid.fill(MF.EMPTY); g.bricks = 0;
+  g.monsters[0].c = 2; g.monsters[0].r = 2; g.monsters[0].tc = 3; g.monsters[0].tr = 2;
+  g.manC = 5; g.manR = 10;
+  for (let c = 6; c <= 20; c++) put(g, c, 10);
+  g.steps = 3;
+  const ev = g.step("right");
+  ok("classic shoves a line of fifteen without complaint",
+     [ev.blocked, ev.pushed], [false, 15]);
+}
+{
+  /* and neither does the first cellar, where the blocks are timber */
+  const g = new MF.Game({ seed: SEED });
+  g.F = 1; g.sheet(); g.grid.fill(MF.EMPTY); g.bricks = 0;
+  g.monsters[0].c = 2; g.monsters[0].r = 2; g.monsters[0].tc = 3; g.monsters[0].tr = 2;
+  g.manC = 5; g.manR = 10;
+  for (let c = 6; c <= 20; c++) put(g, c, 10);
+  g.steps = 3;
+  const ev = g.step("right");
+  ok("wooden blocks have no limit either",
+     [g.wood, ev.blocked, ev.pushed], [true, false, 15]);
+}
+{
+  /* but cellar 2 is brick, and brick has a limit */
+  const g = new MF.Game({ seed: SEED });
+  g.F = 2; g.sheet(); g.grid.fill(MF.EMPTY); g.bricks = 0;
+  g.monsters[0].c = 2; g.monsters[0].r = 2; g.monsters[0].tc = 3; g.monsters[0].tr = 2;
+  g.manC = 5; g.manR = 10;
+  for (let c = 6; c <= 20; c++) put(g, c, 10);
+  g.steps = 3;
+  const ev = g.step("right");
+  ok("and brick does", [g.wood, ev.blocked, !!ev.tooHeavy], [false, true, true]);
+}
+{
+  /* tar will not burn through one */
+  const g = bare();
+  g.grid[I(12, 10)] = MF.ROCK;
+  g.fluid[I(11, 10)] = MF.TAR; g.fvol[I(11, 10)] = 9;
+  for (let t = 0; t < 30; t++) g.step(null);
+  ok("tar does not burn a rock", g.grid[I(12, 10)], MF.ROCK);
+}
+{
+  /* and a beetle cannot eat one */
+  const g = bare();
+  const b = monster(g, "beetle", 10, 10);
+  g.leash = 0;
+  g.grid[I(11, 10)] = MF.ROCK;
+  for (let t = 0; t < 60; t++) g.step(null);
+  ok("a beetle cannot eat a rock", g.grid[I(11, 10)], MF.ROCK);
+}
+{
+  /* a rock walls a monster in as well as anything else */
+  const g = bare();
+  g.leash = 0;
+  const m = monster(g, "spider", 15, 15);
+  g.grid[I(16, 15)] = MF.ROCK;
+  put(g, 14, 15); put(g, 15, 16); put(g, 15, 14);
+  const ev = g.step(null);
+  ok("a rock is a wall like any other", [m.trapped, ev.won], [true, true]);
+}
+{
+  /* there are never many of them */
+  const g = new MF.Game({ seed: SEED });
+  g.F = 15; g.sheet();
+  let rocks = 0, bricks = 0;
+  for (let i = 0; i < MF.COLS * MF.ROWS; i++) {
+    if (g.grid[i] === MF.ROCK) rocks++;
+    if (g.grid[i] === MF.BRICK) bricks++;
+  }
+  ok("no more than a tenth of the bricks", [rocks > 0, rocks <= Math.ceil(bricks * 0.1)],
+     [true, true]);
+}
+
+
+/* ---- robots ------------------------------------------------------- */
+function deep(level) {
+  const g = bare(level || 16);
+  return g;
+}
+{
+  const g = deep();
+  g.robots.push({ c: 12, r: 10, size: 1, running: false, power: 12, life: 40, wait: 20, gone: false });
+  g.manC = 11; g.manR = 10;
+  g.steps = 3;
+  const ev = g.step("right");
+  ok("walking into a robot starts it, and costs you the turn",
+     [!!ev.robotStarted, g.robots[0].running, g.manC], [true, true, 11]);
+}
+{
+  /* left alone it wanders off */
+  const g = deep();
+  g.robots.push({ c: 12, r: 10, size: 1, running: false, power: 12, life: 40, wait: 3, gone: false });
+  g.manC = 2; g.manR = 2;
+  for (let t = 0; t < 5; t++) g.step(null);
+  ok("a robot nobody starts goes away again", g.robots[0].gone, true);
+}
+{
+  /* it has three rocks in it where a man has two */
+  const g = deep();
+  const b = { c: 10, r: 10, size: 1, running: true, power: 12, life: 40, wait: 20, gone: false };
+  g.robots.push(b);
+  for (const c of [11, 12, 13]) g.grid[I(c, 10)] = MF.ROCK;
+  const moved = g.robotMove(b, [1, 0], { pushed: 0 });
+  ok("a robot shoves three rocks", [moved, g.grid[I(14, 10)], b.c], [true, MF.ROCK, 11]);
+}
+{
+  const g = deep();
+  const b = { c: 10, r: 10, size: 1, running: true, power: 12, life: 40, wait: 20, gone: false };
+  g.robots.push(b);
+  for (const c of [11, 12, 13, 14]) g.grid[I(c, 10)] = MF.ROCK;
+  const moved = g.robotMove(b, [1, 0], { pushed: 0 });
+  ok("but not four", [moved, b.c], [false, 10]);
+}
+{
+  /* nothing shoves one over the edge */
+  const g = deep();
+  g.edge.E.fill(MF.DROP);
+  const b = { c: MF.COLS - 1, r: 10, size: 1, running: true, power: 12, life: 40, wait: 20, gone: false };
+  g.robots.push(b);
+  const moved = g.robotMove(b, [1, 0], { pushed: 0 });
+  ok("a robot will not walk off a drop", [moved, b.gone, b.c], [false, false, MF.COLS - 1]);
+}
+{
+  const g = deep();
+  g.edge.E.fill(MF.DROP);
+  const b = { c: MF.COLS - 1, r: 10, size: 1, running: true, power: 12, life: 40, wait: 20, gone: false };
+  g.robots.push(b);
+  g.manC = MF.COLS - 3; g.manR = 10;
+  put(g, MF.COLS - 2, 10);
+  g.steps = 3;
+  const ev = g.step("right");
+  ok("and a brick line will not push one over either",
+     [ev.blocked, b.gone, g.manC], [true, false, MF.COLS - 3]);
+}
+{
+  /* a monster takes one apart */
+  const g = deep();
+  g.leash = 0;
+  const b = { c: 15, r: 15, size: 1, running: true, power: 12, life: 40, wait: 20, gone: false };
+  g.robots.push(b);
+  const m = monster(g, "spider", 15, 15);
+  g.step(null);
+  ok("a monster destroys a robot it reaches", [b.gone, !!g._lastEv], [true, false]);
+}
+{
+  /* the charge runs out */
+  const g = deep();
+  const b = { c: 5, r: 5, size: 1, running: true, power: 12, life: 3, wait: 20, gone: false };
+  g.robots.push(b);
+  g.manC = 2; g.manR = 2;
+  for (let t = 0; t < 6; t++) g.step(null);
+  ok("a robot stops when its charge does", b.gone, true);
+}
+{
+  /* bigger ones shove more and last longer */
+  const g = deep();
+  g.feat.robots = true;
+  let sizes = {}, powers = {}, lives = {};
+  for (let t = 0; t < 4000 && Object.keys(sizes).length < 3; t++) {
+    g.robots.length = 0;
+    g.spawnRobot({});
+    for (const b of g.robots) { sizes[b.size] = 1; powers[b.size] = b.power; lives[b.size] = b.life; }
+  }
+  ok("a bigger robot shoves more and lasts longer",
+     [powers[1] < powers[3], lives[1] < lives[3], powers[1] >= 12], [true, true, true]);
+}
+{
+  /* and a monster goes for whichever of you is nearer */
+  const g = deep();
+  const m = monster(g, "spider", 20, 10);
+  g.manC = 2; g.manR = 10;
+  const far = g.prey(m);
+  g.robots.push({ c: 22, r: 10, size: 1, running: true, power: 12, life: 40, wait: 20, gone: false });
+  const near = g.prey(m);
+  ok("a running robot is what a monster goes for when it is nearer",
+     [far.c, near.c], [2, 22]);
+}
+{
+  /* but not one that is standing there switched off */
+  const g = deep();
+  const m = monster(g, "spider", 20, 10);
+  g.manC = 2; g.manR = 10;
+  g.robots.push({ c: 22, r: 10, size: 1, running: false, power: 12, life: 40, wait: 20, gone: false });
+  ok("a robot nobody has started is not worth chasing", g.prey(m).c, 2);
 }
 
 console.log("\n" + pass + " passed, " + fail + " failed");

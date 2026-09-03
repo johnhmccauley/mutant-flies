@@ -98,8 +98,8 @@
 
   /* Backwards from every wanted square at once. Returns the cheapest
      shove that starts a brick on its way there, or null. */
-  function findShove(g, ac, ar) {
-    var targets = wanted(g);
+  function findShove(g, ac, ar, targets) {
+    targets = targets || wanted(g);
     if (!targets.length) return [];
 
     var dist = new Int16Array(MF.COLS * MF.ROWS);
@@ -180,7 +180,7 @@
     /* Try them in order and take the first the man can actually get to.
        Keeping only the single cheapest meant one unreachable spot froze
        it on the spot for the rest of the cellar. */
-    var shoves = findShove(g, ac, ar);
+    var shoves = findShove(g, ac, ar, null);
     for (var s = 0; s < shoves.length && s < 16; s++) {
       var sh = shoves[s];
       if (sh.standC === ac && sh.standR === ar) return sh.dir;
@@ -211,5 +211,6 @@
   }
 
   root.MutantBot = { think: think, findShove: findShove, wanted: wanted,
-                     route: route, danger: danger };
+                     route: route, danger: danger, walkable: walkable,
+                     empty: empty, brick: brick, D: D, ORDER: ORDER, idx: idx };
 })(typeof window !== "undefined" ? window : globalThis);
