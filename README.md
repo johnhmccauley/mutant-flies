@@ -1,162 +1,157 @@
-# Menace of the Mutant Flies
+# Mutant Fly
 
-A playable recreation of a BBC Micro type-in game, written for
-**The Micro User**, July 1985, by **John McCauley** — article on pages 66–69,
-program listing from page 168.
+**FLY**, by John McCauley — published in *The Micro User*, July 1985, as the
+article *Menace of the mutant flies* with a six-page BBC BASIC listing.
 
-> *The locals have told you about a vast fortune that lies hidden in the
-> multi-level basement of some nearby ruins… It's no fluke that the fortune
-> still remains undisturbed. For it is protected by some fearsome guards —
-> mutant flies, the size of a man.*
+Forty-one years later, playable in a browser two ways: as the 1985 screen, and
+in three dimensions.
 
-Runs in any browser. One file, no dependencies, no build step.
+### ▶ Play: <https://johnhmccauley.github.io/mutant-flies/>
 
-### ▶ Play it: <https://johnhmccauley.github.io/mutant-flies/>
+- **[The 3D cellar](https://johnhmccauley.github.io/mutant-flies/)** — torchlight, stone, and a fly the size of a man.
+- **[The 1985 screen](https://johnhmccauley.github.io/mutant-flies/classic/)** — MODE 1, four colours, the author's own characters.
 
-Or open `index.html` from a local copy.
+Both run the same rules, ported line by line from the original BASIC.
 
 ---
 
-## The machine it came from
+## This is a port, not a reconstruction
 
-| | |
+It began as a recreation from the magazine article and the photographs of the
+printed listing. Then the original turned up.
+
+The July 1985 issue is scanned on the Internet Archive; Database Publications'
+monthly cassette for that issue survives as a UEF, and two disc conversions of
+it survive as SSDs. The program is on all three. `original/FLY.bas` is the
+cassette edition, detokenised — 125 lines, numbered 10 to 1240, matching the
+printed listing line for line. `src/rules.js` is the port, with the original's
+line numbers in its comments.
+
+Reading the actual code corrected a lot of what the article implies:
+
+| what the article suggests | what the code does |
 |---|---|
-| Computer | Acorn BBC Microcomputer, Model B (1981) |
-| CPU | 6502 at 2 MHz |
-| RAM | 32K — of which MODE 2 took 20K for the screen alone |
-| Language | BBC BASIC II |
-| Screen | MODE 2: 160×256 pixels, 20×32 characters, 16 logical colours |
-| Sound | Texas Instruments SN76489 — three square-wave tone channels and one noise channel |
+| Controls are "the Z, X and / keys" | Four keys. `INKEY-98` Z, `INKEY-67` X, `INKEY-73` `:`, `INKEY-105` `/` — and the instruction screen says so |
+| `PA%` is the "rate at which fly follows man" | `PA%` is a **leash radius**. The fly picks a random direction each turn and may only take the step if it keeps it inside a box `PA%` wide around you. It tightens 400 → 0 across the levels, so it is dragged onto you |
+| A time bonus | A **move counter**. `CO%` counts turns and is on screen; the bonus is 300/200/150/100/50/10 by move band, with nothing at all past 800 |
+| "any brick, or number of bricks" driven at the fly is powdered | **Exactly one** — the leading brick lands on the fly's square and its redraw wipes it |
+| Surround the fly | Four *actual bricks*. `POINT` returns −1 outside the playfield, so the cellar wall is no help and a fly in the corner can never be caught |
 
-BBC BASIC was unusual for its day: it had **named procedures** (`DEFPROC` /
-`ENDPROC`), `REPEAT…UNTIL`, and integer variables marked with `%` that ran
-markedly faster than floats. That is why a 1985 magazine listing could print a
-tidy table of procedure and variable names — and why this port can be read
-against it.
-
-## How to play
-
-| Key | |
-|---|---|
-| `Z` | left |
-| `X` | right |
-| `:` | up |
-| `/` | down |
-| `1`–`9` | select starting difficulty |
-| `SPACE` | start / continue |
-| `I` | instructions |
-| `S` / `Q` | sound on / quiet |
-| `P` | pause |
-| `ESC` | back to the title screen |
-
-Arrow keys work too, and the red function-key strip under the screen is
-clickable — it doubles as a live key indicator on desktop and as the d-pad on
-a phone.
+It also runs in **MODE 1** — 320×256, four colours — not the MODE 2 the
+photographed line 50 appeared to say.
 
 ## The rules
 
 You are in a cellar with a fly the size of a man. You cannot kill it. You can
 only wall it in.
 
-1. The cellar is littered with house bricks. Walking into one **pushes** it,
-   and a whole line of bricks shoves along together.
-2. A brick pushed **off the edge of the cellar is gone for good**. Waste them
-   and you may not have enough left to build your barrier.
-3. Bricks pushed **directly at the fly are crunched to powder** in its jaws.
-   You cannot crush it — pushing a line into it destroys the whole line and
-   you don't advance.
-4. You win the cellar by **surrounding the fly** so it has no square to move
-   to. Walls count, so herding it into a corner is cheapest.
-5. Trap it before the clock runs out for a **bonus in proportion to the time
-   in reserve**. When the clock hits zero the fly becomes enraged and moves
-   at nearly double speed.
-6. **The fly touching you is the end.** You get one life. That is all the
-   dying you get.
-7. Nine difficulty levels are selectable at the start. Each cellar you descend
-   into has **fewer bricks** and a **fly more likely to come straight for
-   you** — but is worth more points.
+1. Walking into a brick shoves it one square, and **a whole line of bricks
+   shifts together**. A push never fails: you always advance.
+2. A brick pushed **off the edge of the cellar is gone for good**.
+3. A brick driven **into the fly** is destroyed — one per push, and you stay
+   where you are.
+4. **Four bricks around the fly** wins the cellar. Walls do not count.
+5. **Touching the fly is the end.** One life, and dying wipes your score before
+   the high score is ever compared, so a death scores nothing. That is the
+   original's behaviour, not a bug in the port.
+6. Nine starting levels; it keeps going past nine.
 
-The difficulty curve, level 1 → 9:
+| Level | Bricks (`PE%`) | Leash (`PA%`) | | Level | Bricks | Leash |
+|---|---|---|---|---|---|---|
+| 1 | 200 | 400 | | 6 | 75 | 75 |
+| 2 | 175 | 300 | | 7 | 50 | 50 |
+| 3 | 150 | 200 | | 8 | 40 | 40 |
+| 4 | 125 | 150 | | 9 | 30 | 30 |
+| 5 | 100 | 100 | | 10+ | 20 | 0 |
 
-| Level | Bricks | Chance the fly chases | Fly step | Time |
-|---|---|---|---|---|
-| 1 | 78 | 28% | 418 ms | 100 s |
-| 5 | 54 | 60% | 290 ms | 80 s |
-| 9 | 30 | 92% | 162 ms | 60 s |
+At `PA%=0` the fly can only ever step toward you.
 
-## What is faithful, and what is reconstruction
+## Controls
 
-The magazine photographs give the complete article text, the procedure table,
-the variable table, and the first few lines of BASIC — but the listing itself
-is six pages of dense 6-point type that does not survive photography. **This is
-a recreation from the published description, not a line-by-line port.**
+| Key | |
+|---|---|
+| `Z` `X` `:` `/` | left, right, up, down — as printed in 1985 |
+| `←` `→` `↑` `↓` | also |
+| `1`–`9` | starting level |
 
-Faithful:
+The 1985 screen adds `S`/`Q` for sound and quiet, the BBC convention. On a
+phone, both versions have a touch pad.
 
-- The **procedure names** from the magazine's PROCEDURES box are the function
-  names here: `PROCinstructions`, `PROCtitle_page`, `PROCmove_bricks`,
-  `PROCmove_fly`, `PROCnext_sheet`, `PROCbonus`, `PROCloss`, `PROCset_level`.
-- The **variables** from the VARIABLES box are carried in `V`: `HI%` `SC%`
-  `X1%,Y1%` `OX%,OY%` `J%` `P%` `I%` `PB%` (bricks displayed) and `PA%`
-  (*"rate at which fly follows man"* — which is exactly how the fly's rising
-  intelligence is implemented: a percentage chance per step of moving toward
-  you rather than at random).
-- **Z X : /** — the original's controls, read on the real machine with
-  negative `INKEY`.
-- The **MODE 2 palette**: eight solid colours built from full-on/full-off RGB,
-  plus the eight flashing pairs, flashing at the BBC's default rate.
-- An **8×8 bitmap font** and **16×16 sprites** built the way `VDU 23`
-  user-defined characters were, from four 8×8 characters glued together.
-- The **screen shape**: 320×256 logical pixels presented at 4:3, the way a
-  Model B fed a domestic colour television.
-- **`SOUND` and `ENVELOPE`** are re-synthesised rather than emulated, but
-  against the real parameter model — `SOUND C,A,P,D` with pitch at four units
-  to the semitone and duration in twentieths of a second, and the 14-parameter
-  `ENVELOPE`. The one envelope legible in the photograph is line 40:
-  `ENVELOPE1,1,-10,10,-10,33,33,33,…` — a pitch swinging down ten, up ten and
-  down ten again over three sections of 33 hundredth-of-a-second steps. That
-  is about a second of warble. That is the fly, and it is used as the fly.
+## What is faithful
 
-Reconstruction, where the article stops short:
+The 3D version is a new presentation of ported rules. The 1985 version tries to
+be the thing itself:
 
-- The exact grid size, brick counts, timings and scoring. The article gives the
-  shape of the curve (*"less bricks available… each fly becomes more
-  intelligent"*) but not the numbers.
-- What happens when the clock expires. The article promises a bonus for time in
-  reserve but never says what running out costs, so here it enrages the fly
-  rather than killing you outright.
-- The artwork. The magazine's illustrations are Micro User house art, not
-  screenshots, so the sprites are drawn to the description.
+- **MODE 1** — 320×256, 40×32 characters, four logical colours, presented at
+  4:3 the way a Model B fed a television.
+- **The author's own `VDU 23` characters** — the man (`28,28,8,127,8,20,34,65`),
+  the fly (two characters overlaid in two colours), and the brick and its
+  mortar. Byte for byte from line 150.
+- **The palette, and its shifts.** A yellow floor, red bricks with white
+  mortar, a black man and fly — and `VDU19` recolours the cellar as you go
+  down: magenta at level 3, cyan with blue bricks at 6, magenta again at 8.
+- **The title screen**, whose `DATA` statements at line 190 turn out to spell
+  **FLY** in bricks.
+- **The teletext instruction screen**, verbatim, including the author's
+  *"Do not move the bricks to close to the edge"*.
+- **`SOUND` and `ENVELOPE`** re-synthesised against the real parameter model —
+  pitch at four units to the semitone with 53 as middle C, duration in
+  twentieths of a second, and the SN76489's 2 dB-per-step attenuator. The four
+  envelopes are the listing's own. The fly's drone is `SOUND0,-10,23,1` fired
+  every single turn, on the noise channel at pitch 23 — which slaves its rate
+  to tone channel 1, so **the buzz changes timbre after every brick you push**.
+  That was free, and the author left it in.
 
-## Files
+Departures, both deliberate:
+
+- The 3D version takes **150ms a turn** instead of the original's 50. Twenty
+  turns a second is a blur in a 3D cellar. Scoring is untouched, because the
+  original's pressure was a count of moves rather than a clock.
+- The 1985 version's hand-drawn 8×8 font is in the spirit of the BBC's ROM
+  font rather than a copy of it.
+
+## Layout
 
 ```
-index.html          the whole game — markup, styles and script in one file
-tools/check.js      geometry, syntax and procedure checks
-tools/make-artifact.js  derives the embeddable (headless) copy
-.github/workflows/  publishes the site on every push to main
+index.html            the 3D cellar
+classic/index.html    the 1985 screen
+src/rules.js          the port of the BASIC - the only copy of the rules
+src/font.js           an 8x8 character set
+original/FLY.bas      the 1985 listing, detokenised
+original/FLY.bbc      the same, still tokenised
+assets/               optional .glb models - see assets/README.md
+tools/                build and checks
 ```
+
+Both pages are self-contained: `tools/build.js` inlines `src/` into them, so
+each HTML file runs from disk, from a server, or on its own.
+
+## Better models
+
+The 3D fly and man are built from primitives in code, so the game needs no
+downloads. If you would rather use modelled or AI-generated art — Meshy and the
+like export `.glb` — drop `fly.glb` or `man.glb` into `assets/` and the game
+picks them up, rescaling and standing them on the floor for you. See
+[assets/README.md](assets/README.md).
+
+## Working on it
+
+```bash
+node tools/build.js       # inline src/ into the pages (run after editing src/)
+node tools/check.js       # geometry, syntax, markup, inlined copies in sync
+node tools/test-rules.js  # 17 assertions against the original's behaviour
+```
+
+Every push to `main` republishes the site, and the two checks gate the deploy.
 
 ## Versions
 
-- **v1** — the game, playable locally from `index.html`.
-- **v2** — published to the web at
-  <https://johnhmccauley.github.io/mutant-flies/> so it can be played from
-  anywhere, on anything with a browser.
+- **v1** — the game, recreated from the article, playable locally.
+- **v2** — published to the web.
+- **v3** — the original recovered and properly ported, plus a 3D cellar.
 
-Every push to `main` republishes the site. `.github/workflows/pages.yml` runs
-`tools/check.js` first, so a broken sprite, a malformed font glyph or a syntax
-error stops the deploy instead of shipping a blank screen.
+## Credit and copyright
 
-## Checking a change
-
-```
-node tools/check.js          # sprite and font geometry, script parses, procedures intact
-node tools/make-artifact.js  # regenerate the embeddable copy
-```
-
-## Licence
-
-The 1985 program and article are © The Micro User / Database Publications.
-This is a new implementation written from the published description; the code
-here is the author's own.
+*FLY* and *Menace of the mutant flies* are © The Micro User / Database
+Publications, 1985, and are reproduced here by their author. The port, the two
+presentations and the tooling are new work.

@@ -25,8 +25,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Check the game still parses before publishing it
+      - name: Check the pages still parse before publishing them
         run: node tools/check.js
+
+      - name: Check the ported rules still match the 1985 original
+        run: node tools/test-rules.js
 
       - uses: actions/configure-pages@v5
         with:

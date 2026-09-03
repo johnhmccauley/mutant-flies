@@ -2,1062 +2,1383 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Menace of the Mutant Flies</title>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo+Narrow:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Mutant Fly</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo+Narrow:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
 <style>
   :root{
-    --case:#d9d2c0;
-    --case-hi:#e7e1d2;
-    --case-sh:#b7af9b;
-    --case-dk:#8b8375;
-    --fkey:#b8382c;
-    --fkey-dk:#8d2820;
-    --void:#0b0b0d;
-    --ink:#2e2a24;
-    --ink-soft:#6b6357;
-    --rule:#c4bcaa;
+    --stone:#171310;
+    --stone-hi:#2a231c;
+    --torch:#ff9b3d;
+    --torch-dim:#c66a1e;
+    --bone:#e8dcc8;
+    --bone-dim:#9c9083;
+    --blood:#c33a26;
+    --chitin:#4a6fd0;
   }
   *{box-sizing:border-box}
+  html,body{height:100%}
   body{
-    margin:0;
-    background:#171512;
-    background-image:
-      radial-gradient(120% 90% at 50% 0%, #241f1a 0%, #171512 55%, #0e0d0c 100%);
-    color:var(--ink);
+    margin:0;background:#0a0806;color:var(--bone);
     font-family:"Archivo Narrow","Helvetica Neue",Arial,sans-serif;
-    min-height:100vh;
-    display:flex;
-    align-items:center;
-    justify-content:center;
-    padding:clamp(12px,3vw,40px);
+    overflow:hidden;overscroll-behavior:none;
   }
-  .rig{
-    width:min(760px,100%);
-    display:flex;
-    flex-direction:column;
-    gap:18px;
+  #stage{position:fixed;inset:0}
+  canvas#gl{display:block;width:100%;height:100%}
+
+  /* the cellar closes in at the edges */
+  .vignette{
+    position:fixed;inset:0;pointer-events:none;
+    box-shadow:inset 0 0 22vmin 8vmin rgba(0,0,0,.82),inset 0 0 40vmin 2vmin rgba(0,0,0,.45);
   }
 
-  /* ---- the machine ---- */
-  .machine{
-    background:linear-gradient(178deg,var(--case-hi) 0%,var(--case) 22%,var(--case) 78%,var(--case-sh) 100%);
-    border-radius:10px 10px 16px 16px;
-    padding:clamp(14px,2.6vw,24px);
-    display:flex;
-    flex-direction:column;
-    gap:14px;
-    box-shadow:
-      0 1px 0 rgba(255,255,255,.55) inset,
-      0 -2px 0 rgba(0,0,0,.12) inset,
-      0 26px 50px -18px rgba(0,0,0,.85),
-      0 3px 0 var(--case-dk);
-  }
-
-  .crt{
-    position:relative;
-    background:var(--void);
-    border-radius:14px/18px;
-    padding:clamp(8px,1.6vw,14px);
-    box-shadow:
-      0 0 0 2px var(--case-dk),
-      0 0 0 3px rgba(255,255,255,.35),
-      0 10px 24px -8px rgba(0,0,0,.7) inset;
-  }
-  #screen{
-    display:block;
-    width:100%;
-    aspect-ratio:4/3;      /* period-correct: 320x256 stretched to 4:3 */
-    height:auto;
-    background:#000;
-    border-radius:6px/9px;
-    image-rendering:pixelated;
-    image-rendering:crisp-edges;
-    outline:none;
-    touch-action:manipulation;
-  }
-  #screen:focus-visible{box-shadow:0 0 0 3px #ffcf3f}
-  .glass{
-    position:absolute;
-    inset:clamp(8px,1.6vw,14px);
-    border-radius:6px/9px;
-    pointer-events:none;
-    background:
-      linear-gradient(103deg,rgba(255,255,255,.10) 0 18%,rgba(255,255,255,0) 42%),
-      repeating-linear-gradient(180deg,rgba(0,0,0,.22) 0 1px,rgba(0,0,0,0) 1px 3px);
-    mix-blend-mode:screen;
-    opacity:.5;
-  }
-  .glass::after{
-    content:"";position:absolute;inset:0;border-radius:inherit;
-    box-shadow:0 0 60px 18px rgba(0,0,0,.55) inset;
-  }
-
-  /* ---- red function-key strip: live key legend + touch pad ---- */
-  .strip{
-    display:grid;
-    grid-template-columns:repeat(6,1fr);
-    gap:5px;
-    background:var(--fkey-dk);
-    padding:5px;
-    border-radius:4px;
-    box-shadow:0 1px 0 rgba(255,255,255,.4);
-  }
-  .fkey{
-    appearance:none;
-    border:0;
-    font:inherit;
-    cursor:pointer;
-    background:var(--fkey);
-    color:#f6e9e2;
-    border-radius:2px;
-    padding:7px 2px 6px;
-    display:flex;
-    flex-direction:column;
-    align-items:center;
-    gap:2px;
-    line-height:1;
-    box-shadow:0 1px 0 rgba(255,255,255,.28) inset,0 -2px 0 rgba(0,0,0,.28) inset;
-    transition:background .06s linear,transform .06s linear;
-    touch-action:manipulation;
-    -webkit-tap-highlight-color:transparent;
-  }
-  .fkey .cap{font-size:clamp(13px,2.4vw,17px);font-weight:700;letter-spacing:.02em}
-  .fkey .sub{
+  /* ---------- head-up display ---------- */
+  [hidden]{display:none!important}
+  .hud{
+    position:fixed;top:0;left:0;right:0;pointer-events:none;
+    display:flex;gap:clamp(10px,3vw,34px);align-items:baseline;
+    padding:clamp(10px,2vw,18px) clamp(12px,3vw,26px);
     font-family:"IBM Plex Mono",ui-monospace,monospace;
-    font-size:clamp(7px,1.35vw,9px);
-    letter-spacing:.09em;
-    opacity:.72;
-    text-transform:uppercase;
+    background:linear-gradient(180deg,rgba(6,4,3,.86),rgba(6,4,3,0));
   }
-  .fkey:is(:hover,:focus-visible){background:#c9463a}
-  .fkey:focus-visible{outline:2px solid #ffcf3f;outline-offset:1px}
-  .fkey.lit{background:#f0a04a;color:#2b1206;transform:translateY(1px)}
+  .stat{display:flex;flex-direction:column;gap:2px;line-height:1}
+  .stat .k{
+    font-size:clamp(8px,1.5vw,10px);letter-spacing:.18em;text-transform:uppercase;
+    color:var(--bone-dim);
+  }
+  .stat .v{
+    font-size:clamp(15px,3vw,22px);font-weight:600;font-variant-numeric:tabular-nums;
+    color:var(--bone);
+  }
+  .stat.warn .v{color:var(--torch)}
+  .stat.crit .v{color:var(--blood)}
+  .spacer{flex:1}
+  .stat.right{align-items:flex-end}
 
-  /* ---- case badge ---- */
-  .badge{
-    display:flex;
-    align-items:baseline;
-    justify-content:space-between;
-    gap:12px;
-    border-top:1px solid var(--rule);
-    padding-top:11px;
-    flex-wrap:wrap;
+  /* ---------- the cellar plan ---------- */
+  #plan{
+    position:fixed;right:clamp(10px,2vw,20px);bottom:clamp(10px,2vw,20px);
+    width:clamp(120px,17vw,204px);height:auto;aspect-ratio:34/26;
+    background:rgba(8,6,5,.72);border:1px solid rgba(232,220,200,.16);
+    border-radius:3px;pointer-events:none;image-rendering:pixelated;
   }
-  .badge .model{
-    font-weight:700;
-    font-size:clamp(13px,2.1vw,16px);
-    letter-spacing:.16em;
-    text-transform:uppercase;
-    color:var(--ink);
+
+  /* ---------- overlays ---------- */
+  .sheet{
+    position:fixed;inset:0;display:grid;place-items:center;padding:6vmin;
+    background:radial-gradient(120% 80% at 50% 40%,rgba(20,14,10,.86),rgba(4,3,2,.96));
+    backdrop-filter:blur(2px);text-align:center;
   }
-  .badge .model span{color:var(--fkey)}
-  .badge .meta{
+  .sheet[hidden]{display:none}
+  .card{max-width:min(640px,92vw);display:flex;flex-direction:column;gap:clamp(12px,2.4vw,20px)}
+  .kicker{
     font-family:"IBM Plex Mono",ui-monospace,monospace;
-    font-size:clamp(9px,1.5vw,11px);
-    letter-spacing:.04em;
-    color:var(--ink-soft);
-    text-align:right;
+    font-size:clamp(9px,1.7vw,11px);letter-spacing:.3em;text-transform:uppercase;
+    color:var(--torch-dim);
   }
-
-  /* ---- provenance ---- */
-  .colophon{
-    margin:0;
+  h1{
+    margin:0;font-size:clamp(34px,9vw,74px);line-height:.92;font-weight:700;
+    letter-spacing:-.01em;text-wrap:balance;
+    color:var(--bone);
+    text-shadow:0 0 28px rgba(255,155,61,.28);
+  }
+  h1 em{font-style:normal;color:var(--blood)}
+  .lede{
+    margin:0 auto;max-width:52ch;font-size:clamp(14px,2.4vw,17px);line-height:1.62;
+    color:#c8bca9;
+  }
+  .lede b{color:var(--bone);font-weight:600}
+  .rules{
+    margin:0;padding:0;list-style:none;display:grid;gap:8px;
+    max-width:52ch;margin-inline:auto;text-align:left;
+    font-size:clamp(13px,2.1vw,15px);line-height:1.5;color:#c0b4a2;
+  }
+  .rules li{display:grid;grid-template-columns:auto 1fr;gap:11px;align-items:start}
+  .rules .pip{
+    width:9px;height:9px;margin-top:.42em;border-radius:1px;background:var(--blood);
+    box-shadow:0 0 0 1px rgba(0,0,0,.5) inset;
+  }
+  .rules li:nth-child(2) .pip{background:var(--torch)}
+  .rules li:nth-child(3) .pip{background:var(--chitin)}
+  .rules li:nth-child(4) .pip{background:var(--bone-dim)}
+  .keys{
+    display:flex;gap:7px;justify-content:center;flex-wrap:wrap;
+    font-family:"IBM Plex Mono",ui-monospace,monospace;font-size:clamp(11px,1.9vw,13px);
+  }
+  .keys kbd{
+    background:#241c16;border:1px solid #3d3128;border-bottom-width:2px;
+    border-radius:3px;padding:5px 9px;color:var(--bone);
+  }
+  .levels{display:flex;gap:6px;justify-content:center;flex-wrap:wrap}
+  .lvl{
+    appearance:none;font:inherit;cursor:pointer;
+    width:clamp(30px,6vw,38px);height:clamp(30px,6vw,38px);
+    background:#1d1712;border:1px solid #3a2e25;border-radius:3px;color:#a89b8b;
+    font-family:"IBM Plex Mono",ui-monospace,monospace;font-weight:600;
+    transition:background .12s,color .12s,border-color .12s;
+  }
+  .lvl:hover{background:#2a211a;color:var(--bone)}
+  .lvl[aria-pressed="true"]{background:var(--blood);border-color:#e05a42;color:#fff}
+  .lvl:focus-visible{outline:2px solid var(--torch);outline-offset:2px}
+  .go{
+    appearance:none;font:inherit;cursor:pointer;justify-self:center;
+    padding:13px 30px;border:0;border-radius:3px;
+    background:var(--blood);color:#fff;font-weight:700;
+    font-size:clamp(14px,2.4vw,17px);letter-spacing:.06em;text-transform:uppercase;
+    box-shadow:0 6px 24px -8px rgba(195,58,38,.9);
+    transition:background .12s,transform .12s;
+  }
+  .go:hover{background:#d94630;transform:translateY(-1px)}
+  .go:focus-visible{outline:2px solid var(--torch);outline-offset:3px}
+  .fine{
     font-family:"IBM Plex Mono",ui-monospace,monospace;
-    font-size:clamp(9.5px,1.55vw,11.5px);
-    line-height:1.75;
-    letter-spacing:.02em;
-    color:#8d8474;
-    text-align:center;
+    font-size:clamp(9px,1.6vw,11px);line-height:1.8;color:#7d7264;
   }
-  .colophon b{color:#c9bfa9;font-weight:500}
-  .colophon .sep{color:#5b5449;padding:0 .5em}
+  .fine a{color:#a2957f}
+  .tally{
+    display:flex;gap:clamp(16px,4vw,40px);justify-content:center;
+    font-family:"IBM Plex Mono",ui-monospace,monospace;
+  }
+  .tally div{display:flex;flex-direction:column;gap:4px}
+  .tally .k{font-size:10px;letter-spacing:.2em;text-transform:uppercase;color:var(--bone-dim)}
+  .tally .v{font-size:clamp(20px,5vw,30px);font-weight:600;color:var(--bone)}
 
-  @media (max-width:520px){
-    .fkey .sub{display:none}
-    .fkey{padding:11px 2px}
+  /* ---------- touch pad ---------- */
+  .pad{
+    position:fixed;left:clamp(10px,2vw,20px);bottom:clamp(10px,2vw,20px);
+    display:none;grid-template-columns:repeat(3,1fr);gap:6px;
+    width:min(45vw,190px);
   }
-  @media (prefers-reduced-motion:reduce){
-    .fkey{transition:none}
+  body.touch .pad{display:grid}
+  .pad button{
+    appearance:none;border:1px solid rgba(232,220,200,.2);border-radius:4px;
+    background:rgba(20,15,11,.66);color:var(--bone);
+    aspect-ratio:1;font-size:19px;font-family:"IBM Plex Mono",ui-monospace,monospace;
+    display:grid;place-items:center;-webkit-tap-highlight-color:transparent;
+    touch-action:none;
   }
+  .pad button:active{background:var(--blood);border-color:var(--blood)}
+  .pad .e{visibility:hidden}
+  #banner{
+    position:fixed;left:50%;top:38%;transform:translate(-50%,-50%);
+    font-size:clamp(30px,9vw,66px);font-weight:700;letter-spacing:.02em;
+    text-shadow:0 0 30px rgba(0,0,0,.9);pointer-events:none;text-align:center;
+  }
+  #banner[hidden]{display:none}
+  #banner small{display:block;font-size:.34em;letter-spacing:.24em;color:var(--torch);margin-top:.5em}
+  @media (prefers-reduced-motion:reduce){.go,.lvl{transition:none}}
 </style>
-
 </head>
-<body style="margin:0">
-<main class="rig">
-  <div class="machine">
-    <div class="crt">
-      <canvas id="screen" width="320" height="256" tabindex="0"
-              aria-label="Mutant Fly game screen. Push bricks with Z, X, colon and slash to trap the fly."></canvas>
-      <div class="glass" aria-hidden="true"></div>
-    </div>
+<body>
+<div id="stage"><canvas id="gl"></canvas></div>
+<div class="vignette" aria-hidden="true"></div>
 
-    <div class="strip" role="group" aria-label="Game controls">
-      <button class="fkey" data-act="left"  type="button"><span class="cap">Z</span><span class="sub">left</span></button>
-      <button class="fkey" data-act="up"    type="button"><span class="cap">:</span><span class="sub">up</span></button>
-      <button class="fkey" data-act="down"  type="button"><span class="cap">/</span><span class="sub">down</span></button>
-      <button class="fkey" data-act="right" type="button"><span class="cap">X</span><span class="sub">right</span></button>
-      <button class="fkey" data-act="fire"  type="button"><span class="cap">SPACE</span><span class="sub">start</span></button>
-      <button class="fkey" data-act="sound" type="button"><span class="cap">S/Q</span><span class="sub">sound</span></button>
-    </div>
+<div class="hud" id="hud" hidden>
+  <div class="stat"><span class="k">Cellar</span><span class="v" id="hCellar">1</span></div>
+  <div class="stat"><span class="k">Score</span><span class="v" id="hScore">0</span></div>
+  <div class="stat"><span class="k">Best</span><span class="v" id="hBest">0</span></div>
+  <div class="spacer"></div>
+  <div class="stat right" id="sBricks"><span class="k">Bricks</span><span class="v" id="hBricks">200</span></div>
+  <div class="stat right" id="sMoves"><span class="k">Moves</span><span class="v" id="hMoves">0</span></div>
+</div>
+<canvas id="plan" width="34" height="26" hidden></canvas>
+<div id="banner" hidden></div>
 
-    <div class="badge">
-      <div class="model">Acorn <span>BBC</span> Microcomputer &nbsp;Model&nbsp;B</div>
-      <div class="meta">MODE&nbsp;2 &middot; 20&times;32 &middot; 16 COLOUR &middot; 20K</div>
+<div class="pad" id="pad" aria-hidden="true">
+  <button class="e" tabindex="-1"></button>
+  <button data-act="up">:</button>
+  <button class="e" tabindex="-1"></button>
+  <button data-act="left">Z</button>
+  <button class="e" tabindex="-1"></button>
+  <button data-act="right">X</button>
+  <button class="e" tabindex="-1"></button>
+  <button data-act="down">/</button>
+  <button class="e" tabindex="-1"></button>
+</div>
+
+<div class="sheet" id="titleSheet">
+  <div class="card">
+    <p class="kicker">The Micro User &middot; July 1985 &middot; John McCauley</p>
+    <h1>Mutant <em>Fly</em></h1>
+    <p class="lede">A fortune lies in the cellars under the ruins, and on every level down
+      there is a fly the size of a man. You cannot kill it. <b>You can only wall it in.</b></p>
+    <ul class="rules">
+      <li><span class="pip"></span><span>Walk into a brick to shove it. A whole line shifts at once.</span></li>
+      <li><span class="pip"></span><span>Drive a brick <b>into</b> the fly and its jaws take it. Push one off the edge of the cellar and it is gone for good.</span></li>
+      <li><span class="pip"></span><span>Surround it with <b>four bricks</b> to trap it. The cellar wall is no help to you.</span></li>
+      <li><span class="pip"></span><span>Fewer bricks each cellar down, and the fly never lets you get far. Touch it once and that is that.</span></li>
+    </ul>
+    <div class="keys">
+      <kbd>Z</kbd> left <kbd>X</kbd> right <kbd>:</kbd> up <kbd>/</kbd> down
+      <kbd>&larr;&uarr;&darr;&rarr;</kbd> also
     </div>
+    <div class="levels" id="levels" role="group" aria-label="Starting difficulty"></div>
+    <button class="go" id="start" type="button">Go down</button>
+    <p class="fine">
+      Ported from the original BBC Micro BASIC, recovered from the Database
+      Publications cassette.<br>
+      <a href="classic/">Play the 1985 screen &rarr;</a>
+    </p>
   </div>
+</div>
 
-  <p class="colophon">
-    <b>&ldquo;MENACE OF THE MUTANT FLIES&rdquo;</b> by JOHN McCAULEY<span class="sep">&bull;</span>THE MICRO USER, JULY 1985, PP.&nbsp;66&ndash;69<span class="sep">&bull;</span>LISTING FROM P.&nbsp;168<br>
-    RECREATED FROM THE PUBLISHED ARTICLE &mdash; BBC BASIC PROCEDURE NAMES PRESERVED
-  </p>
-</main>
+<div class="sheet" id="overSheet" hidden>
+  <div class="card">
+    <p class="kicker" id="overKicker">Caught</p>
+    <h1 id="overTitle">The fly got you</h1>
+    <div class="tally">
+      <div><span class="k">Score</span><span class="v" id="oScore">0</span></div>
+      <div><span class="k">Cellar</span><span class="v" id="oCellar">1</span></div>
+      <div><span class="k">Best</span><span class="v" id="oBest">0</span></div>
+    </div>
+    <p class="lede" id="overNote">You get one life. That is all the dying you get.</p>
+    <button class="go" id="again" type="button">Again</button>
+  </div>
+</div>
 
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
+<!--inline:src/rules.js-->
+<script>
+/* =====================================================================
+   MUTANT FLY - the rules
+   Ported from the original BBC BASIC.
+
+   Source: FLY, by John Mc Cauley, (C) The Micro User. 125 lines, 10-1240,
+   detokenised from the Database Publications cassette for The Micro User
+   volume 3 issue 5 (July 1985) - the tape advertised in that issue as
+   "JULY: Fly. Take on mutant flies in this arcade spectacular."
+
+   Everything here follows the listing rather than the magazine article,
+   which describes the game loosely and in two places incorrectly. The
+   line numbers in the comments are the original's.
+
+   The original ran in MODE 1 and did all its collision detection with
+   POINT() against the screen: colour 2 meant "brick". This port keeps a
+   grid instead, but every rule below is the rule the BASIC implements.
+   ===================================================================== */
+(function (root) {
+  "use strict";
+
+  /* --- geometry -----------------------------------------------------
+     The original worked in BBC graphics units: 32 units to a character
+     cell. The man was bounded by X%>96 / X%<1152 (line 230,240) and
+     Y%>128 / Y%<928 (250,260), giving a playfield 34 cells across and
+     26 down. Bricks were scattered from the PA%() table (line 100),
+     which holds 160,192,...1088 - so bricks land in the inner 30x23.  */
+  var COLS = 34, ROWS = 26;
+  var BRICK_C0 = 2, BRICK_C1 = 31;      /* PA%(1..30) = X 160..1088 */
+  var BRICK_R0 = 1, BRICK_R1 = 23;      /* PA%(1..23) = Y 160..864  */
+
+  var EMPTY = 0, BRICK = 1;
+
+  /* The cassette edition has no frame limiter and runs as fast as BASIC
+     manages. The disc conversion added one - `210 T%=TIME+5` with
+     `380 REPEAT UNTIL TIME>T%`, TIME being centiseconds - which pins the
+     main loop at 20 turns a second. That is the rate used here.        */
+  var TICK_HZ = 20;
+
+  /* line 130: X%=608 Y%=576, X1%=576 Y1%=512 */
+  var MAN_C0 = 16, MAN_R0 = 14, FLY_C0 = 15, FLY_R0 = 12;
+
+  /* --- PROCset_level, lines 890-990 ---------------------------------
+     PE% is the number of bricks. PA% is the fly's leash: see step().
+     (The listing really does use PA% for both this scalar and the
+     brick-position array PA%(); BBC BASIC keeps them apart.)          */
+  var LEVELS = [
+    /* F%  PE%  PA% */
+    [1, 200, 400], [2, 175, 300], [3, 150, 200], [4, 125, 150], [5, 100, 100],
+    [6,  75,  75], [7,  50,  50], [8,  40,  40], [9,  30,  30]
+  ];
+  function levelOf(F) {
+    if (F >= 10) return { PE: 20, PA: 0 };          /* line 990 */
+    var row = LEVELS[F - 1] || LEVELS[0];
+    return { PE: row[1], PA: row[2] };
+  }
+
+  /* The leash is in graphics units; 32 of them to a cell. */
+  function leashCells(PA) { return PA / 32; }
+
+  /* --- the palette shifts as you descend, lines 1000-1020 -----------
+     VDU19 remaps logical 0 (the floor) and, from level 6, logical 1
+     (the brick body). Physical colours are the BBC's own numbering.   */
+  function palette(F) {
+    var floor = 3;                                  /* yellow, line 150 */
+    if (F >= 3) floor = 5;                          /* magenta          */
+    if (F >= 6) floor = 6;                          /* cyan             */
+    if (F >= 8) floor = 5;                          /* magenta again    */
+    return {
+      floor: floor,
+      brick: (F >= 6) ? 4 : 1,                      /* blue from 6, else red */
+      mortar: 7,                                    /* white, line 170  */
+      figure: 0                                     /* black, line 150  */
+    };
+  }
+
+  /* --- PROCbonus, lines 1110-1130 ----------------------------------- */
+  function bonusFor(CO) {
+    if (CO <= 100) return 300;
+    if (CO < 400) return 200;
+    if (CO < 500) return 150;
+    if (CO < 600) return 100;
+    if (CO < 700) return 50;
+    return 10;
+  }
+
+  function Game() {
+    this.HI = 0;
+    this.grid = new Uint8Array(COLS * ROWS);
+    this.reset(1);
+  }
+
+  Game.prototype.idx = function (c, r) { return r * COLS + c; };
+  Game.prototype.inField = function (c, r) {
+    return c >= 0 && r >= 0 && c < COLS && r < ROWS;
+  };
+  Game.prototype.brickAt = function (c, r) {
+    return this.inField(c, r) && this.grid[this.idx(c, r)] === BRICK;
+  };
+
+  /* line 110-140 plus PROCset_level / PROCprint_bricks */
+  Game.prototype.reset = function (startLevel) {
+    this.F = startLevel || 1;
+    this.SC = 0;
+    this.CO = 0;
+    this.over = false;
+    this.won = false;
+    this.sheet();
+  };
+
+  /* PROCnext_sheet, line 860, and PROCprint_bricks, line 810 */
+  Game.prototype.sheet = function () {
+    if (this.SC > this.HI) this.HI = this.SC;       /* line 1030 */
+    var lv = levelOf(this.F);
+    this.PE = lv.PE;
+    this.PA = lv.PA;
+    this.CO = 0;
+    this.grid.fill(EMPTY);
+
+    this.manC = MAN_C0; this.manR = MAN_R0;
+    this.flyC = FLY_C0; this.flyR = FLY_R0;
+
+    /* line 820-840: PE% bricks, each dropped on a square that is not
+       already a brick. The original does not avoid the man or the fly;
+       the fly simply erases whatever it is standing on when it moves.  */
+    var placed = 0, guard = 0;
+    while (placed < this.PE && guard++ < 200000) {
+      var c = BRICK_C0 + ((Math.random() * (BRICK_C1 - BRICK_C0 + 1)) | 0);
+      var r = BRICK_R0 + ((Math.random() * (BRICK_R1 - BRICK_R0 + 1)) | 0);
+      if (this.grid[this.idx(c, r)] === BRICK) continue;
+      if (c === this.flyC && r === this.flyR) continue;
+      if (c === this.manC && r === this.manR) continue;
+      this.grid[this.idx(c, r)] = BRICK;
+      placed++;
+    }
+    this.bricks = placed;
+  };
+
+  /* --- one turn of the main loop, lines 200-390 ---------------------
+     dir is "left" | "right" | "up" | "down" | null.
+     Order matters and is the original's: the man moves and shoves,
+     then the fly moves, then CO% counts up, then the game is tested.  */
+  Game.prototype.step = function (dir) {
+    var ev = { moved: false, pushed: 0, lostOverEdge: 0, crunched: 0,
+               flyMoved: false, won: false, lost: false, bonus: 0 };
+    if (this.over || this.won) return ev;
+
+    /* ---- the man, lines 230-260 ---------------------------------- */
+    var d = { left: [-1, 0], right: [1, 0], up: [0, 1], down: [0, -1] }[dir];
+    if (d) {
+      var nc = this.manC + d[0], nr = this.manR + d[1];
+      if (this.inField(nc, nr)) {                   /* the bounds tests */
+        this.manC = nc; this.manR = nr;             /* he always moves  */
+        ev.moved = true;
+
+        if (this.grid[this.idx(nc, nr)] === BRICK) {
+          /* line 230: REPEAT J%=J%+32 UNTIL POINT(...)<>2 - count the
+             run of bricks starting under him and find the first square
+             that is not a brick.                                       */
+          var n = 0, cc = nc, rr = nr;
+          while (this.brickAt(cc, rr)) { n++; cc += d[0]; rr += d[1]; }
+
+          /* PROCmove_bricks, line 410: the run shifts one square into
+             that first free square. Three things can be standing there. */
+          if (!this.inField(cc, rr)) {
+            /* off the edge of the cellar. The original drew the brick
+               outside the graphics viewport, where it was clipped away
+               and never came back.                                     */
+            ev.lostOverEdge = 1;
+            this.bricks--;
+          } else if (cc === this.flyC && rr === this.flyR) {
+            /* driven straight at the fly. The brick lands on its square
+               and the fly wipes that square the moment it moves, so the
+               leading brick - and only the leading brick - is lost.     */
+            ev.crunched = 1;
+            this.bricks--;
+          } else {
+            this.grid[this.idx(cc, rr)] = BRICK;
+          }
+          this.grid[this.idx(nc, nr)] = EMPTY;      /* he stands here now */
+          ev.pushed = n;
+        }
+      }
+    }
+
+    /* ---- the fly, lines 300-340 ----------------------------------
+       One random direction per turn. It moves only if the square is
+       not a brick AND the move keeps it inside a box of half-width
+       PA% around the man. That box is the whole of the fly's
+       intelligence: at level 1 it is 12 squares and the fly wanders,
+       at level 10 it is nothing and the fly can only close on you.   */
+    var R = 1 + ((Math.random() * 4) | 0);
+    var leash = leashCells(this.PA);
+    var fc = this.flyC, fr = this.flyR;
+    if (R === 1 && fc > 0 && fc > this.manC - leash && !this.brickAt(fc - 1, fr)) fc--;
+    else if (R === 2 && fc < COLS - 1 && fc < this.manC + leash && !this.brickAt(fc + 1, fr)) fc++;
+    else if (R === 3 && fr > 0 && fr > this.manR - leash && !this.brickAt(fc, fr - 1)) fr--;
+    else if (R === 4 && fr < ROWS - 1 && fr < this.manR + leash && !this.brickAt(fc, fr + 1)) fr++;
+    if (fc !== this.flyC || fr !== this.flyR) {
+      this.flyC = fc; this.flyR = fr;
+      ev.flyMoved = true;
+    }
+
+    this.CO++;                                       /* line 370 */
+
+    /* ---- line 380 -------------------------------------------------
+       Caught if they share a square. Trapped if all four orthogonal
+       neighbours are bricks - the edge of the cellar does NOT count,
+       so a corner is no help. Four real bricks or nothing.           */
+    if (this.manC === this.flyC && this.manR === this.flyR) {
+      ev.lost = true; this.over = true;
+      this.SC = 0;                                   /* PROCloss, line 480 */
+    } else if (this.brickAt(this.flyC + 1, this.flyR) &&
+               this.brickAt(this.flyC - 1, this.flyR) &&
+               this.brickAt(this.flyC, this.flyR + 1) &&
+               this.brickAt(this.flyC, this.flyR - 1)) {
+      ev.won = true; this.won = true;
+      /* PROCwin, lines 570-580. The high score is deliberately NOT
+         touched here: the original only compares it in PROCset_level
+         (line 1030), which runs on the next sheet. Since PROCloss wipes
+         SC% to zero first, a run that dies before clearing a sheet
+         contributes nothing to HI%. That is the original's behaviour.  */
+      if (this.CO < 800) { ev.bonus = bonusFor(this.CO); this.SC += ev.bonus; }
+      this.SC += this.F * 50;
+    }
+    return ev;
+  };
+
+  /* called after the win has been shown - line 610 PROCnext_sheet */
+  Game.prototype.nextSheet = function () {
+    this.F++;
+    this.won = false;
+    this.sheet();
+  };
+
+  /* --- the user-defined characters, lines 80 and 150-160 -------------
+     Eight bytes each, exactly as the original VDU23 statements.
+     224 is a solid block, used both as the eraser and as the body of a
+     brick; 228 is the mortar drawn over it in another colour; 225 is
+     the man; 226 and 227 are the fly, overlaid in two colours.        */
+  var UDG = {
+    block: [255, 255, 255, 255, 255, 255, 255, 255],   /* 224 */
+    man:   [28, 28, 8, 127, 8, 20, 34, 65],            /* 225 */
+    fly:   [36, 24, 60, 90, 153, 153, 165, 195],       /* 226 */
+    flyHi: [0, 0, 0, 36, 102, 102, 66, 0],             /* 227 */
+    mortar:[255, 8, 8, 8, 255, 64, 64, 64]             /* 228 */
+  };
+
+  /* --- SOUND and ENVELOPE, lines 40-70 -------------------------------
+     The four envelopes exactly as the listing declares them.          */
+  var ENVELOPES = {
+    1: [1, -10, 20, -10, 33, 33, 33, 25, -1, -1, -2, 100, 80],
+    2: [1, 4, -3, 5, 40, 20, 30, 127, -1, 0, 0, 126, 0],
+    3: [6, -8, -18, 7, 2, 14, 0, 0, 0, 0, 0, 0, 0],
+    4: [0, 0, 0, 0, 0, 0, 67, -3, 0, -4, 126, 126, 0]
+  };
+
+  /* the instruction screen, lines 1170-1220, verbatim including the
+     author's "to close to the edge" */
+  var INSTRUCTIONS = [
+    "You must trap the fly",
+    "by surrounding it with bricks",
+    "using the Z, X, : and / keys.",
+    "The fly can only destroy the bricks",
+    "when you drive them straight at him.",
+    "Do not move the bricks to close to the",
+    "edge, and don't get caught or else!!"
+  ];
+
+  root.MutantFly = {
+    Game: Game,
+    COLS: COLS, ROWS: ROWS, EMPTY: EMPTY, BRICK: BRICK, TICK_HZ: TICK_HZ,
+    levelOf: levelOf, leashCells: leashCells, palette: palette,
+    bonusFor: bonusFor,
+    UDG: UDG, ENVELOPES: ENVELOPES, INSTRUCTIONS: INSTRUCTIONS,
+    /* the BBC's eight physical colours */
+    PHYSICAL: ["#000000", "#ff0000", "#00ff00", "#ffff00",
+               "#0000ff", "#ff00ff", "#00ffff", "#ffffff"]
+  };
+})(typeof window !== "undefined" ? window : globalThis);
+</script>
+<!--/inline-->
 <script>
 "use strict";
 /* =====================================================================
-   MENACE OF THE MUTANT FLIES
-   John McCauley, The Micro User, July 1985 (pp.66-69, listing p.168)
-   Recreated in JavaScript, 2026.
-
-   The original was BBC BASIC II on an Acorn BBC Microcomputer Model B:
-   a 2MHz 6502, 32K of RAM, and a MODE 2 screen (160x256 pixels, 20x32
-   characters, 16 logical colours) that ate 20K of that RAM on its own.
-
-   The magazine printed the program's procedure and variable tables.
-   Those names are preserved here so the port can be read against the
-   listing:
-
-     PROCEDURES                     -> functions below
-       instructions                 -> PROCinstructions()
-       title_page                   -> PROCtitle_page()
-       move_bricks                  -> PROCmove_bricks()
-       move_fly                     -> PROCmove_fly()
-       next_sheet                   -> PROCnext_sheet()
-       bonus                        -> PROCbonus()
-       loss                         -> PROCloss()
-       level                        -> PROCset_level()
-
-     VARIABLES                      -> V.* below
-       HI%   high score             X1%,Y1% fly's position
-       SC%   score                  OX%,OY% fly's last position
-       R%    random no.             J%,P%   level of difficulty
-       I%    direction bricks move  PB%     number of bricks displayed
-       PA%   rate at which the fly follows the man
+   MUTANT FLY - 2026
+   The same game, three-dimensionally. Every rule comes from src/rules.js,
+   which is a port of John McCauley's 1985 BBC BASIC; only the presentation
+   is new. The one deliberate change is pace: the original ran its turn
+   loop at 20 a second, which in a 3D cellar reads as a blur, so a turn
+   here takes 150ms and the figures glide between squares. Scoring is
+   unaffected - the original's pressure was a count of moves, not a clock.
    ===================================================================== */
+var MF = window.MutantFly;
+var COLS = MF.COLS, ROWS = MF.ROWS;
+var TURN_MS = 150;
 
-/* ------------------------------------------------------------------ */
-/* MODE 2 palette. The BBC's 16 logical colours are 8 solid colours    */
-/* built from full-on/full-off R, G and B, plus 8 flashing pairs.      */
-/* ------------------------------------------------------------------ */
-var PAL = ["#000000","#ff0000","#00ff00","#ffff00",
-           "#0000ff","#ff00ff","#00ffff","#ffffff"];
-/* colours 8-15 flash between colour n-8 and its complement 7-(n-8) */
-var flashPhase = 0;
-function ink(c){
-  if(c < 8) return PAL[c];
-  var a = c - 8, b = 7 - a;
-  return flashPhase ? PAL[b] : PAL[a];
-}
-
-/* ------------------------------------------------------------------ */
-/* An 8x8 character set in the spirit of the BBC's own ROM font.       */
-/* Eight rows per glyph, hash = ink.                                   */
-/* ------------------------------------------------------------------ */
-var FONTSRC = {
-" ":"........,........,........,........,........,........,........,........",
-"!":"..##....,..##....,..##....,..##....,..##....,........,..##....,........",
-"#":"........,.#.#....,.#####..,.#.#....,.#####..,.#.#....,........,........",
-"$":"...#....,..####..,.#.#....,..###...,...#.#..,.####...,...#....,........",
-"%":".##...#.,.##..#..,....#...,...#....,..#..##.,.#...##.,........,........",
-"&":"..##....,.#..#...,..##....,.#.#.#..,.#..#...,..##.#..,........,........",
-"'":"..##....,..##....,..#.....,........,........,........,........,........",
-"(":"...#....,..#.....,..#.....,..#.....,..#.....,..#.....,...#....,........",
-")":"..#.....,...#....,...#....,...#....,...#....,...#....,..#.....,........",
-"*":"........,..#.#...,...#....,.#####..,...#....,..#.#...,........,........",
-"+":"........,...#....,...#....,.#####..,...#....,...#....,........,........",
-",":"........,........,........,........,........,..##....,..##....,..#.....",
-"-":"........,........,........,.#####..,........,........,........,........",
-".":"........,........,........,........,........,..##....,..##....,........",
-"/":".....#..,....#...,....#...,...#....,..#.....,..#.....,.#......,........",
-"0":"..###...,.#...#..,.#..##..,.#.#.#..,.##..#..,.#...#..,..###...,........",
-"1":"...#....,..##....,...#....,...#....,...#....,...#....,..###...,........",
-"2":"..###...,.#...#..,.....#..,....#...,...#....,..#.....,.#####..,........",
-"3":".#####..,....#...,...##...,....#...,.....#..,.#...#..,..###...,........",
-"4":"....##..,...#.#..,..#..#..,.#...#..,.#####..,.....#..,.....#..,........",
-"5":".#####..,.#......,.####...,.....#..,.....#..,.#...#..,..###...,........",
-"6":"...##...,..#.....,.#......,.####...,.#...#..,.#...#..,..###...,........",
-"7":".#####..,.....#..,....#...,...#....,..#.....,..#.....,..#.....,........",
-"8":"..###...,.#...#..,.#...#..,..###...,.#...#..,.#...#..,..###...,........",
-"9":"..###...,.#...#..,.#...#..,..####..,.....#..,....#...,..##....,........",
-":":"........,..##....,..##....,........,..##....,..##....,........,........",
-";":"........,..##....,..##....,........,..##....,..##....,..#.....,........",
-"<":"....#...,...#....,..#.....,.#......,..#.....,...#....,....#...,........",
-"=":"........,........,.#####..,........,.#####..,........,........,........",
-">":"..#.....,...#....,....#...,.....#..,....#...,...#....,..#.....,........",
-"?":"..###...,.#...#..,.....#..,....#...,...#....,........,...#....,........",
-"@":"..###...,.#...#..,.#.###..,.#.#.#..,.#.###..,.#......,..####..,........",
-"A":"..###...,.#...#..,.#...#..,.#####..,.#...#..,.#...#..,.#...#..,........",
-"B":".####...,.#...#..,.#...#..,.####...,.#...#..,.#...#..,.####...,........",
-"C":"..####..,.#...#..,.#......,.#......,.#......,.#...#..,..####..,........",
-"D":".####...,.#...#..,.#...#..,.#...#..,.#...#..,.#...#..,.####...,........",
-"E":".#####..,.#......,.#......,.####...,.#......,.#......,.#####..,........",
-"F":".#####..,.#......,.#......,.####...,.#......,.#......,.#......,........",
-"G":"..####..,.#...#..,.#......,.#..##..,.#...#..,.#...#..,..####..,........",
-"H":".#...#..,.#...#..,.#...#..,.#####..,.#...#..,.#...#..,.#...#..,........",
-"I":"..###...,...#....,...#....,...#....,...#....,...#....,..###...,........",
-"J":"..####..,....#...,....#...,....#...,....#...,.#..#...,..##....,........",
-"K":".#...#..,.#..#...,.#.#....,.##.....,.#.#....,.#..#...,.#...#..,........",
-"L":".#......,.#......,.#......,.#......,.#......,.#......,.#####..,........",
-"M":".#...#..,.##.##..,.#.#.#..,.#...#..,.#...#..,.#...#..,.#...#..,........",
-"N":".#...#..,.##..#..,.#.#.#..,.#..##..,.#...#..,.#...#..,.#...#..,........",
-"O":"..###...,.#...#..,.#...#..,.#...#..,.#...#..,.#...#..,..###...,........",
-"P":".####...,.#...#..,.#...#..,.####...,.#......,.#......,.#......,........",
-"Q":"..###...,.#...#..,.#...#..,.#...#..,.#.#.#..,.#..#...,..##.#..,........",
-"R":".####...,.#...#..,.#...#..,.####...,.#.#....,.#..#...,.#...#..,........",
-"S":"..####..,.#...#..,.#......,..###...,.....#..,.#...#..,..###...,........",
-"T":".#####..,...#....,...#....,...#....,...#....,...#....,...#....,........",
-"U":".#...#..,.#...#..,.#...#..,.#...#..,.#...#..,.#...#..,..###...,........",
-"V":".#...#..,.#...#..,.#...#..,.#...#..,.#...#..,..#.#...,...#....,........",
-"W":".#...#..,.#...#..,.#...#..,.#.#.#..,.#.#.#..,.##.##..,.#...#..,........",
-"X":".#...#..,.#...#..,..#.#...,...#....,..#.#...,.#...#..,.#...#..,........",
-"Y":".#...#..,.#...#..,..#.#...,...#....,...#....,...#....,...#....,........",
-"Z":".#####..,.....#..,....#...,...#....,..#.....,.#......,.#####..,........",
-"_":"........,........,........,........,........,........,........,.#####..",
-"{":"..###...,.#...#..,.#.##...,.#.#....,.#.##...,.#...#..,..###...,........",
-"|":"...#....,...#....,...#....,...#....,...#....,...#....,...#....,........"
-};
-var FONT = {};
-(function(){
-  for(var ch in FONTSRC){
-    var rows = FONTSRC[ch].split(","), bits = [];
-    for(var y=0;y<8;y++){
-      var r = rows[y], m = 0;
-      for(var x=0;x<8;x++) if(r.charAt(x) === "#") m |= (1<<x);
-      bits.push(m);
-    }
-    FONT[ch] = bits;
-  }
-})();
-
-/* ------------------------------------------------------------------ */
-/* User-defined graphics. On the real machine these were VDU 23        */
-/* definitions: eight bytes per 8x8 character, four characters glued   */
-/* together to make a 16x16 sprite. Digits are logical colours.        */
-/* ------------------------------------------------------------------ */
-var UDG = {
-  brick: [
-    "................",
-    ".333333.33333333",
-    ".111111.11111111",
-    ".111111.11111111",
-    ".111111.11111111",
-    "................",
-    ".33.3333333.3333",
-    ".11.1111111.1111",
-    ".11.1111111.1111",
-    ".11.1111111.1111",
-    "................",
-    ".333333.33333333",
-    ".111111.11111111",
-    ".111111.11111111",
-    ".111111.11111111",
-    "................"],
-  wall: [
-    "................",
-    "6666666.66666666",
-    "4444444.44444444",
-    "4444444.44444444",
-    "4444444.44444444",
-    "................",
-    "666.6666666.6666",
-    "444.4444444.4444",
-    "444.4444444.4444",
-    "444.4444444.4444",
-    "................",
-    "6666666.66666666",
-    "4444444.44444444",
-    "4444444.44444444",
-    "4444444.44444444",
-    "................"],
-  man: [
-    "......3333......",
-    ".....333333.....",
-    ".....3.33.3.....",
-    ".....333333.....",
-    "......3333......",
-    "....7733333.....",
-    "....77333333....",
-    ".....33333333...",
-    "......3333......",
-    "......3333......",
-    ".....33..33.....",
-    ".....33..33.....",
-    "....33....33....",
-    "....33....33....",
-    "...333....333...",
-    "................"],
-  fly0: [
-    "7..............7",
-    ".77..........77.",
-    "..777......777..",
-    "...777....777...",
-    ".....111111.....",
-    "....11111111....",
-    "....11444411....",
-    ".....444444.....",
-    "....44444444....",
-    "....44444444....",
-    ".....444444.....",
-    ".....444444.....",
-    "......4444......",
-    "......4444......",
-    ".7...7....7...7.",
-    "7....7....7....7"],
-  fly1: [
-    "................",
-    "..77........77..",
-    "..777......777..",
-    "...77......77...",
-    ".....111111.....",
-    "....11111111....",
-    "....11444411....",
-    ".....444444.....",
-    "....44444444....",
-    "....44444444....",
-    ".....444444.....",
-    ".....444444.....",
-    "......4444......",
-    "......4444......",
-    "..7..7....7..7..",
-    ".7...7....7...7."]
-};
-
-/* ------------------------------------------------------------------ */
-/* Screen. 320x256 logical pixels, presented at 4:3 the way a BBC fed  */
-/* a domestic colour television.                                       */
-/* ------------------------------------------------------------------ */
-var SCR = document.getElementById("screen");
-var ctx = SCR.getContext("2d", {alpha:false});
-ctx.imageSmoothingEnabled = false;
-
-var CELL = 16, GW = 20, GH = 14, TOP = 32;
-
-function bake(rows){
+/* ==================================================================
+   PROCEDURAL TEXTURES
+   Nothing is loaded from anywhere; every surface is drawn here and
+   turned into a colour map with a matching height map for relief.
+   ================================================================== */
+function noiseCanvas(size, fn) {
   var c = document.createElement("canvas");
-  c.width = 16; c.height = 16;
-  var g = c.getContext("2d");
-  for(var y=0;y<16;y++){
-    var r = rows[y];
-    for(var x=0;x<16;x++){
-      var ch = r.charAt(x);
-      if(ch === ".") continue;
-      g.fillStyle = PAL[ch.charCodeAt(0) - 48];
-      g.fillRect(x,y,1,1);
-    }
-  }
+  c.width = c.height = size;
+  fn(c.getContext("2d"), size);
   return c;
 }
-var SPR = {};
-for(var k in UDG) SPR[k] = bake(UDG[k]);
-SPR.manL = (function(){
-  var c = document.createElement("canvas"); c.width = 16; c.height = 16;
-  var g = c.getContext("2d");
-  g.translate(16,0); g.scale(-1,1); g.drawImage(SPR.man,0,0);
-  return c;
-})();
+function tex(canvas, repeatX, repeatY, srgb) {
+  var t = new THREE.CanvasTexture(canvas);
+  t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  t.repeat.set(repeatX || 1, repeatY || 1);
+  t.anisotropy = 8;
+  if (srgb) t.encoding = THREE.sRGBEncoding;
+  return t;
+}
+function grain(g, size, amount, dark) {
+  var img = g.getImageData(0, 0, size, size), d = img.data;
+  for (var i = 0; i < d.length; i += 4) {
+    var n = (Math.random() - 0.5) * amount;
+    d[i] = Math.max(0, Math.min(255, d[i] + n));
+    d[i + 1] = Math.max(0, Math.min(255, d[i + 1] + n));
+    d[i + 2] = Math.max(0, Math.min(255, d[i + 2] + n * (dark ? 1.2 : 1)));
+  }
+  g.putImageData(img, 0, 0);
+}
 
-function cls(c){ ctx.fillStyle = PAL[c||0]; ctx.fillRect(0,0,320,256); }
-
-/* PRINT TAB(x,y) - text on the 8x8 character grid */
-function plot(str, cx, cy, colour){
-  ctx.fillStyle = ink(colour);
-  var px = cx*8, py = cy*8;
-  for(var i=0;i<str.length;i++){
-    var g = FONT[str.charAt(i)];
-    if(g){
-      for(var y=0;y<8;y++){
-        var m = g[y];
-        if(!m) continue;
-        for(var x=0;x<8;x++) if(m & (1<<x)) ctx.fillRect(px+x, py+y, 1, 1);
+/* --- a brick, drawn as courses with mortar and worn edges ---------- */
+function brickMaps(hue) {
+  var S = 256, rows = 5, h = S / rows;
+  var col = noiseCanvas(S, function (g) {
+    g.fillStyle = "#2b2521"; g.fillRect(0, 0, S, S);       /* mortar */
+    for (var r = 0; r < rows; r++) {
+      var off = (r % 2) ? h : 0;
+      for (var x = -h; x < S; x += h * 2) {
+        var bx = x + off + 3, by = r * h + 3, bw = h * 2 - 6, bh = h - 6;
+        var v = 0.78 + Math.random() * 0.34;
+        g.fillStyle = "hsl(" + (hue.h + (Math.random() * 10 - 5)) + "," +
+                      (hue.s * (0.9 + Math.random() * 0.2)) + "%," +
+                      Math.min(70, hue.l * v) + "%)";
+        g.fillRect(bx, by, bw, bh);
+        g.fillStyle = "rgba(255,255,255,.055)";
+        g.fillRect(bx, by, bw, 2);
+        g.fillStyle = "rgba(0,0,0,.16)";
+        g.fillRect(bx, by + bh - 2, bw, 2);
       }
     }
-    px += 8;
+    grain(g, S, 26, true);
+  });
+  var bump = noiseCanvas(S, function (g) {
+    g.fillStyle = "#000"; g.fillRect(0, 0, S, S);
+    for (var r = 0; r < rows; r++) {
+      var off = (r % 2) ? h : 0;
+      for (var x = -h; x < S; x += h * 2) {
+        g.fillStyle = "#d8d8d8";
+        g.fillRect(x + off + 3, r * h + 3, h * 2 - 6, h - 6);
+      }
+    }
+    grain(g, S, 40);
+  });
+  return { map: tex(col, 1, 1, true), bump: tex(bump, 1, 1) };
+}
+
+/* --- cellar stone, big rough blocks -------------------------------- */
+function stoneMaps() {
+  var S = 512, rows = 6, h = S / rows;
+  var col = noiseCanvas(S, function (g) {
+    g.fillStyle = "#151210"; g.fillRect(0, 0, S, S);
+    for (var r = 0; r < rows; r++) {
+      var off = (r % 2) ? h * 0.9 : 0;
+      for (var x = -h * 2; x < S; x += h * 1.8) {
+        var v = 30 + Math.random() * 22;
+        g.fillStyle = "hsl(" + (28 + Math.random() * 12) + ",9%," + v + "%)";
+        g.beginPath();
+        var bx = x + off + 4, by = r * h + 4, bw = h * 1.8 - 8, bh = h - 8;
+        g.rect(bx, by, bw, bh); g.fill();
+        g.fillStyle = "rgba(0,0,0,.25)"; g.fillRect(bx, by + bh - 3, bw, 3);
+        g.fillStyle = "rgba(255,255,255,.05)"; g.fillRect(bx, by, bw, 2);
+        /* damp patches */
+        if (Math.random() < 0.3) {
+          g.fillStyle = "rgba(24,40,34,.20)";
+          g.beginPath();
+          g.ellipse(bx + Math.random() * bw, by + bh * 0.75,
+                    bw * 0.3, bh * 0.3, 0, 0, 6.3);
+          g.fill();
+        }
+      }
+    }
+    grain(g, S, 30, true);
+  });
+  var bump = noiseCanvas(S, function (g) {
+    g.fillStyle = "#111"; g.fillRect(0, 0, S, S);
+    for (var r = 0; r < rows; r++) {
+      var off = (r % 2) ? h * 0.9 : 0;
+      for (var x = -h * 2; x < S; x += h * 1.8) {
+        g.fillStyle = "hsl(0,0%," + (58 + Math.random() * 34) + "%)";
+        g.fillRect(x + off + 4, r * h + 4, h * 1.8 - 8, h - 8);
+      }
+    }
+    grain(g, S, 55);
+  });
+  return { map: tex(col, 1, 1, true), bump: tex(bump, 1, 1) };
+}
+
+/* --- the floor: flagstones, dust, standing damp --------------------- */
+function floorMaps() {
+  var S = 512, n = 4, h = S / n;
+  var col = noiseCanvas(S, function (g) {
+    g.fillStyle = "#0f0d0b"; g.fillRect(0, 0, S, S);
+    for (var r = 0; r < n; r++) for (var c = 0; c < n; c++) {
+      var v = 15 + Math.random() * 13;
+      g.fillStyle = "hsl(" + (30 + Math.random() * 14) + ",11%," + v + "%)";
+      g.fillRect(c * h + 3, r * h + 3, h - 6, h - 6);
+      for (var s = 0; s < 40; s++) {
+        g.fillStyle = "rgba(255,240,210," + (Math.random() * 0.035) + ")";
+        g.fillRect(c * h + Math.random() * h, r * h + Math.random() * h,
+                   Math.random() * 9, Math.random() * 3);
+      }
+    }
+    grain(g, S, 22, true);
+  });
+  var bump = noiseCanvas(S, function (g) {
+    g.fillStyle = "#0a0a0a"; g.fillRect(0, 0, S, S);
+    for (var r = 0; r < n; r++) for (var c = 0; c < n; c++) {
+      g.fillStyle = "hsl(0,0%," + (52 + Math.random() * 26) + "%)";
+      g.fillRect(c * h + 3, r * h + 3, h - 6, h - 6);
+    }
+    grain(g, S, 46);
+  });
+  return { map: tex(col, 9, 7, true), bump: tex(bump, 9, 7) };
+}
+
+/* ==================================================================
+   SCENE
+   ================================================================== */
+var renderer, scene, camera, clock;
+var brickMesh, wallGroup, floorMesh, manRig, flyRig, motes, debris = [];
+var torches = [], keyLight;
+var BRICK_MAT, BRICK_TEX = {};
+
+function init3D() {
+  renderer = new THREE.WebGLRenderer({
+    canvas: document.getElementById("gl"), antialias: true, powerPreference: "high-performance"
+  });
+  renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  renderer.outputEncoding = THREE.sRGBEncoding;
+  renderer.toneMapping = THREE.ACESFilmicToneMapping;
+  renderer.toneMappingExposure = 1.15;
+  renderer.physicallyCorrectLights = false;
+
+  scene = new THREE.Scene();
+  scene.background = new THREE.Color(0x070605);
+  scene.fog = new THREE.FogExp2(0x0b0805, 0.031);
+
+  camera = new THREE.PerspectiveCamera(50, 1, 0.1, 220);
+  clock = new THREE.Clock();
+
+  scene.add(new THREE.HemisphereLight(0x2a2418, 0x090705, 0.30));
+
+  /* the lamp the player carries with him, and the only shadow caster */
+  keyLight = new THREE.SpotLight(0xffb163, 3.1, 34, 0.86, 0.55, 1.1);
+  keyLight.castShadow = true;
+  keyLight.shadow.mapSize.set(1024, 1024);
+  keyLight.shadow.bias = -0.0022;
+  keyLight.shadow.camera.near = 1;
+  keyLight.shadow.camera.far = 40;
+  scene.add(keyLight, keyLight.target);
+
+  buildCellar();
+  manRig = buildMan(); scene.add(manRig);
+  flyRig = buildFly(); scene.add(flyRig);
+  buildMotes();
+  loadAssets();
+
+  addEventListener("resize", resize);
+  resize();
+}
+
+function resize() {
+  var w = innerWidth, h = innerHeight;
+  renderer.setSize(w, h, false);
+  camera.aspect = w / h;
+  camera.updateProjectionMatrix();
+}
+
+function buildCellar() {
+  var fm = floorMaps();
+  floorMesh = new THREE.Mesh(
+    new THREE.PlaneGeometry(COLS + 10, ROWS + 10),
+    new THREE.MeshStandardMaterial({ map: fm.map, bumpMap: fm.bump, bumpScale: 0.06,
+                                     roughness: 0.97, metalness: 0.02, color: 0xffffff })
+  );
+  floorMesh.rotation.x = -Math.PI / 2;
+  floorMesh.position.set(COLS / 2, 0, ROWS / 2);
+  floorMesh.receiveShadow = true;
+  scene.add(floorMesh);
+
+  var sm = stoneMaps();
+  var wallMat = new THREE.MeshStandardMaterial({
+    map: sm.map, bumpMap: sm.bump, bumpScale: 0.11, roughness: 0.95, metalness: 0.03
+  });
+  var H = 5.2, T = 2.4;
+  wallGroup = new THREE.Group();
+  function wall(w, d, x, z) {
+    var m = new THREE.Mesh(new THREE.BoxGeometry(w, H, d), wallMat);
+    m.position.set(x, H / 2, z);
+    m.receiveShadow = true; m.castShadow = true;
+    wallGroup.add(m);
+  }
+  var W = COLS, D = ROWS;
+  wall(W + T * 2, T, W / 2, -T / 2);
+  wall(W + T * 2, T, W / 2, D + T / 2);
+  wall(T, D + T * 2, -T / 2, D / 2);
+  wall(T, D + T * 2, W + T / 2, D / 2);
+  scene.add(wallGroup);
+
+  /* torches bracketed to the walls */
+  var spots = [[6,-0.4],[17,-0.4],[28,-0.4],[6,ROWS+0.4],[17,ROWS+0.4],[28,ROWS+0.4],
+               [-0.4,7],[-0.4,19],[COLS+0.4,7],[COLS+0.4,19]];
+  var flameMat = new THREE.MeshBasicMaterial({ color: 0xffc06a, transparent: true, opacity: 0.95 });
+  for (var i = 0; i < spots.length; i++) {
+    var g = new THREE.Group();
+    g.position.set(spots[i][0], 3.0, spots[i][1]);
+    var bracket = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.07, 0.09, 0.7, 6),
+      new THREE.MeshStandardMaterial({ color: 0x2a2018, roughness: 0.7, metalness: 0.5 })
+    );
+    bracket.rotation.z = 0.4; g.add(bracket);
+    var flame = new THREE.Mesh(new THREE.ConeGeometry(0.19, 0.62, 7), flameMat);
+    flame.position.y = 0.52; g.add(flame);
+    var lt = new THREE.PointLight(0xff8c2e, 1.5, 15, 1.7);
+    lt.position.y = 0.5; g.add(lt);
+    torches.push({ g: g, light: lt, flame: flame, seed: Math.random() * 9 });
+    scene.add(g);
+  }
+
+  /* bricks, as one instanced mesh - the level 1 sheet is 200 of them */
+  BRICK_TEX.red = brickMaps({ h: 8, s: 46, l: 44 });
+  BRICK_TEX.blue = brickMaps({ h: 218, s: 40, l: 44 });
+  BRICK_MAT = new THREE.MeshStandardMaterial({
+    map: BRICK_TEX.red.map, bumpMap: BRICK_TEX.red.bump, bumpScale: 0.05,
+    roughness: 0.92, metalness: 0.02
+  });
+  brickMesh = new THREE.InstancedMesh(new THREE.BoxGeometry(0.94, 0.66, 0.94), BRICK_MAT, 260);
+  brickMesh.castShadow = true;
+  brickMesh.receiveShadow = true;
+  brickMesh.count = 0;
+  scene.add(brickMesh);
+}
+
+/* --- the man ------------------------------------------------------- */
+function buildMan() {
+  var g = new THREE.Group();
+  var cloth = new THREE.MeshStandardMaterial({ color: 0x6d5a3f, roughness: 0.86 });
+  var skin  = new THREE.MeshStandardMaterial({ color: 0xc79b74, roughness: 0.72 });
+  var dark  = new THREE.MeshStandardMaterial({ color: 0x37301f, roughness: 0.9 });
+  var paper = new THREE.MeshStandardMaterial({ color: 0xd8d0bb, roughness: 0.95 });
+
+  var torso = new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.30, 0.62, 10), cloth);
+  torso.position.y = 0.92; g.add(torso);
+  var hips = new THREE.Mesh(new THREE.SphereGeometry(0.27, 12, 10), dark);
+  hips.position.y = 0.62; hips.scale.y = 0.75; g.add(hips);
+  var head = new THREE.Mesh(new THREE.SphereGeometry(0.21, 14, 12), skin);
+  head.position.y = 1.38; g.add(head);
+  var hair = new THREE.Mesh(new THREE.SphereGeometry(0.215, 14, 10,
+             0, Math.PI * 2, 0, Math.PI * 0.55), dark);
+  hair.position.y = 1.40; g.add(hair);
+
+  function limb(r, len, mat) {
+    var m = new THREE.Mesh(new THREE.CylinderGeometry(r, r * 0.85, len, 8), mat);
+    m.position.y = -len / 2;
+    var pivot = new THREE.Group(); pivot.add(m);
+    return pivot;
+  }
+  g.userData.legL = limb(0.09, 0.58, dark); g.userData.legL.position.set(-0.13, 0.60, 0);
+  g.userData.legR = limb(0.09, 0.58, dark); g.userData.legR.position.set(0.13, 0.60, 0);
+  g.userData.armL = limb(0.075, 0.50, cloth); g.userData.armL.position.set(-0.30, 1.16, 0);
+  g.userData.armR = limb(0.075, 0.50, cloth); g.userData.armR.position.set(0.30, 1.16, 0);
+  g.add(g.userData.legL, g.userData.legR, g.userData.armL, g.userData.armR);
+
+  /* the rolled-up copy of The Times he came down with */
+  var roll = new THREE.Mesh(new THREE.CylinderGeometry(0.055, 0.055, 0.46, 8), paper);
+  roll.rotation.z = 0.5; roll.position.set(0.06, -0.46, 0.06);
+  g.userData.armR.add(roll);
+
+  g.traverse(function (o) { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
+  g.userData.walk = 0;
+  return g;
+}
+
+/* --- the fly: the size of a man ------------------------------------ */
+function buildFly() {
+  var g = new THREE.Group();
+  var chitin = new THREE.MeshStandardMaterial({
+    color: 0x3d63c4, roughness: 0.24, metalness: 0.66, flatShading: false
+  });
+  var chitinDark = new THREE.MeshStandardMaterial({
+    color: 0x1e2c5c, roughness: 0.36, metalness: 0.54
+  });
+  var eyeMat = new THREE.MeshStandardMaterial({
+    color: 0x8e1208, roughness: 0.22, metalness: 0.3,
+    emissive: 0x350502, emissiveIntensity: 0.9, flatShading: true
+  });
+  var wingMat = new THREE.MeshStandardMaterial({
+    color: 0xdfe9f7, transparent: true, opacity: 0.13, roughness: 0.1,
+    metalness: 0.1, side: THREE.DoubleSide, depthWrite: false
+  });
+  var body = new THREE.Group();
+  body.position.y = 0.95;
+  g.add(body);
+  /* the article promises a fly "the size of a man": it should fill its
+     square and stand as tall as he does, not swallow the cellar. */
+  g.scale.setScalar(0.63);
+
+  /* abdomen: three tapering segments */
+  var seg = [[0.44, -0.62], [0.38, -1.02], [0.26, -1.32]];
+  for (var i = 0; i < seg.length; i++) {
+    var s = new THREE.Mesh(new THREE.SphereGeometry(seg[i][0], 16, 13),
+                           i % 2 ? chitinDark : chitin);
+    s.position.set(0, -0.04 * i, seg[i][1]);
+    s.scale.set(1, 0.86, 1.12);
+    body.add(s);
+  }
+  /* thorax */
+  var thorax = new THREE.Mesh(new THREE.SphereGeometry(0.52, 18, 14), chitin);
+  thorax.scale.set(1, 0.9, 1.1);
+  body.add(thorax);
+  /* head and compound eyes */
+  var head = new THREE.Mesh(new THREE.SphereGeometry(0.34, 16, 13), chitinDark);
+  head.position.z = 0.62; body.add(head);
+  for (var e = 0; e < 2; e++) {
+    var eye = new THREE.Mesh(new THREE.IcosahedronGeometry(0.26, 1), eyeMat);
+    eye.position.set(e ? 0.2 : -0.2, 0.07, 0.72);
+    eye.scale.set(1, 1.18, 0.9);
+    body.add(eye);
+  }
+  /* antennae */
+  for (var a = 0; a < 2; a++) {
+    var ant = new THREE.Mesh(new THREE.CylinderGeometry(0.022, 0.014, 0.34, 5), chitinDark);
+    ant.position.set(a ? 0.1 : -0.1, 0.3, 0.78);
+    ant.rotation.set(-0.7, 0, a ? 0.3 : -0.3);
+    body.add(ant);
+  }
+  /* six legs, two segments each */
+  g.userData.legs = [];
+  for (var L = 0; L < 6; L++) {
+    var side = L < 3 ? -1 : 1, k = L % 3;
+    var hip = new THREE.Group();
+    hip.position.set(side * 0.4, -0.12, 0.28 - k * 0.34);
+    var upper = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.04, 0.62, 6), chitinDark);
+    upper.position.y = -0.31; hip.add(upper);
+    var knee = new THREE.Group(); knee.position.y = -0.62;
+    var lower = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.02, 0.6, 6), chitinDark);
+    lower.position.y = -0.30; knee.add(lower);
+    hip.add(knee);
+    hip.rotation.z = side * 0.85;
+    knee.rotation.z = -side * 1.15;
+    body.add(hip);
+    g.userData.legs.push({ hip: hip, knee: knee, side: side, phase: L * 1.05 });
+  }
+  /* wings - a crisp pair plus a swept disc that reads as the blur */
+  g.userData.wings = [];
+  for (var w = 0; w < 2; w++) {
+    var sd = w ? 1 : -1;
+    var pivot = new THREE.Group();
+    pivot.position.set(sd * 0.22, 0.34, -0.1);
+    var wing = new THREE.Mesh(new THREE.CircleGeometry(0.72, 20, 0, Math.PI), wingMat);
+    wing.scale.set(1, 0.34, 1);
+    wing.rotation.x = -Math.PI / 2;
+    wing.position.x = sd * 0.68;
+    wing.rotation.z = sd * Math.PI / 2;
+    pivot.add(wing);
+    body.add(pivot);
+    g.userData.wings.push({ pivot: pivot, side: sd });
+  }
+  g.traverse(function (o) { if (o.isMesh) { o.castShadow = true; } });
+  g.userData.body = body;
+  return g;
+}
+
+function buildMotes() {
+  var N = 520, pos = new Float32Array(N * 3);
+  for (var i = 0; i < N; i++) {
+    pos[i * 3] = Math.random() * (COLS + 6) - 3;
+    pos[i * 3 + 1] = Math.random() * 4.2 + 0.2;
+    pos[i * 3 + 2] = Math.random() * (ROWS + 6) - 3;
+  }
+  var geo = new THREE.BufferGeometry();
+  geo.setAttribute("position", new THREE.BufferAttribute(pos, 3));
+  motes = new THREE.Points(geo, new THREE.PointsMaterial({
+    color: 0xffcf9a, size: 0.055, transparent: true, opacity: 0.5,
+    depthWrite: false, sizeAttenuation: true
+  }));
+  scene.add(motes);
+}
+
+/* --- brick debris when one is crunched or lost --------------------- */
+function burst(c, r, colour) {
+  var mat = new THREE.MeshStandardMaterial({ color: colour, roughness: 0.9 });
+  for (var i = 0; i < 16; i++) {
+    var s = 0.08 + Math.random() * 0.16;
+    var m = new THREE.Mesh(new THREE.BoxGeometry(s, s * 0.7, s), mat);
+    m.position.set(c + 0.5 + (Math.random() - 0.5) * 0.6, 0.4 + Math.random() * 0.4,
+                   r + 0.5 + (Math.random() - 0.5) * 0.6);
+    m.castShadow = true;
+    scene.add(m);
+    debris.push({
+      m: m, life: 1.1 + Math.random() * 0.7,
+      v: new THREE.Vector3((Math.random() - 0.5) * 4.5, 2.2 + Math.random() * 3.4,
+                           (Math.random() - 0.5) * 4.5),
+      spin: new THREE.Vector3(Math.random() * 9, Math.random() * 9, Math.random() * 9)
+    });
   }
 }
-function centre(str, cy, colour){ plot(str, Math.round((40-str.length)/2), cy, colour); }
 
-/* ====================================================================
-   SOUND and ENVELOPE
-   The Model B's noise came from a Texas Instruments SN76489: three
-   square-wave tone channels and one noise channel. The MOS exposed it
-   as SOUND C,A,P,D with four programmable ENVELOPEs.
 
-     C  0 = noise, 1..3 = tone
-     A  0 to -15 fixed amplitude, or 1..4 to play under ENVELOPE 1..4
-     P  pitch, 0..255, four units to the semitone, 53 = middle C
-     D  duration in twentieths of a second
+/* ------------------------------------------------------------------
+   OPTIONAL HAND-MADE MODELS
+   Drop a .glb into assets/ and it takes the place of the built-in
+   geometry - assets/fly.glb and assets/man.glb. Made to suit models
+   generated with a tool like Meshy: export .glb, drop it in, reload.
+   The model is rescaled to the right height and stood on the floor,
+   so it does not matter what units it came out in. Nothing here is
+   required; with no assets present the procedural models stand.
+   ------------------------------------------------------------------ */
+var ASSETS = { fly: "assets/fly.glb", man: "assets/man.glb" };
+var ASSET_HEIGHT = { fly: 1.7, man: 1.62 };
 
-     ENVELOPE N,T,PI1,PI2,PI3,PN1,PN2,PN3,AA,AD,AS,AR,ALA,ALD
-     T = step length in hundredths of a second; PIn/PNn = pitch change
-     per step and number of steps for each of three sections; AA/AD/AS/AR
-     = amplitude change per step for attack/decay/sustain/release;
-     ALA/ALD = the levels attack and decay aim at.
+function loadAssets() {
+  if (location.protocol === "file:") return;   /* nothing to fetch from disk */
+  if (!THREE.GLTFLoader) return;
+  var loader = new THREE.GLTFLoader();
+  Object.keys(ASSETS).forEach(function (key) {
+    fetch(ASSETS[key], { method: "HEAD" }).then(function (r) {
+      if (r.ok) loader.load(ASSETS[key], function (g) { adopt(key, g.scene); }, null, function () {});
+    }).catch(function () {});
+  });
+}
 
-   Re-synthesised here in Web Audio rather than emulated sample-exactly.
-   ==================================================================== */
+function adopt(key, model) {
+  var rig = (key === "fly") ? flyRig : manRig;
+  var host = (key === "fly") ? flyRig.userData.body : rig;
+
+  var box = new THREE.Box3().setFromObject(model);
+  var size = new THREE.Vector3(); box.getSize(size);
+  model.scale.setScalar(ASSET_HEIGHT[key] / Math.max(0.001, size.y));
+  box.setFromObject(model);
+  model.position.y -= box.min.y;
+  model.traverse(function (o) { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
+
+  for (var i = host.children.length - 1; i >= 0; i--) host.remove(host.children[i]);
+  if (key === "fly") {
+    rig.scale.setScalar(1);
+    rig.userData.wings = [];            /* the model brings its own */
+    rig.userData.legs = [];
+    rig.userData.baseY = 0.25;          /* it still hovers */
+  } else {
+    rig.userData.legL = rig.userData.legR = rig.userData.armL = rig.userData.armR = null;
+  }
+  host.add(model);
+  console.log("mutant-fly: using " + ASSETS[key]);
+}
+
+/* ==================================================================
+   SOUND - the machine's own voice, reverberated for a stone cellar
+   ================================================================== */
 var Beeb = {
-  ac: null,
-  on: true,
-  master: null,
-  env: {},
-
-  wake: function(){
-    if(this.ac) { if(this.ac.state === "suspended") this.ac.resume(); return; }
+  ac: null, on: true, bus: null, ch1: 100,
+  wake: function () {
+    if (this.ac) { if (this.ac.state === "suspended") this.ac.resume(); return; }
     var AC = window.AudioContext || window.webkitAudioContext;
-    if(!AC) { this.on = false; return; }
+    if (!AC) { this.on = false; return; }
     this.ac = new AC();
-    this.master = this.ac.createGain();
-    this.master.gain.value = 0.22;
-    this.master.connect(this.ac.destination);
-    /* one second of white noise, looped, for channel 0 */
-    var n = this.ac.sampleRate, buf = this.ac.createBuffer(1, n, n), d = buf.getChannelData(0);
-    for(var i=0;i<n;i++) d[i] = Math.random()*2 - 1;
-    this.noise = buf;
+    var out = this.ac.createGain(); out.gain.value = 0.34; out.connect(this.ac.destination);
+    /* a short, dark impulse response - a brick room underground */
+    var len = Math.floor(this.ac.sampleRate * 1.5);
+    var imp = this.ac.createBuffer(2, len, this.ac.sampleRate);
+    for (var ch = 0; ch < 2; ch++) {
+      var d = imp.getChannelData(ch);
+      for (var i = 0; i < len; i++)
+        d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 3.1) * 0.55;
+    }
+    var cv = this.ac.createConvolver(); cv.buffer = imp;
+    var wet = this.ac.createGain(); wet.gain.value = 0.34;
+    cv.connect(wet); wet.connect(out);
+    this.bus = this.ac.createGain(); this.bus.connect(out); this.bus.connect(cv);
+    var n = this.ac.sampleRate, b = this.ac.createBuffer(1, n, n), nd = b.getChannelData(0);
+    for (var k = 0; k < n; k++) nd[k] = Math.random() * 2 - 1;
+    this.noise = b;
   },
-
-  /* pitch 53 = middle C, four units to the semitone */
-  hz: function(p){ return 261.626 * Math.pow(2, (p - 53) / 48); },
-
-  ENVELOPE: function(n,T,pi1,pi2,pi3,pn1,pn2,pn3,aa,ad,as,ar,ala,ald){
-    this.env[n] = {T:(T&127)/100, pi:[pi1,pi2,pi3], pn:[pn1,pn2,pn3],
-                   aa:aa, ad:ad, as:as, ar:ar, ala:ala, ald:ald};
-  },
-
-  SOUND: function(c,a,p,d){
-    if(!this.on) return;
-    this.wake();
-    if(!this.ac) return;
-    var ac = this.ac, t0 = ac.currentTime, dur = Math.max(0.02, d/20);
-    var g = ac.createGain();
-    g.gain.value = 0;
-    g.connect(this.master);
-
-    var src, isNoise = (c === 0);
-    if(isNoise){
-      src = ac.createBufferSource();
-      src.buffer = this.noise;
-      src.loop = true;
-      var bp = ac.createBiquadFilter();
-      bp.type = "bandpass";
-      /* channel 0 pitches 0-3 are periodic and buzzy, 4-7 are hissier */
-      bp.frequency.value = (p < 4) ? 220 + p*260 : 900 + (p-4)*1500;
-      bp.Q.value = (p < 4) ? 3.2 : 0.7;
+  hz: function (p) { return 261.6256 * Math.pow(2, (p - 53) / 48); },
+  gain: function (v) { return v <= 0 ? 0 : Math.pow(10, -((15 - v) * 2) / 20); },
+  SOUND: function (c, a, p, d) {
+    if (!this.on) return;
+    this.wake(); if (!this.ac) return;
+    var ac = this.ac, t0 = ac.currentTime, dur = Math.max(0.02, d / 20);
+    var g = ac.createGain(); g.gain.value = 0; g.connect(this.bus);
+    var src;
+    if (c === 0) {
+      src = ac.createBufferSource(); src.buffer = this.noise; src.loop = true;
+      var bp = ac.createBiquadFilter(); bp.type = "bandpass";
+      var np = p & 7;
+      bp.frequency.value = (np === 7) ? Math.max(120, this.hz(this.ch1) * 1.6)
+                                      : (np < 4 ? 200 + np * 300 : 900 + (np - 4) * 1200);
+      bp.Q.value = 1.5;
       src.connect(bp); bp.connect(g);
     } else {
-      src = ac.createOscillator();
-      src.type = "square";
+      if (c === 1) this.ch1 = p;
+      src = ac.createOscillator(); src.type = "square";
       src.frequency.setValueAtTime(this.hz(p), t0);
     }
-
-    var e = (a >= 1) ? this.env[a] : null;
-    if(!e){
-      var lvl = Math.min(15, -a) / 15;
+    var e = (a >= 1) ? MF.ENVELOPES[a] : null;
+    if (!e) {
+      var lvl = this.gain(Math.min(15, -a));
       g.gain.setValueAtTime(0, t0);
-      g.gain.linearRampToValueAtTime(lvl, t0 + 0.006);
-      g.gain.setValueAtTime(lvl, t0 + dur*0.82);
+      g.gain.linearRampToValueAtTime(lvl, t0 + 0.005);
+      g.gain.setValueAtTime(lvl, t0 + dur * 0.8);
       g.gain.exponentialRampToValueAtTime(0.0008, t0 + dur);
-      src.start(t0); src.stop(t0 + dur + 0.02);
-      return;
+      src.start(t0); src.stop(t0 + dur + 0.02); return;
     }
-
-    /* amplitude: attack to ALA, decay to ALD, then sustain, then release */
-    var step = Math.max(0.005, e.T), amp = 0, t = t0, guard = 0;
+    var T = (e[0] & 127) / 100, PI = [e[1], e[2], e[3]], PN = [e[4], e[5], e[6]];
+    var AA = e[7], AD = e[8], AS = e[9], AR = e[10], ALA = e[11], ALD = e[12];
+    var step = Math.max(0.005, T), amp = 0, t = t0, guard = 0;
     g.gain.setValueAtTime(0, t0);
-    while(amp < e.ala && e.aa > 0 && guard++ < 400){
-      amp = Math.min(e.ala, amp + e.aa); t += step;
-      g.gain.linearRampToValueAtTime(amp/126, t);
+    while (amp < ALA && AA > 0 && guard++ < 400) {
+      amp = Math.min(ALA, amp + AA); t += step;
+      g.gain.linearRampToValueAtTime(this.gain(amp * 15 / 126), t);
     }
     guard = 0;
-    while(amp > e.ald && e.ad < 0 && guard++ < 400){
-      amp = Math.max(e.ald, amp + e.ad); t += step;
-      g.gain.linearRampToValueAtTime(amp/126, t);
+    while (amp > ALD && AD < 0 && guard++ < 400) {
+      amp = Math.max(ALD, amp + AD); t += step;
+      g.gain.linearRampToValueAtTime(this.gain(amp * 15 / 126), t);
     }
     var endS = t0 + dur;
-    if(t < endS){
-      amp = Math.max(0, amp + e.as * ((endS - t)/step));
-      g.gain.linearRampToValueAtTime(Math.max(0,amp)/126, endS);
+    if (t < endS) {
+      amp = Math.max(0, amp + AS * ((endS - t) / step));
+      g.gain.linearRampToValueAtTime(this.gain(amp * 15 / 126), endS);
     }
-    var rel = e.ar ? Math.min(0.6, Math.abs(amp / e.ar) * step) : 0.05;
+    var rel = AR ? Math.min(0.6, Math.abs(amp / AR) * step) : 0.05;
     g.gain.linearRampToValueAtTime(0.0001, endS + rel);
-
-    /* pitch: three sections of PNn steps changing by PIn each */
-    if(!isNoise){
+    if (c !== 0) {
       var pt = t0, pp = p;
-      for(var s=0;s<3;s++){
-        for(var k=0;k<e.pn[s];k++){
-          pp += e.pi[s]; pt += step;
-          if(pt > endS + rel) break;
-          src.frequency.linearRampToValueAtTime(this.hz(Math.max(0,Math.min(255,pp))), pt);
-        }
+      for (var s = 0; s < 3; s++) for (var k2 = 0; k2 < PN[s]; k2++) {
+        pp += PI[s]; pt += step;
+        if (pt > endS + rel) break;
+        src.frequency.linearRampToValueAtTime(this.hz(Math.max(0, Math.min(255, pp))), pt);
       }
     }
     src.start(t0); src.stop(endS + rel + 0.02);
   }
 };
 
-/* The one ENVELOPE legible in the photographed listing is line 40:
-   ENVELOPE1,1,-10,10,-10,33,33,33,...
-   A one-hundredth-of-a-second step, with the pitch swinging down ten,
-   up ten and down ten again over three sections of 33 steps: a warble
-   about a second long. That is the fly. The four amplitude parameters
-   and two levels were not legible and are chosen to suit.            */
-Beeb.ENVELOPE(1, 1, -10, 10, -10, 33, 33, 33,  8, -1, -1, -3, 90, 72);
-/* a short scrape for a brick dragging over a stone floor */
-Beeb.ENVELOPE(2, 2,  -4,   4,  -4,  4,  4,  4, 40, -6, -8, -9, 96, 60);
-/* the drop away when a brick goes over the edge and is lost */
-Beeb.ENVELOPE(3, 3,  -6,  -6,  -6, 12, 12, 12, 30, -2, -3, -6,100, 80);
+/* ==================================================================
+   GAME GLUE
+   ================================================================== */
+var game = new MF.Game();
+var running = false, held = {}, turnAcc = 0;
+var manPos = new THREE.Vector3(), flyPos = new THREE.Vector3();
+var manWant = new THREE.Vector3(), flyWant = new THREE.Vector3();
+var manFace = 0, manFaceWant = 0, startLevel = 1;
+var PRIORITY = ["left", "right", "up", "down"];
+var bannerT = 0;
 
-var FX = {
-  step:    function(){ Beeb.SOUND(1, -6, 40 + ((Math.random()*6)|0), 1); },
-  push:    function(){ Beeb.SOUND(2,  2, 24, 3); },
-  lost:    function(){ Beeb.SOUND(2,  3, 60, 8); },
-  crunch:  function(){ Beeb.SOUND(0, -13, 5, 6); Beeb.SOUND(2, -9, 12, 5); },
-  blocked: function(){ Beeb.SOUND(0, -6, 2, 1); },
-  buzz:    function(){ Beeb.SOUND(3,  1, 20 + ((Math.random()*8)|0), 6); },
-  trapped: function(){
-    var n = [53,57,60,65,69,72];
-    for(var i=0;i<n.length;i++) (function(p,i){
-      setTimeout(function(){ Beeb.SOUND(1, -12, p, 3); }, i*90);
-    })(n[i], i);
-  },
-  death: function(){
-    Beeb.SOUND(0, -14, 6, 22);
-    for(var i=0;i<14;i++) (function(i){
-      setTimeout(function(){ Beeb.SOUND(2, -11, 90 - i*6, 2); }, i*70);
-    })(i);
-  },
-  tick:  function(){ Beeb.SOUND(1, -7, 120, 1); },
-  bleep: function(){ Beeb.SOUND(1, -10, 89, 2); }
-};
+var $ = function (id) { return document.getElementById(id); };
+var plan = $("plan"), planCtx = plan.getContext("2d");
 
-/* ====================================================================
-   THE GAME
-   ==================================================================== */
-var EMPTY = 0, BRICK = 1, WALL = 2;
-var G = new Uint8Array(GW*GH);
+/* the grid runs with row 0 at the far side, matching the original's
+   Y axis, so a cell maps to world (c, 0, ROWS-1-r) */
+function worldOf(c, r, v) { return v.set(c + 0.5, 0, (ROWS - 1 - r) + 0.5); }
 
-var V = {                      /* the magazine's variable table */
-  HI: 0,        /* HI%  high score                      */
-  SC: 0,        /* SC%  score                           */
-  X1: 0, Y1: 0, /* X1%,Y1%  fly's position              */
-  OX: 0, OY: 0, /* OX%,OY%  fly's last position         */
-  J: 1,         /* J%   selected level of difficulty    */
-  P: 1,         /* P%   level of difficulty in play     */
-  PB: 0,        /* PB%  number of bricks displayed      */
-  PA: 0,        /* PA%  rate at which the fly follows   */
-  I: 0          /* I%   direction with brick moves      */
-};
-
-var mx = 2, my = 2, face = 1;
-var bricksLeft = 0, timeLeft = 0, timeLimit = 0, flyMs = 400, flyClock = 0;
-var enraged = false, dust = [], state = "title", stateT = 0, blink = 0;
-var bonusPot = 0, bonusT = 0, tickN = 0, titleFly = {x:-18, y:100, d:1};
-
-function at(x,y){ return (x<0||y<0||x>=GW||y>=GH) ? WALL : G[y*GW+x]; }
-function put(x,y,v){ if(x>=0&&y>=0&&x<GW&&y<GH) G[y*GW+x] = v; }
-function rnd(n){ return (Math.random()*n)|0; }
-
-/* --- PROCset_level: how many bricks, and how sharp the fly is ------ */
-function PROCset_level(){
-  var p = V.P;
-  V.PB = Math.max(26, 84 - p*6);      /* fewer bricks every sheet     */
-  V.PA = Math.min(94, 20 + p*8);      /* and a keener pursuit         */
-  flyMs = Math.max(130, 450 - p*32);
-  timeLimit = Math.max(45, 105 - p*5);
-}
-
-/* --- PROCnext_sheet: lay out the next cellar ----------------------- */
-function PROCnext_sheet(){
-  PROCset_level();
-  G.fill(EMPTY);
-  for(var x=0;x<GW;x++){ put(x,0,WALL); put(x,GH-1,WALL); }
-  for(var y=0;y<GH;y++){ put(0,y,WALL); put(GW-1,y,WALL); }
-
-  mx = 2; my = GH-3; face = 1;
-  V.X1 = GW-3; V.Y1 = 2; V.OX = V.X1; V.OY = V.Y1;
-
-  var placed = 0, tries = 0;
-  while(placed < V.PB && tries++ < 6000){
-    var bx = 1 + rnd(GW-2), by = 1 + rnd(GH-2);
-    if(at(bx,by) !== EMPTY) continue;
-    if(Math.max(Math.abs(bx-mx), Math.abs(by-my)) < 3) continue;
-    if(Math.max(Math.abs(bx-V.X1), Math.abs(by-V.Y1)) < 3) continue;
-    put(bx,by,BRICK); placed++;
+function syncBricks() {
+  var m = new THREE.Matrix4(), n = 0;
+  var pal = MF.palette(game.F);
+  var t = (pal.brick === 4) ? BRICK_TEX.blue : BRICK_TEX.red;
+  if (BRICK_MAT.map !== t.map) { BRICK_MAT.map = t.map; BRICK_MAT.bumpMap = t.bump; BRICK_MAT.needsUpdate = true; }
+  for (var r = 0; r < ROWS; r++) for (var c = 0; c < COLS; c++) {
+    if (game.grid[r * COLS + c] !== MF.BRICK) continue;
+    if (n >= brickMesh.instanceMatrix.count) break;
+    m.makeTranslation(c + 0.5, 0.33, (ROWS - 1 - r) + 0.5);
+    brickMesh.setMatrixAt(n++, m);
   }
-  bricksLeft = placed;
-  timeLeft = timeLimit;
-  enraged = false;
-  flyClock = 0;
-  dust.length = 0;
-  state = "play";
+  brickMesh.count = n;
+  brickMesh.instanceMatrix.needsUpdate = true;
 }
 
-/* --- PROCmove_bricks: the man walks, and shoves what is in his way -- */
-function PROCmove_bricks(dx,dy){
-  V.I = dx + dy*10;
-  if(dx) face = dx;
-  var nx = mx+dx, ny = my+dy;
-
-  if(nx === V.X1 && ny === V.Y1){ PROCloss(); return; }
-
-  var c = at(nx,ny);
-  if(c === WALL){ FX.blocked(); return; }
-  if(c === EMPTY){ mx = nx; my = ny; FX.step(); checkTrap(); return; }
-
-  /* a run of bricks: find the cell beyond the last of them */
-  var n = 0, tx = nx, ty = ny;
-  while(at(tx,ty) === BRICK){ n++; tx += dx; ty += dy; }
-
-  if(tx === V.X1 && ty === V.Y1){
-    /* pushed straight at the fly - it crunches the lot to powder */
-    for(var k=0;k<n;k++){
-      put(nx+dx*k, ny+dy*k, EMPTY);
-      powder(nx+dx*k, ny+dy*k);
-    }
-    bricksLeft -= n;
-    FX.crunch();
-    return;                                   /* and he does not advance */
-  }
-
-  if(at(tx,ty) === WALL){
-    /* the leading brick goes over the edge of the cellar. Gone. */
-    put(nx,ny,EMPTY);
-    bricksLeft--;
-    powder(tx-dx, ty-dy);
-    FX.lost();
-  } else {
-    put(tx,ty,BRICK);
-    put(nx,ny,EMPTY);
-    FX.push();
-  }
-  mx = nx; my = ny;
-  checkTrap();
+function drawPlan() {
+  planCtx.clearRect(0, 0, COLS, ROWS);
+  planCtx.fillStyle = "rgba(20,15,11,.6)";
+  planCtx.fillRect(0, 0, COLS, ROWS);
+  planCtx.fillStyle = MF.palette(game.F).brick === 4 ? "#4a72d8" : "#b8462e";
+  for (var r = 0; r < ROWS; r++) for (var c = 0; c < COLS; c++)
+    if (game.grid[r * COLS + c] === MF.BRICK) planCtx.fillRect(c, ROWS - 1 - r, 1, 1);
+  planCtx.fillStyle = "#ffd27a";
+  planCtx.fillRect(game.manC, ROWS - 1 - game.manR, 1, 1);
+  planCtx.fillStyle = "#7fe0ff";
+  planCtx.fillRect(game.flyC, ROWS - 1 - game.flyR, 1, 1);
 }
 
-/* --- PROCmove_fly: PA% of the time it comes straight for you -------- */
-var STEPS = [[-1,0],[1,0],[0,-1],[0,1]];
-function PROCmove_fly(){
-  V.OX = V.X1; V.OY = V.Y1;
-  var open = [];
-  for(var i=0;i<4;i++){
-    var nx = V.X1+STEPS[i][0], ny = V.Y1+STEPS[i][1];
-    if(at(nx,ny) === EMPTY) open.push([nx,ny]);
-  }
-  if(!open.length) return;
-
-  var pick;
-  if(rnd(100) < V.PA){
-    var best = 1e9, cands = [];
-    for(var j=0;j<open.length;j++){
-      var d = Math.abs(open[j][0]-mx) + Math.abs(open[j][1]-my);
-      if(d < best){ best = d; cands = [open[j]]; }
-      else if(d === best) cands.push(open[j]);
-    }
-    pick = cands[rnd(cands.length)];
-  } else {
-    pick = open[rnd(open.length)];
-  }
-  V.X1 = pick[0]; V.Y1 = pick[1];
-  if(rnd(5) === 0) FX.buzz();
-  if(V.X1 === mx && V.Y1 === my){ PROCloss(); }
+function hud() {
+  $("hCellar").textContent = game.F;
+  $("hScore").textContent = game.SC;
+  $("hBest").textContent = game.HI;
+  $("hBricks").textContent = game.bricks;
+  $("hMoves").textContent = game.CO;
+  $("sBricks").className = "stat right" + (game.bricks < 8 ? " crit" : game.bricks < 20 ? " warn" : "");
+  $("sMoves").className = "stat right" + (game.CO >= 700 ? " crit" : game.CO >= 400 ? " warn" : "");
 }
 
-/* --- the win condition: it cannot move at all ---------------------- */
-function checkTrap(){
-  for(var i=0;i<4;i++)
-    if(at(V.X1+STEPS[i][0], V.Y1+STEPS[i][1]) === EMPTY) return false;
-  PROCbonus();
-  return true;
+function banner(text, sub, ms) {
+  var b = $("banner");
+  b.innerHTML = text + (sub ? "<small>" + sub + "</small>" : "");
+  b.hidden = false;
+  bannerT = ms;
 }
 
-/* --- PROCbonus: a bonus in proportion to the time in reserve ------- */
-function PROCbonus(){
-  V.SC += 100 * V.P;
-  bonusPot = Math.max(0, Math.floor(timeLeft)) * 10 * V.P;
-  bonusT = 0;
-  state = "trapped";
-  stateT = 0;
-  FX.trapped();
+function newSheet() {
+  syncBricks();
+  worldOf(game.manC, game.manR, manWant); manPos.copy(manWant);
+  worldOf(game.flyC, game.flyR, flyWant); flyPos.copy(flyWant);
+  hud(); drawPlan();
 }
 
-/* --- PROCloss: curtains -------------------------------------------- */
-function PROCloss(){
-  if(state !== "play") return;
-  state = "dead"; stateT = 0;
-  for(var i=0;i<40;i++) powder(mx,my);
-  FX.death();
-  if(V.SC > V.HI) V.HI = V.SC;
-}
-
-function powder(cx,cy){
-  for(var i=0;i<7;i++)
-    dust.push({ x: cx*CELL+8+rnd(10)-5, y: TOP+cy*CELL+8+rnd(10)-5,
-                vx: (Math.random()-0.5)*40, vy: -8-Math.random()*34,
-                life: 0.5+Math.random()*0.5, c: [1,3,7][rnd(3)] });
-}
-
-/* ====================================================================
-   INPUT.  The original read the keyboard with negative INKEY:
-   Z left, X right, : up, / down.  Arrow keys are added for anyone
-   who no longer has a Model B on the desk.
-   ==================================================================== */
-var held = {}, repeatT = 0, REPEAT = 0.115;
-var KEYMAP = {
-  "z":"left", "arrowleft":"left",
-  "x":"right","arrowright":"right",
-  ":":"up",   ";":"up",  "arrowup":"up",
-  "/":"down", "arrowdown":"down"
-};
-
-function actOf(e){
-  var k = e.key.length === 1 ? e.key.toLowerCase() : e.key.toLowerCase();
-  return KEYMAP[k] || null;
-}
-
-window.addEventListener("keydown", function(e){
+function startGame() {
   Beeb.wake();
-  var a = actOf(e);
-  if(a){ e.preventDefault(); if(!held[a]){ held[a] = true; repeatT = 0; step(a); } lightKey(a,true); return; }
-  var k = e.key.toLowerCase();
-  if(k === " " || k === "spacebar"){ e.preventDefault(); lightKey("fire",true); press(); return; }
-  if(k === "s"){ Beeb.on = true; FX.bleep(); lightKey("sound",true); return; }
-  if(k === "q"){ Beeb.on = false; lightKey("sound",true); return; }
-  if(k === "i" && state === "title"){ state = "instructions"; stateT = 0; FX.bleep(); return; }
-  if(k === "p" && (state === "play" || state === "paused")){
-    state = (state === "play") ? "paused" : "play"; return;
+  game.reset(startLevel);
+  running = true; turnAcc = 0;
+  $("titleSheet").hidden = true;
+  $("overSheet").hidden = true;
+  $("hud").hidden = false;
+  plan.hidden = false;
+  newSheet();
+  banner("CELLAR " + game.F, MF.levelOf(game.F).PE + " BRICKS", 1500);
+}
+
+function turn() {
+  var dir = null;
+  for (var i = 0; i < PRIORITY.length; i++) if (held[PRIORITY[i]]) { dir = PRIORITY[i]; break; }
+
+  var beforeC = game.manC, beforeR = game.manR;
+  var ev = game.step(dir);
+
+  Beeb.SOUND(0, -10, 23, 1);                     /* the drone, every turn */
+  if (ev.pushed) Beeb.SOUND(1, 1, 3, 1);
+  if (ev.lostOverEdge) { Beeb.SOUND(0, -9, 4, 2); burst(game.manC, ROWS - 1 - game.manR, 0x6a3a2c); }
+  if (ev.crunched) { Beeb.SOUND(0, -12, 5, 4); burst(game.flyC, ROWS - 1 - game.flyR, 0x8a3826); }
+
+  if (ev.moved) {
+    if (dir === "left") manFaceWant = -Math.PI / 2;
+    if (dir === "right") manFaceWant = Math.PI / 2;
+    if (dir === "up") manFaceWant = Math.PI;
+    if (dir === "down") manFaceWant = 0;
   }
-  if(k === "escape"){ state = "title"; stateT = 0; return; }
-  if(state === "title" && k >= "1" && k <= "9"){ V.J = +k; FX.bleep(); }
-});
-window.addEventListener("keyup", function(e){
-  var a = actOf(e);
-  if(a){ held[a] = false; lightKey(a,false); }
-  var k = e.key.toLowerCase();
-  if(k === " ") lightKey("fire",false);
-  if(k === "s" || k === "q") lightKey("sound",false);
-});
+  if (ev.pushed || ev.moved) syncBricks();
 
-function press(){
-  if(state === "title"){ V.SC = 0; V.P = V.J; PROCnext_sheet(); }
-  else if(state === "instructions"){ state = "title"; stateT = 0; }
-  else if(state === "over"){ state = "title"; stateT = 0; }
+  worldOf(game.manC, game.manR, manWant);
+  worldOf(game.flyC, game.flyR, flyWant);
+  hud(); drawPlan();
+
+  if (ev.lost) {
+    running = false;
+    Beeb.SOUND(0, -14, 6, 22);
+    burst(game.manC, ROWS - 1 - game.manR, 0x7a6244);
+    setTimeout(endScreen, 1400, false);
+  } else if (ev.won) {
+    running = false;
+    for (var s = 1; s <= 30; s++) (function (s) {
+      setTimeout(function () { Beeb.SOUND(1, 1, s * 10, 1); }, s * 20);
+    })(s);
+    banner("TRAPPED", "BONUS " + ev.bonus, 2000);
+    setTimeout(function () {
+      game.nextSheet();
+      newSheet();
+      running = true; turnAcc = 0;
+      banner("CELLAR " + game.F, MF.levelOf(game.F).PE + " BRICKS", 1500);
+    }, 2300);
+  }
 }
 
-function step(a){
-  if(state !== "play") return;
-  if(a === "left")  PROCmove_bricks(-1,0);
-  if(a === "right") PROCmove_bricks(1,0);
-  if(a === "up")    PROCmove_bricks(0,-1);
-  if(a === "down")  PROCmove_bricks(0,1);
+function endScreen() {
+  $("oScore").textContent = game.SC;
+  $("oCellar").textContent = game.F;
+  $("oBest").textContent = game.HI;
+  $("overSheet").hidden = false;
+  $("banner").hidden = true;
 }
 
-/* the red key strip doubles as a live key indicator and a touch pad */
-var fkeys = {};
-Array.prototype.forEach.call(document.querySelectorAll(".fkey"), function(b){
+/* ==================================================================
+   INPUT
+   ================================================================== */
+var KEYMAP = { "z": "left", "arrowleft": "left", "x": "right", "arrowright": "right",
+               ":": "up", ";": "up", "arrowup": "up", "/": "down", "arrowdown": "down" };
+addEventListener("keydown", function (e) {
+  var a = KEYMAP[e.key.toLowerCase()];
+  if (a) { e.preventDefault(); held[a] = true; Beeb.wake(); return; }
+  if (e.key === " ") { e.preventDefault(); if (!running && !$("titleSheet").hidden) startGame(); }
+  if (e.key.toLowerCase() === "m") Beeb.on = !Beeb.on;
+});
+addEventListener("keyup", function (e) {
+  var a = KEYMAP[e.key.toLowerCase()];
+  if (a) held[a] = false;
+});
+addEventListener("blur", function () { held = {}; });
+
+Array.prototype.forEach.call(document.querySelectorAll(".pad button[data-act]"), function (b) {
   var a = b.dataset.act;
-  fkeys[a] = b;
-  var down = function(ev){
-    ev.preventDefault(); Beeb.wake();
-    b.classList.add("lit");
-    if(a === "fire") press();
-    else if(a === "sound"){ Beeb.on = !Beeb.on; if(Beeb.on) FX.bleep(); }
-    else { held[a] = true; repeatT = 0; step(a); }
-  };
-  var up = function(){ b.classList.remove("lit"); if(held[a]) held[a] = false; };
-  b.addEventListener("pointerdown", down);
-  b.addEventListener("pointerup", up);
-  b.addEventListener("pointercancel", up);
-  b.addEventListener("pointerleave", up);
+  var on = function (ev) { ev.preventDefault(); held[a] = true; Beeb.wake(); };
+  var off = function () { held[a] = false; };
+  b.addEventListener("pointerdown", on);
+  b.addEventListener("pointerup", off);
+  b.addEventListener("pointerleave", off);
+  b.addEventListener("pointercancel", off);
 });
-function lightKey(a,on){ if(fkeys[a]) fkeys[a].classList.toggle("lit", on); }
+if (matchMedia("(hover:none)").matches) document.body.classList.add("touch");
 
-/* ====================================================================
-   SCREENS
-   ==================================================================== */
-function panel(){
-  var sc = ("00000" + V.SC).slice(-6), hi = ("00000" + V.HI).slice(-6);
-  plot("SCORE " + sc, 1, 0, 3);
-  plot("HI " + hi, 30, 0, 6);
-  plot("CELLAR " + V.P, 1, 2, 7);
-  plot("BRICKS " + ("0" + bricksLeft).slice(-2), 13, 2, bricksLeft < 6 ? 9 : 2);
-  var t = Math.max(0, Math.ceil(timeLeft));
-  plot("TIME " + ("00" + t).slice(-3), 30, 2, (t < 15) ? 9 : 5);
-}
+(function () {
+  var wrap = $("levels");
+  for (var i = 1; i <= 9; i++) (function (i) {
+    var b = document.createElement("button");
+    b.type = "button"; b.className = "lvl"; b.textContent = i;
+    b.setAttribute("aria-pressed", i === 1 ? "true" : "false");
+    b.addEventListener("click", function () {
+      startLevel = i;
+      Array.prototype.forEach.call(wrap.children, function (c) {
+        c.setAttribute("aria-pressed", c === b ? "true" : "false");
+      });
+    });
+    wrap.appendChild(b);
+  })(i);
+})();
+$("start").addEventListener("click", startGame);
+$("again").addEventListener("click", function () {
+  $("overSheet").hidden = true;
+  $("titleSheet").hidden = false;
+  $("hud").hidden = true;
+  plan.hidden = true;
+});
 
-function drawField(){
-  for(var y=0;y<GH;y++) for(var x=0;x<GW;x++){
-    var c = G[y*GW+x];
-    if(c === WALL)  ctx.drawImage(SPR.wall,  x*CELL, TOP+y*CELL);
-    if(c === BRICK) ctx.drawImage(SPR.brick, x*CELL, TOP+y*CELL);
-  }
-  var f = (blink & 1) ? SPR.fly1 : SPR.fly0;
-  if(state !== "dead" || (stateT*8|0) % 2 === 0)
-    ctx.drawImage(f, V.X1*CELL, TOP+V.Y1*CELL);
-  if(state !== "dead")
-    ctx.drawImage(face < 0 ? SPR.manL : SPR.man, mx*CELL, TOP+my*CELL);
+/* ==================================================================
+   FRAME
+   ================================================================== */
+var camPos = new THREE.Vector3(), camAim = new THREE.Vector3(), tmp = new THREE.Vector3();
 
-  for(var i=0;i<dust.length;i++){
-    var d = dust[i];
-    ctx.fillStyle = PAL[d.c];
-    ctx.fillRect(d.x|0, d.y|0, 2, 2);
-  }
-}
-
-var INSTR = [
- "",
- "     THE LOCALS TOLD YOU OF A",
- "  FORTUNE HIDDEN IN THE CELLARS",
- "     OF THE RUINS. IT IS NOT",
- "        UNGUARDED. ON EVERY",
- "   LEVEL WAITS A MUTANT FLY THE",
- "           SIZE OF A MAN.",
- "",
- "  PUSH THE HOUSE BRICKS AROUND",
- "  WITH Z X : AND / AND WALL THE",
- "  BRUTE IN. SURROUND IT. DO NOT",
- "        TRY TO CRUSH IT -",
- "",
- "  BRICKS SHOVED INTO THE FLY GO",
- "  TO POWDER IN ITS JAWS, AND A",
- "  BRICK PUSHED OFF THE EDGE OF",
- "  THE CELLAR IS GONE FOR GOOD.",
- "",
- "  TRAP IT AGAINST THE CLOCK FOR",
- "  A BONUS. EACH CELLAR DOWN HAS",
- "  FEWER BRICKS AND A KEENER FLY.",
- "",
- "     YOU DIE ONCE. THAT IS ALL",
- "          THE DYING YOU GET."
-];
-
-function PROCinstructions(){
-  cls(0);
-  centre("THE MENACE", 1, 9);
-  for(var i=0;i<INSTR.length;i++) if(INSTR[i]) plot(INSTR[i], 0, 3+i, i%2 ? 6 : 7);
-  if((blink & 1) === 0) centre("SPACE BAR TO CONTINUE", 29, 3);
-}
-
-function PROCtitle_page(){
-  cls(0);
-  centre("MENACE OF THE", 2, 3);
-  centre("MUTANT FLIES", 4, 9);
-  centre("BY JOHN MCCAULEY", 7, 7);
-  centre("{ THE MICRO USER   JULY 1985", 9, 2);
-
-  /* a fly cruising the title screen, as one always did */
-  var bandY = 100;
-  titleFly.x += 0.7;
-  if(titleFly.x > 336) titleFly.x = -18;
-  ctx.drawImage(SPR.man, 26, bandY);
-  ctx.drawImage(SPR.brick, 48, bandY);
-  ctx.drawImage((blink & 1) ? SPR.fly1 : SPR.fly0,
-                titleFly.x|0, bandY + (((blink>>1) & 1) ? -2 : 0));
-
-  centre("SELECT DIFFICULTY  1 TO 9", 17, 6);
-  centre("LEVEL " + V.J, 19, 3);
-  if((blink & 1) === 0) centre("SPACE BAR TO PLAY", 22, 3);
-  centre("I FOR INSTRUCTIONS", 24, 7);
-  centre("S FOR SOUND    Q FOR QUIET", 26, 5);
-  centre("HI-SCORE " + ("00000" + V.HI).slice(-6), 29, 6);
-}
-
-function PROCgame_over(){
-  cls(0);
-  centre("GAME OVER", 8, 9);
-  centre("YOU SCORED " + V.SC, 12, 3);
-  centre("YOU REACHED CELLAR " + V.P, 14, 7);
-  if(V.SC >= V.HI && V.SC > 0) centre("A NEW HIGH SCORE", 17, 10);
-  if((blink & 1) === 0) centre("SPACE BAR FOR ANOTHER GO", 22, 6);
-}
-
-/* ====================================================================
-   THE MAIN LOOP
-   ==================================================================== */
-var last = 0;
-function frame(ts){
+function frame() {
   requestAnimationFrame(frame);
-  var dt = last ? Math.min(0.05, (ts - last)/1000) : 0;
-  last = ts;
-  flashPhase = ((ts/500)|0) & 1;        /* the BBC's default flash rate */
-  blink = (ts/110)|0;
-  stateT += dt;
+  var dt = Math.min(0.05, clock.getDelta()), now = clock.elapsedTime;
 
-  /* held keys auto-repeat, as *FX 11 did */
-  if(state === "play"){
-    repeatT += dt;
-    if(repeatT >= REPEAT){
-      repeatT = 0;
-      if(held.left) step("left");
-      else if(held.right) step("right");
-      else if(held.up) step("up");
-      else if(held.down) step("down");
-    }
-    timeLeft -= dt;
-    if(timeLeft <= 0){ timeLeft = 0; if(!enraged){ enraged = true; flyMs = Math.max(90, flyMs*0.55); } }
-    flyClock += dt*1000;
-    while(flyClock >= flyMs){ flyClock -= flyMs; if(state === "play") PROCmove_fly(); }
+  if (running) {
+    turnAcc += dt * 1000;
+    while (turnAcc >= TURN_MS) { turnAcc -= TURN_MS; if (running) turn(); }
   }
 
-  for(var i=dust.length-1;i>=0;i--){
-    var d = dust[i];
-    d.x += d.vx*dt; d.y += d.vy*dt; d.vy += 150*dt; d.life -= dt;
-    if(d.life <= 0) dust.splice(i,1);
+  /* glide between squares rather than snapping */
+  var k = 1 - Math.pow(0.0016, dt);
+  manPos.lerp(manWant, k);
+  flyPos.lerp(flyWant, k);
+  manFace += (function (d) { while (d > Math.PI) d -= 6.28318; while (d < -Math.PI) d += 6.28318; return d; })(manFaceWant - manFace) * Math.min(1, dt * 13);
+
+  manRig.position.copy(manPos);
+  manRig.rotation.y = manFace;
+  var speed = manPos.distanceTo(manWant);
+  manRig.userData.walk += dt * (4 + speed * 26);
+  if (manRig.userData.legL) {
+    var sw = Math.sin(manRig.userData.walk) * Math.min(0.75, 0.2 + speed * 5);
+    manRig.userData.legL.rotation.x = sw;
+    manRig.userData.legR.rotation.x = -sw;
+    manRig.userData.armL.rotation.x = -sw * 0.7;
+    manRig.userData.armR.rotation.x = sw * 0.7;
   }
 
-  if(state === "title"){ PROCtitle_page(); return; }
-  if(state === "instructions"){ PROCinstructions(); return; }
-  if(state === "over"){ PROCgame_over(); return; }
-
-  cls(0);
-  panel();
-  drawField();
-
-  if(state === "paused"){
-    if((blink & 1) === 0) centre("PAUSED", 16, 10);
+  /* the fly hovers, tips toward where it is going, and beats its wings
+     far faster than the eye resolves */
+  flyRig.position.copy(flyPos);
+  var fb = flyRig.userData.body;
+  fb.position.y = (flyRig.userData.baseY || 0.95) + Math.sin(now * 6.4) * 0.08;
+  tmp.copy(flyWant).sub(flyPos);
+  if (tmp.lengthSq() > 0.0004) flyRig.rotation.y = Math.atan2(tmp.x, tmp.z);
+  fb.rotation.x = -Math.min(0.35, tmp.length() * 0.5);
+  for (var w = 0; w < flyRig.userData.wings.length; w++) {
+    var ww = flyRig.userData.wings[w];
+    ww.pivot.rotation.z = ww.side * (0.35 + Math.sin(now * 46 + w) * 0.75);
+    ww.pivot.rotation.x = Math.sin(now * 46 + w) * 0.28;
   }
-  if(state === "play" && enraged && (blink & 1) === 0){
-    centre("THE FLY IS ENRAGED", 30, 9);
-  }
-  if(state === "play" && bricksLeft < 6 && (blink & 1) === 0){
-    centre("BRICKS RUNNING OUT", 31, 9);
-  }
-
-  if(state === "trapped"){
-    centre("TRAPPED", 30, 10);
-    bonusT += dt;
-    if(bonusT > 0.6){
-      var take = Math.min(bonusPot, Math.max(10, Math.ceil(bonusPot/20)));
-      if(bonusPot > 0){
-        bonusPot -= take; V.SC += take;
-        if((tickN++ % 3) === 0) FX.tick();
-      } else if(stateT > 2.4){
-        V.P++; PROCnext_sheet(); return;
-      }
-    }
-    plot("BONUS " + bonusPot, 13, 31, 3);
+  for (var g2 = 0; g2 < flyRig.userData.legs.length; g2++) {
+    var lg = flyRig.userData.legs[g2];
+    lg.hip.rotation.x = Math.sin(now * 3.2 + lg.phase) * 0.16;
+    lg.knee.rotation.x = Math.cos(now * 3.2 + lg.phase) * 0.12;
   }
 
-  if(state === "dead"){
-    if((blink & 1) === 0) centre("AAARGH", 30, 9);
-    if(stateT > 2.8){ state = "over"; stateT = 0; }
+  /* torchlight never sits still */
+  for (var t = 0; t < torches.length; t++) {
+    var tt = torches[t];
+    var f = 1.15 + Math.sin(now * 11 + tt.seed) * 0.22 + Math.sin(now * 27.3 + tt.seed * 3) * 0.14;
+    tt.light.intensity = 1.35 * f;
+    tt.flame.scale.set(0.85 + f * 0.2, 0.8 + f * 0.35, 0.85 + f * 0.2);
   }
+
+  /* the lamp follows the man */
+  keyLight.position.set(manPos.x - 1.6, 7.4, manPos.z - 1.2);
+  keyLight.target.position.copy(manPos);
+  keyLight.target.updateMatrixWorld();
+
+  /* debris */
+  for (var i = debris.length - 1; i >= 0; i--) {
+    var d = debris[i];
+    d.life -= dt;
+    d.v.y -= 15 * dt;
+    d.m.position.addScaledVector(d.v, dt);
+    if (d.m.position.y < 0.06) { d.m.position.y = 0.06; d.v.y *= -0.32; d.v.x *= 0.7; d.v.z *= 0.7; }
+    d.m.rotation.x += d.spin.x * dt; d.m.rotation.y += d.spin.y * dt;
+    if (d.life <= 0) { scene.remove(d.m); d.m.geometry.dispose(); debris.splice(i, 1); }
+  }
+
+  /* motes drift */
+  if (motes) {
+    motes.rotation.y = now * 0.012;
+    motes.position.y = Math.sin(now * 0.35) * 0.16;
+  }
+
+  /* camera: raised, behind, easing after him */
+  camAim.copy(manPos).add(tmp.set(0, 0.9, 0));
+  camPos.set(manPos.x, 16.5, manPos.z + 12.8);
+  camera.position.lerp(camPos, 1 - Math.pow(0.002, dt));
+  camera.lookAt(camAim);
+
+  if (bannerT > 0) { bannerT -= dt * 1000; if (bannerT <= 0) $("banner").hidden = true; }
+
+  renderer.render(scene, camera);
 }
 
-/* PROCtitle_page is where a BBC game started, and so does this one */
-state = "title";
-requestAnimationFrame(frame);
+if (!window.THREE) {
+  document.getElementById("titleSheet").innerHTML =
+    '<div class="card"><h1>No WebGL</h1><p class="lede">The 3D cellar could not start. ' +
+    '<a href="classic/">Play the 1985 screen instead &rarr;</a></p></div>';
+} else {
+  init3D();
+  newSheet();
+  frame();
+}
 </script>
-
 </body>
 </html>

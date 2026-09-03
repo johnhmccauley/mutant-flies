@@ -1,0 +1,871 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Mutant Fly (1985)</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo+Narrow:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+  :root{
+    --case:#d9d2c0; --case-hi:#e7e1d2; --case-sh:#b7af9b; --case-dk:#8b8375;
+    --fkey:#b8382c; --fkey-dk:#8d2820; --void:#0b0b0d;
+    --ink:#2e2a24; --ink-soft:#6b6357; --rule:#c4bcaa;
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0; background:#171512;
+    background-image:radial-gradient(120% 90% at 50% 0%,#241f1a 0%,#171512 55%,#0e0d0c 100%);
+    color:var(--ink); font-family:"Archivo Narrow","Helvetica Neue",Arial,sans-serif;
+    min-height:100vh; display:flex; align-items:center; justify-content:center;
+    padding:clamp(12px,3vw,40px);
+  }
+  .rig{width:min(780px,100%);display:flex;flex-direction:column;gap:18px}
+  .machine{
+    background:linear-gradient(178deg,var(--case-hi) 0%,var(--case) 22%,var(--case) 78%,var(--case-sh) 100%);
+    border-radius:10px 10px 16px 16px; padding:clamp(14px,2.6vw,24px);
+    display:flex; flex-direction:column; gap:14px;
+    box-shadow:0 1px 0 rgba(255,255,255,.55) inset,0 -2px 0 rgba(0,0,0,.12) inset,
+               0 26px 50px -18px rgba(0,0,0,.85),0 3px 0 var(--case-dk);
+  }
+  .crt{
+    position:relative; background:var(--void); border-radius:14px/18px;
+    padding:clamp(8px,1.6vw,14px);
+    box-shadow:0 0 0 2px var(--case-dk),0 0 0 3px rgba(255,255,255,.35),
+               0 10px 24px -8px rgba(0,0,0,.7) inset;
+  }
+  #screen{
+    display:block; width:100%; aspect-ratio:4/3; height:auto; background:#000;
+    border-radius:6px/9px; image-rendering:pixelated; outline:none;
+    touch-action:manipulation;
+  }
+  #screen:focus-visible{box-shadow:0 0 0 3px #ffcf3f}
+  .glass{
+    position:absolute; inset:clamp(8px,1.6vw,14px); border-radius:6px/9px; pointer-events:none;
+    background:linear-gradient(103deg,rgba(255,255,255,.10) 0 18%,rgba(255,255,255,0) 42%),
+               repeating-linear-gradient(180deg,rgba(0,0,0,.22) 0 1px,rgba(0,0,0,0) 1px 3px);
+    mix-blend-mode:screen; opacity:.5;
+  }
+  .glass::after{content:"";position:absolute;inset:0;border-radius:inherit;
+    box-shadow:0 0 60px 18px rgba(0,0,0,.55) inset}
+  .strip{display:grid;grid-template-columns:repeat(6,1fr);gap:5px;background:var(--fkey-dk);
+    padding:5px;border-radius:4px;box-shadow:0 1px 0 rgba(255,255,255,.4)}
+  .fkey{appearance:none;border:0;font:inherit;cursor:pointer;background:var(--fkey);color:#f6e9e2;
+    border-radius:2px;padding:7px 2px 6px;display:flex;flex-direction:column;align-items:center;
+    gap:2px;line-height:1;box-shadow:0 1px 0 rgba(255,255,255,.28) inset,0 -2px 0 rgba(0,0,0,.28) inset;
+    transition:background .06s linear,transform .06s linear;touch-action:manipulation;
+    -webkit-tap-highlight-color:transparent}
+  .fkey .cap{font-size:clamp(13px,2.4vw,17px);font-weight:700}
+  .fkey .sub{font-family:"IBM Plex Mono",ui-monospace,monospace;font-size:clamp(7px,1.35vw,9px);
+    letter-spacing:.09em;opacity:.72;text-transform:uppercase}
+  .fkey:is(:hover,:focus-visible){background:#c9463a}
+  .fkey:focus-visible{outline:2px solid #ffcf3f;outline-offset:1px}
+  .fkey.lit{background:#f0a04a;color:#2b1206;transform:translateY(1px)}
+  .badge{display:flex;align-items:baseline;justify-content:space-between;gap:12px;
+    border-top:1px solid var(--rule);padding-top:11px;flex-wrap:wrap}
+  .badge .model{font-weight:700;font-size:clamp(13px,2.1vw,16px);letter-spacing:.16em;
+    text-transform:uppercase}
+  .badge .model span{color:var(--fkey)}
+  .badge .meta{font-family:"IBM Plex Mono",ui-monospace,monospace;font-size:clamp(9px,1.5vw,11px);
+    color:var(--ink-soft);text-align:right}
+  .colophon{margin:0;font-family:"IBM Plex Mono",ui-monospace,monospace;
+    font-size:clamp(9.5px,1.55vw,11.5px);line-height:1.75;color:#8d8474;text-align:center}
+  .colophon b{color:#c9bfa9;font-weight:500}
+  .colophon .sep{color:#5b5449;padding:0 .5em}
+  .colophon a{color:#c9bfa9}
+  @media (max-width:520px){.fkey .sub{display:none}.fkey{padding:11px 2px}}
+  @media (prefers-reduced-motion:reduce){.fkey{transition:none}}
+</style>
+</head>
+<body>
+<main class="rig">
+  <div class="machine">
+    <div class="crt">
+      <canvas id="screen" width="320" height="256" tabindex="0"
+              aria-label="Mutant Fly. Push bricks with Z, X, colon and slash to surround the fly."></canvas>
+      <div class="glass" aria-hidden="true"></div>
+    </div>
+    <div class="strip" role="group" aria-label="Game controls">
+      <button class="fkey" data-act="left"  type="button"><span class="cap">Z</span><span class="sub">left</span></button>
+      <button class="fkey" data-act="up"    type="button"><span class="cap">:</span><span class="sub">up</span></button>
+      <button class="fkey" data-act="down"  type="button"><span class="cap">/</span><span class="sub">down</span></button>
+      <button class="fkey" data-act="right" type="button"><span class="cap">X</span><span class="sub">right</span></button>
+      <button class="fkey" data-act="fire"  type="button"><span class="cap">KEY</span><span class="sub">continue</span></button>
+      <button class="fkey" data-act="sound" type="button"><span class="cap">SND</span><span class="sub">on/off</span></button>
+    </div>
+    <div class="badge">
+      <div class="model">Acorn <span>BBC</span> Microcomputer &nbsp;Model&nbsp;B</div>
+      <div class="meta">MODE&nbsp;1 &middot; 320&times;256 &middot; 4 COLOUR &middot; 20K</div>
+    </div>
+  </div>
+  <p class="colophon">
+    <b>FLY</b> by JOHN McCAULEY<span class="sep">&bull;</span>THE MICRO USER, JULY 1985<span class="sep">&bull;</span>PORTED FROM THE DATABASE CASSETTE<br>
+    <a href="../">&larr; the 3D version</a>
+  </p>
+</main>
+
+<!--inline:../src/rules.js-->
+<script>
+/* =====================================================================
+   MUTANT FLY - the rules
+   Ported from the original BBC BASIC.
+
+   Source: FLY, by John Mc Cauley, (C) The Micro User. 125 lines, 10-1240,
+   detokenised from the Database Publications cassette for The Micro User
+   volume 3 issue 5 (July 1985) - the tape advertised in that issue as
+   "JULY: Fly. Take on mutant flies in this arcade spectacular."
+
+   Everything here follows the listing rather than the magazine article,
+   which describes the game loosely and in two places incorrectly. The
+   line numbers in the comments are the original's.
+
+   The original ran in MODE 1 and did all its collision detection with
+   POINT() against the screen: colour 2 meant "brick". This port keeps a
+   grid instead, but every rule below is the rule the BASIC implements.
+   ===================================================================== */
+(function (root) {
+  "use strict";
+
+  /* --- geometry -----------------------------------------------------
+     The original worked in BBC graphics units: 32 units to a character
+     cell. The man was bounded by X%>96 / X%<1152 (line 230,240) and
+     Y%>128 / Y%<928 (250,260), giving a playfield 34 cells across and
+     26 down. Bricks were scattered from the PA%() table (line 100),
+     which holds 160,192,...1088 - so bricks land in the inner 30x23.  */
+  var COLS = 34, ROWS = 26;
+  var BRICK_C0 = 2, BRICK_C1 = 31;      /* PA%(1..30) = X 160..1088 */
+  var BRICK_R0 = 1, BRICK_R1 = 23;      /* PA%(1..23) = Y 160..864  */
+
+  var EMPTY = 0, BRICK = 1;
+
+  /* The cassette edition has no frame limiter and runs as fast as BASIC
+     manages. The disc conversion added one - `210 T%=TIME+5` with
+     `380 REPEAT UNTIL TIME>T%`, TIME being centiseconds - which pins the
+     main loop at 20 turns a second. That is the rate used here.        */
+  var TICK_HZ = 20;
+
+  /* line 130: X%=608 Y%=576, X1%=576 Y1%=512 */
+  var MAN_C0 = 16, MAN_R0 = 14, FLY_C0 = 15, FLY_R0 = 12;
+
+  /* --- PROCset_level, lines 890-990 ---------------------------------
+     PE% is the number of bricks. PA% is the fly's leash: see step().
+     (The listing really does use PA% for both this scalar and the
+     brick-position array PA%(); BBC BASIC keeps them apart.)          */
+  var LEVELS = [
+    /* F%  PE%  PA% */
+    [1, 200, 400], [2, 175, 300], [3, 150, 200], [4, 125, 150], [5, 100, 100],
+    [6,  75,  75], [7,  50,  50], [8,  40,  40], [9,  30,  30]
+  ];
+  function levelOf(F) {
+    if (F >= 10) return { PE: 20, PA: 0 };          /* line 990 */
+    var row = LEVELS[F - 1] || LEVELS[0];
+    return { PE: row[1], PA: row[2] };
+  }
+
+  /* The leash is in graphics units; 32 of them to a cell. */
+  function leashCells(PA) { return PA / 32; }
+
+  /* --- the palette shifts as you descend, lines 1000-1020 -----------
+     VDU19 remaps logical 0 (the floor) and, from level 6, logical 1
+     (the brick body). Physical colours are the BBC's own numbering.   */
+  function palette(F) {
+    var floor = 3;                                  /* yellow, line 150 */
+    if (F >= 3) floor = 5;                          /* magenta          */
+    if (F >= 6) floor = 6;                          /* cyan             */
+    if (F >= 8) floor = 5;                          /* magenta again    */
+    return {
+      floor: floor,
+      brick: (F >= 6) ? 4 : 1,                      /* blue from 6, else red */
+      mortar: 7,                                    /* white, line 170  */
+      figure: 0                                     /* black, line 150  */
+    };
+  }
+
+  /* --- PROCbonus, lines 1110-1130 ----------------------------------- */
+  function bonusFor(CO) {
+    if (CO <= 100) return 300;
+    if (CO < 400) return 200;
+    if (CO < 500) return 150;
+    if (CO < 600) return 100;
+    if (CO < 700) return 50;
+    return 10;
+  }
+
+  function Game() {
+    this.HI = 0;
+    this.grid = new Uint8Array(COLS * ROWS);
+    this.reset(1);
+  }
+
+  Game.prototype.idx = function (c, r) { return r * COLS + c; };
+  Game.prototype.inField = function (c, r) {
+    return c >= 0 && r >= 0 && c < COLS && r < ROWS;
+  };
+  Game.prototype.brickAt = function (c, r) {
+    return this.inField(c, r) && this.grid[this.idx(c, r)] === BRICK;
+  };
+
+  /* line 110-140 plus PROCset_level / PROCprint_bricks */
+  Game.prototype.reset = function (startLevel) {
+    this.F = startLevel || 1;
+    this.SC = 0;
+    this.CO = 0;
+    this.over = false;
+    this.won = false;
+    this.sheet();
+  };
+
+  /* PROCnext_sheet, line 860, and PROCprint_bricks, line 810 */
+  Game.prototype.sheet = function () {
+    if (this.SC > this.HI) this.HI = this.SC;       /* line 1030 */
+    var lv = levelOf(this.F);
+    this.PE = lv.PE;
+    this.PA = lv.PA;
+    this.CO = 0;
+    this.grid.fill(EMPTY);
+
+    this.manC = MAN_C0; this.manR = MAN_R0;
+    this.flyC = FLY_C0; this.flyR = FLY_R0;
+
+    /* line 820-840: PE% bricks, each dropped on a square that is not
+       already a brick. The original does not avoid the man or the fly;
+       the fly simply erases whatever it is standing on when it moves.  */
+    var placed = 0, guard = 0;
+    while (placed < this.PE && guard++ < 200000) {
+      var c = BRICK_C0 + ((Math.random() * (BRICK_C1 - BRICK_C0 + 1)) | 0);
+      var r = BRICK_R0 + ((Math.random() * (BRICK_R1 - BRICK_R0 + 1)) | 0);
+      if (this.grid[this.idx(c, r)] === BRICK) continue;
+      if (c === this.flyC && r === this.flyR) continue;
+      if (c === this.manC && r === this.manR) continue;
+      this.grid[this.idx(c, r)] = BRICK;
+      placed++;
+    }
+    this.bricks = placed;
+  };
+
+  /* --- one turn of the main loop, lines 200-390 ---------------------
+     dir is "left" | "right" | "up" | "down" | null.
+     Order matters and is the original's: the man moves and shoves,
+     then the fly moves, then CO% counts up, then the game is tested.  */
+  Game.prototype.step = function (dir) {
+    var ev = { moved: false, pushed: 0, lostOverEdge: 0, crunched: 0,
+               flyMoved: false, won: false, lost: false, bonus: 0 };
+    if (this.over || this.won) return ev;
+
+    /* ---- the man, lines 230-260 ---------------------------------- */
+    var d = { left: [-1, 0], right: [1, 0], up: [0, 1], down: [0, -1] }[dir];
+    if (d) {
+      var nc = this.manC + d[0], nr = this.manR + d[1];
+      if (this.inField(nc, nr)) {                   /* the bounds tests */
+        this.manC = nc; this.manR = nr;             /* he always moves  */
+        ev.moved = true;
+
+        if (this.grid[this.idx(nc, nr)] === BRICK) {
+          /* line 230: REPEAT J%=J%+32 UNTIL POINT(...)<>2 - count the
+             run of bricks starting under him and find the first square
+             that is not a brick.                                       */
+          var n = 0, cc = nc, rr = nr;
+          while (this.brickAt(cc, rr)) { n++; cc += d[0]; rr += d[1]; }
+
+          /* PROCmove_bricks, line 410: the run shifts one square into
+             that first free square. Three things can be standing there. */
+          if (!this.inField(cc, rr)) {
+            /* off the edge of the cellar. The original drew the brick
+               outside the graphics viewport, where it was clipped away
+               and never came back.                                     */
+            ev.lostOverEdge = 1;
+            this.bricks--;
+          } else if (cc === this.flyC && rr === this.flyR) {
+            /* driven straight at the fly. The brick lands on its square
+               and the fly wipes that square the moment it moves, so the
+               leading brick - and only the leading brick - is lost.     */
+            ev.crunched = 1;
+            this.bricks--;
+          } else {
+            this.grid[this.idx(cc, rr)] = BRICK;
+          }
+          this.grid[this.idx(nc, nr)] = EMPTY;      /* he stands here now */
+          ev.pushed = n;
+        }
+      }
+    }
+
+    /* ---- the fly, lines 300-340 ----------------------------------
+       One random direction per turn. It moves only if the square is
+       not a brick AND the move keeps it inside a box of half-width
+       PA% around the man. That box is the whole of the fly's
+       intelligence: at level 1 it is 12 squares and the fly wanders,
+       at level 10 it is nothing and the fly can only close on you.   */
+    var R = 1 + ((Math.random() * 4) | 0);
+    var leash = leashCells(this.PA);
+    var fc = this.flyC, fr = this.flyR;
+    if (R === 1 && fc > 0 && fc > this.manC - leash && !this.brickAt(fc - 1, fr)) fc--;
+    else if (R === 2 && fc < COLS - 1 && fc < this.manC + leash && !this.brickAt(fc + 1, fr)) fc++;
+    else if (R === 3 && fr > 0 && fr > this.manR - leash && !this.brickAt(fc, fr - 1)) fr--;
+    else if (R === 4 && fr < ROWS - 1 && fr < this.manR + leash && !this.brickAt(fc, fr + 1)) fr++;
+    if (fc !== this.flyC || fr !== this.flyR) {
+      this.flyC = fc; this.flyR = fr;
+      ev.flyMoved = true;
+    }
+
+    this.CO++;                                       /* line 370 */
+
+    /* ---- line 380 -------------------------------------------------
+       Caught if they share a square. Trapped if all four orthogonal
+       neighbours are bricks - the edge of the cellar does NOT count,
+       so a corner is no help. Four real bricks or nothing.           */
+    if (this.manC === this.flyC && this.manR === this.flyR) {
+      ev.lost = true; this.over = true;
+      this.SC = 0;                                   /* PROCloss, line 480 */
+    } else if (this.brickAt(this.flyC + 1, this.flyR) &&
+               this.brickAt(this.flyC - 1, this.flyR) &&
+               this.brickAt(this.flyC, this.flyR + 1) &&
+               this.brickAt(this.flyC, this.flyR - 1)) {
+      ev.won = true; this.won = true;
+      /* PROCwin, lines 570-580. The high score is deliberately NOT
+         touched here: the original only compares it in PROCset_level
+         (line 1030), which runs on the next sheet. Since PROCloss wipes
+         SC% to zero first, a run that dies before clearing a sheet
+         contributes nothing to HI%. That is the original's behaviour.  */
+      if (this.CO < 800) { ev.bonus = bonusFor(this.CO); this.SC += ev.bonus; }
+      this.SC += this.F * 50;
+    }
+    return ev;
+  };
+
+  /* called after the win has been shown - line 610 PROCnext_sheet */
+  Game.prototype.nextSheet = function () {
+    this.F++;
+    this.won = false;
+    this.sheet();
+  };
+
+  /* --- the user-defined characters, lines 80 and 150-160 -------------
+     Eight bytes each, exactly as the original VDU23 statements.
+     224 is a solid block, used both as the eraser and as the body of a
+     brick; 228 is the mortar drawn over it in another colour; 225 is
+     the man; 226 and 227 are the fly, overlaid in two colours.        */
+  var UDG = {
+    block: [255, 255, 255, 255, 255, 255, 255, 255],   /* 224 */
+    man:   [28, 28, 8, 127, 8, 20, 34, 65],            /* 225 */
+    fly:   [36, 24, 60, 90, 153, 153, 165, 195],       /* 226 */
+    flyHi: [0, 0, 0, 36, 102, 102, 66, 0],             /* 227 */
+    mortar:[255, 8, 8, 8, 255, 64, 64, 64]             /* 228 */
+  };
+
+  /* --- SOUND and ENVELOPE, lines 40-70 -------------------------------
+     The four envelopes exactly as the listing declares them.          */
+  var ENVELOPES = {
+    1: [1, -10, 20, -10, 33, 33, 33, 25, -1, -1, -2, 100, 80],
+    2: [1, 4, -3, 5, 40, 20, 30, 127, -1, 0, 0, 126, 0],
+    3: [6, -8, -18, 7, 2, 14, 0, 0, 0, 0, 0, 0, 0],
+    4: [0, 0, 0, 0, 0, 0, 67, -3, 0, -4, 126, 126, 0]
+  };
+
+  /* the instruction screen, lines 1170-1220, verbatim including the
+     author's "to close to the edge" */
+  var INSTRUCTIONS = [
+    "You must trap the fly",
+    "by surrounding it with bricks",
+    "using the Z, X, : and / keys.",
+    "The fly can only destroy the bricks",
+    "when you drive them straight at him.",
+    "Do not move the bricks to close to the",
+    "edge, and don't get caught or else!!"
+  ];
+
+  root.MutantFly = {
+    Game: Game,
+    COLS: COLS, ROWS: ROWS, EMPTY: EMPTY, BRICK: BRICK, TICK_HZ: TICK_HZ,
+    levelOf: levelOf, leashCells: leashCells, palette: palette,
+    bonusFor: bonusFor,
+    UDG: UDG, ENVELOPES: ENVELOPES, INSTRUCTIONS: INSTRUCTIONS,
+    /* the BBC's eight physical colours */
+    PHYSICAL: ["#000000", "#ff0000", "#00ff00", "#ffff00",
+               "#0000ff", "#ff00ff", "#00ffff", "#ffffff"]
+  };
+})(typeof window !== "undefined" ? window : globalThis);
+</script>
+<!--/inline-->
+<!--inline:../src/font.js-->
+<script>
+/* =====================================================================
+   An 8x8 character set in the spirit of the BBC Micro's own ROM font.
+   Eight rows per glyph, hash = ink. Used to draw text on the canvas the
+   way the machine did, rather than with a web font.
+   ===================================================================== */
+(function (root) {
+  "use strict";
+
+  var FONTSRC = {
+  " ":"........,........,........,........,........,........,........,........",
+  "!":"..##....,..##....,..##....,..##....,..##....,........,..##....,........",
+  "#":"........,.#.#....,.#####..,.#.#....,.#####..,.#.#....,........,........",
+  "$":"...#....,..####..,.#.#....,..###...,...#.#..,.####...,...#....,........",
+  "%":".##...#.,.##..#..,....#...,...#....,..#..##.,.#...##.,........,........",
+  "&":"..##....,.#..#...,..##....,.#.#.#..,.#..#...,..##.#..,........,........",
+  "'":"..##....,..##....,..#.....,........,........,........,........,........",
+  "(":"...#....,..#.....,..#.....,..#.....,..#.....,..#.....,...#....,........",
+  ")":"..#.....,...#....,...#....,...#....,...#....,...#....,..#.....,........",
+  "*":"........,..#.#...,...#....,.#####..,...#....,..#.#...,........,........",
+  "+":"........,...#....,...#....,.#####..,...#....,...#....,........,........",
+  ",":"........,........,........,........,........,..##....,..##....,..#.....",
+  "-":"........,........,........,.#####..,........,........,........,........",
+  ".":"........,........,........,........,........,..##....,..##....,........",
+  "/":".....#..,....#...,....#...,...#....,..#.....,..#.....,.#......,........",
+  "0":"..###...,.#...#..,.#..##..,.#.#.#..,.##..#..,.#...#..,..###...,........",
+  "1":"...#....,..##....,...#....,...#....,...#....,...#....,..###...,........",
+  "2":"..###...,.#...#..,.....#..,....#...,...#....,..#.....,.#####..,........",
+  "3":".#####..,....#...,...##...,....#...,.....#..,.#...#..,..###...,........",
+  "4":"....##..,...#.#..,..#..#..,.#...#..,.#####..,.....#..,.....#..,........",
+  "5":".#####..,.#......,.####...,.....#..,.....#..,.#...#..,..###...,........",
+  "6":"...##...,..#.....,.#......,.####...,.#...#..,.#...#..,..###...,........",
+  "7":".#####..,.....#..,....#...,...#....,..#.....,..#.....,..#.....,........",
+  "8":"..###...,.#...#..,.#...#..,..###...,.#...#..,.#...#..,..###...,........",
+  "9":"..###...,.#...#..,.#...#..,..####..,.....#..,....#...,..##....,........",
+  ":":"........,..##....,..##....,........,..##....,..##....,........,........",
+  ";":"........,..##....,..##....,........,..##....,..##....,..#.....,........",
+  "<":"....#...,...#....,..#.....,.#......,..#.....,...#....,....#...,........",
+  "=":"........,........,.#####..,........,.#####..,........,........,........",
+  ">":"..#.....,...#....,....#...,.....#..,....#...,...#....,..#.....,........",
+  "?":"..###...,.#...#..,.....#..,....#...,...#....,........,...#....,........",
+  "@":"..###...,.#...#..,.#.###..,.#.#.#..,.#.###..,.#......,..####..,........",
+  "A":"..###...,.#...#..,.#...#..,.#####..,.#...#..,.#...#..,.#...#..,........",
+  "B":".####...,.#...#..,.#...#..,.####...,.#...#..,.#...#..,.####...,........",
+  "C":"..####..,.#...#..,.#......,.#......,.#......,.#...#..,..####..,........",
+  "D":".####...,.#...#..,.#...#..,.#...#..,.#...#..,.#...#..,.####...,........",
+  "E":".#####..,.#......,.#......,.####...,.#......,.#......,.#####..,........",
+  "F":".#####..,.#......,.#......,.####...,.#......,.#......,.#......,........",
+  "G":"..####..,.#...#..,.#......,.#..##..,.#...#..,.#...#..,..####..,........",
+  "H":".#...#..,.#...#..,.#...#..,.#####..,.#...#..,.#...#..,.#...#..,........",
+  "I":"..###...,...#....,...#....,...#....,...#....,...#....,..###...,........",
+  "J":"..####..,....#...,....#...,....#...,....#...,.#..#...,..##....,........",
+  "K":".#...#..,.#..#...,.#.#....,.##.....,.#.#....,.#..#...,.#...#..,........",
+  "L":".#......,.#......,.#......,.#......,.#......,.#......,.#####..,........",
+  "M":".#...#..,.##.##..,.#.#.#..,.#...#..,.#...#..,.#...#..,.#...#..,........",
+  "N":".#...#..,.##..#..,.#.#.#..,.#..##..,.#...#..,.#...#..,.#...#..,........",
+  "O":"..###...,.#...#..,.#...#..,.#...#..,.#...#..,.#...#..,..###...,........",
+  "P":".####...,.#...#..,.#...#..,.####...,.#......,.#......,.#......,........",
+  "Q":"..###...,.#...#..,.#...#..,.#...#..,.#.#.#..,.#..#...,..##.#..,........",
+  "R":".####...,.#...#..,.#...#..,.####...,.#.#....,.#..#...,.#...#..,........",
+  "S":"..####..,.#...#..,.#......,..###...,.....#..,.#...#..,..###...,........",
+  "T":".#####..,...#....,...#....,...#....,...#....,...#....,...#....,........",
+  "U":".#...#..,.#...#..,.#...#..,.#...#..,.#...#..,.#...#..,..###...,........",
+  "V":".#...#..,.#...#..,.#...#..,.#...#..,.#...#..,..#.#...,...#....,........",
+  "W":".#...#..,.#...#..,.#...#..,.#.#.#..,.#.#.#..,.##.##..,.#...#..,........",
+  "X":".#...#..,.#...#..,..#.#...,...#....,..#.#...,.#...#..,.#...#..,........",
+  "Y":".#...#..,.#...#..,..#.#...,...#....,...#....,...#....,...#....,........",
+  "Z":".#####..,.....#..,....#...,...#....,..#.....,.#......,.#####..,........",
+  "_":"........,........,........,........,........,........,........,.#####..",
+  "{":"..###...,.#...#..,.#.##...,.#.#....,.#.##...,.#...#..,..###...,........",
+  "|":"...#....,...#....,...#....,...#....,...#....,...#....,...#....,........",
+  "a":"........,........,.###....,....#...,.####...,#...#...,.####...,........",
+  "b":"#.......,#.......,#.......,####....,#...#...,#...#...,####....,........",
+  "c":"........,........,.####...,#.......,#.......,#.......,.####...,........",
+  "d":"....#...,....#...,....#...,.####...,#...#...,#...#...,.####...,........",
+  "e":"........,........,.###....,#...#...,#####...,#.......,.####...,........",
+  "f":"..##....,.#..#...,.#......,####....,.#......,.#......,.#......,........",
+  "g":"........,........,.####...,#...#...,#...#...,.####...,....#...,.###....",
+  "h":"#.......,#.......,#.......,####....,#...#...,#...#...,#...#...,........",
+  "i":"..#.....,........,..#.....,..#.....,..#.....,..#.....,..#.....,........",
+  "j":"...#....,........,...#....,...#....,...#....,...#....,#..#....,.##.....",
+  "k":"#.......,#.......,#..#....,#.#.....,##......,#.#.....,#..#....,........",
+  "l":".##.....,..#.....,..#.....,..#.....,..#.....,..#.....,..###...,........",
+  "m":"........,........,##.##...,#.#.#...,#.#.#...,#.#.#...,#.#.#...,........",
+  "n":"........,........,####....,#...#...,#...#...,#...#...,#...#...,........",
+  "o":"........,........,.###....,#...#...,#...#...,#...#...,.###....,........",
+  "p":"........,........,####....,#...#...,#...#...,####....,#.......,#.......",
+  "q":"........,........,.####...,#...#...,#...#...,.####...,....#...,....#...",
+  "r":"........,........,#.###...,##......,#.......,#.......,#.......,........",
+  "s":"........,........,.####...,#.......,.###....,....#...,####....,........",
+  "t":".#......,.#......,####....,.#......,.#......,.#......,..##....,........",
+  "u":"........,........,#...#...,#...#...,#...#...,#...#...,.####...,........",
+  "v":"........,........,#...#...,#...#...,#...#...,.#.#....,..#.....,........",
+  "w":"........,........,#...#...,#.#.#...,#.#.#...,#.#.#...,.#.#....,........",
+  "x":"........,........,#...#...,.#.#....,..#.....,.#.#....,#...#...,........",
+  "y":"........,........,#...#...,#...#...,#...#...,.####...,....#...,.###....",
+  "z":"........,........,#####...,...#....,..#.....,.#......,#####...,........"
+  };
+
+  var FONT = {};
+  for (var ch in FONTSRC) {
+    var rows = FONTSRC[ch].split(","), bits = [];
+    for (var y = 0; y < 8; y++) {
+      var r = rows[y], m = 0;
+      for (var x = 0; x < 8; x++) if (r.charAt(x) === "#") m |= (1 << x);
+      bits.push(m);
+    }
+    FONT[ch] = bits;
+  }
+
+  /* PRINT TAB(cx,cy) - draw text on the 8x8 character grid */
+  function print(ctx, str, cx, cy, colour) {
+    ctx.fillStyle = colour;
+    var px = cx * 8, py = cy * 8;
+    for (var i = 0; i < str.length; i++) {
+      var g = FONT[str.charAt(i)];
+      if (g) {
+        for (var y = 0; y < 8; y++) {
+          var m = g[y];
+          if (!m) continue;
+          for (var x = 0; x < 8; x++) if (m & (1 << x)) ctx.fillRect(px + x, py + y, 1, 1);
+        }
+      }
+      px += 8;
+    }
+  }
+
+  /* centred within a 40-column MODE 1 screen */
+  function centre(ctx, str, cy, colour) {
+    print(ctx, str, Math.round((40 - str.length) / 2), cy, colour);
+  }
+
+  root.BeebFont = { FONT: FONT, print: print, centre: centre };
+})(typeof window !== "undefined" ? window : globalThis);
+</script>
+<!--/inline-->
+<script>
+"use strict";
+/* =====================================================================
+   MUTANT FLY - the 1985 screen.
+   A faithful MODE 1 presentation of the recovered original: 320x256,
+   40x32 characters, four logical colours remapped with VDU19, and the
+   author's own user-defined characters for the man, the fly and the
+   bricks. The rules live in ../src/rules.js.
+   ===================================================================== */
+var MF = window.MutantFly, BF = window.BeebFont;
+var SCR = document.getElementById("screen");
+var ctx = SCR.getContext("2d", {alpha:false});
+ctx.imageSmoothingEnabled = false;
+
+var PHYS = MF.PHYSICAL;
+
+/* The playfield sits at character columns 3-36 and rows 2-27, which is
+   exactly where the original's graphics coordinates put it: a cell at
+   graphics (X,Y) is character (X/32, 31-Y/32).                         */
+function cellX(c){ return (3 + c) * 8; }
+function cellY(r){ return (27 - r) * 8; }
+
+/* --- VDU 23 user-defined characters -------------------------------
+   Bit 7 of each byte is the leftmost pixel, as on the machine.       */
+function udg(bytes, px, py, colour){
+  ctx.fillStyle = colour;
+  for(var y=0;y<8;y++){
+    var b = bytes[y];
+    if(!b) continue;
+    for(var x=0;x<8;x++) if(b & (128 >> x)) ctx.fillRect(px+x, py+y, 1, 1);
+  }
+}
+
+/* ====================================================================
+   SOUND - SOUND C,A,P,D and the listing's four ENVELOPEs.
+   Amplitude is the SN76489's attenuator: 2dB a step, so -7 is 16dB
+   down rather than half volume.
+   ==================================================================== */
+var Beeb = {
+  ac:null, on:true, master:null, ch1pitch:100,
+  wake:function(){
+    if(this.ac){ if(this.ac.state === "suspended") this.ac.resume(); return; }
+    var AC = window.AudioContext || window.webkitAudioContext;
+    if(!AC){ this.on = false; return; }
+    this.ac = new AC();
+    this.master = this.ac.createGain();
+    this.master.gain.value = 0.3;
+    this.master.connect(this.ac.destination);
+    var n = this.ac.sampleRate, b = this.ac.createBuffer(1,n,n), d = b.getChannelData(0);
+    for(var i=0;i<n;i++) d[i] = Math.random()*2-1;
+    this.noise = b;
+  },
+  hz:function(p){ return 261.6256 * Math.pow(2, (p - 53) / 48); },
+  gain:function(v){ return v <= 0 ? 0 : Math.pow(10, -((15 - v) * 2) / 20); },
+  SOUND:function(c,a,p,d){
+    if(!this.on) return;
+    this.wake(); if(!this.ac) return;
+    c = c & 15;
+    var ac = this.ac, t0 = ac.currentTime, dur = Math.max(0.02, d/20);
+    var g = ac.createGain(); g.gain.value = 0; g.connect(this.master);
+    var src;
+    if(c === 0){
+      src = ac.createBufferSource(); src.buffer = this.noise; src.loop = true;
+      var bp = ac.createBiquadFilter(); bp.type = "bandpass";
+      /* pitch AND 7 = 7 means the noise rate follows tone channel 1 */
+      var np = p & 7;
+      bp.frequency.value = (np === 7) ? Math.max(120, this.hz(this.ch1pitch) * 1.6)
+                                      : (np < 4 ? 200 + np*300 : 900 + (np-4)*1200);
+      bp.Q.value = 1.4;
+      src.connect(bp); bp.connect(g);
+    } else {
+      if(c === 1) this.ch1pitch = p;
+      src = ac.createOscillator(); src.type = "square";
+      src.frequency.setValueAtTime(this.hz(p), t0);
+    }
+    var e = (a >= 1) ? MF.ENVELOPES[a] : null;
+    if(!e){
+      var lvl = this.gain(Math.min(15,-a));
+      g.gain.setValueAtTime(0,t0);
+      g.gain.linearRampToValueAtTime(lvl, t0+0.005);
+      g.gain.setValueAtTime(lvl, t0+dur*0.8);
+      g.gain.exponentialRampToValueAtTime(0.0008, t0+dur);
+      src.start(t0); src.stop(t0+dur+0.02);
+      return;
+    }
+    /* ENVELOPE N,T,PI1,PI2,PI3,PN1,PN2,PN3,AA,AD,AS,AR,ALA,ALD */
+    var T=(e[0]&127)/100, PI=[e[1],e[2],e[3]], PN=[e[4],e[5],e[6]],
+        AA=e[7], AD=e[8], AS=e[9], AR=e[10], ALA=e[11], ALD=e[12];
+    var step = Math.max(0.005, T), amp = 0, t = t0, guard = 0;
+    g.gain.setValueAtTime(0,t0);
+    while(amp < ALA && AA > 0 && guard++ < 400){
+      amp = Math.min(ALA, amp+AA); t += step;
+      g.gain.linearRampToValueAtTime(this.gain(amp*15/126), t);
+    }
+    guard = 0;
+    while(amp > ALD && AD < 0 && guard++ < 400){
+      amp = Math.max(ALD, amp+AD); t += step;
+      g.gain.linearRampToValueAtTime(this.gain(amp*15/126), t);
+    }
+    var endS = t0 + dur;
+    if(t < endS){
+      amp = Math.max(0, amp + AS*((endS-t)/step));
+      g.gain.linearRampToValueAtTime(this.gain(amp*15/126), endS);
+    }
+    var rel = AR ? Math.min(0.6, Math.abs(amp/AR)*step) : 0.05;
+    g.gain.linearRampToValueAtTime(0.0001, endS+rel);
+    if(c !== 0){
+      var pt = t0, pp = p;
+      for(var s=0;s<3;s++) for(var k=0;k<PN[s];k++){
+        pp += PI[s]; pt += step;
+        if(pt > endS+rel) break;
+        src.frequency.linearRampToValueAtTime(this.hz(Math.max(0,Math.min(255,pp))), pt);
+      }
+    }
+    src.start(t0); src.stop(endS+rel+0.02);
+  }
+};
+
+/* ====================================================================
+   SCREENS
+   ==================================================================== */
+var game = new MF.Game();
+var mode = "instructions";   /* instructions -> title -> play -> won/lost */
+var startLevel = 1, blink = 0, msgT = 0, titleFly = {c:18, r:16};
+
+/* line 190 DATA: runs of bricks that spell FLY on the title screen.
+   Each record is C%,D%,A%,B% - C%=1 draws a vertical run at x=D% from
+   y=A% to B%, C%=0 a horizontal run at y=D% from x=A% to B%.          */
+var TITLE_DATA = [
+  [1,192,480,896],[1,224,480,896],[0,896,224,684],[0,768,224,320],
+  [1,448,480,768],[0,480,448,608],
+  [1,896,448,704],[0,704,704,1088],[1,704,704,896],[1,1088,704,896]
+];
+function titleBricks(){
+  var out = [];
+  for(var i=0;i<TITLE_DATA.length;i++){
+    var C = TITLE_DATA[i][0], D = TITLE_DATA[i][1], A = TITLE_DATA[i][2], B = TITLE_DATA[i][3];
+    for(var G=A; G<=B; G+=32){
+      var X = (C === 1) ? D : G, Y = (C === 1) ? G : D;
+      out.push([X/32, 31 - Y/32]);
+    }
+  }
+  return out;
+}
+var TITLE_CELLS = titleBricks();
+
+/* PROCFL, line 1070: a fly loose on the title screen while it waits */
+function stepTitleFly(){
+  var R = 1 + ((Math.random()*4)|0);
+  if(R === 1 && titleFly.c > 3) titleFly.c--;
+  else if(R === 2 && titleFly.c < 36) titleFly.c++;
+  else if(R === 3 && titleFly.r < 18) titleFly.r++;
+  else if(R === 4 && titleFly.r > 2) titleFly.r--;
+}
+
+function drawBrickAt(px, py, p){
+  udg(MF.UDG.block,  px, py, PHYS[p.brick]);
+  udg(MF.UDG.mortar, px, py, PHYS[p.mortar]);
+}
+
+/* --- MODE 7. The original showed its instructions in teletext ------
+   (line 90: MODE7 ... PROCinstructions), with a double-height FLY.   */
+function drawInstructions(){
+  ctx.fillStyle = "#000"; ctx.fillRect(0,0,320,256);
+  /* VDU141,129,157,135 - double height, red, new background, white */
+  ctx.fillStyle = PHYS[1];
+  ctx.fillRect(0, 4*8, 320, 16);
+  BF.print(ctx, "FLY", 18, 4, PHYS[7]);
+  BF.print(ctx, "FLY", 18, 5, PHYS[7]);
+  var L = MF.INSTRUCTIONS;
+  BF.print(ctx, L[0],  9,  8, PHYS[6]);
+  BF.print(ctx, L[1],  5,  9, PHYS[6]);
+  BF.print(ctx, L[2],  5, 10, PHYS[6]);
+  BF.print(ctx, L[3],  2, 12, PHYS[1]);
+  BF.print(ctx, L[4],  2, 13, PHYS[1]);
+  BF.print(ctx, L[5],  1, 15, PHYS[2]);
+  BF.print(ctx, L[6],  1, 16, PHYS[2]);
+  if((blink & 1) === 0)
+    BF.print(ctx, "Press any key to continue..", 5, 23, PHYS[7]);
+}
+
+/* --- PROCtitle_page, line 630 -------------------------------------- */
+function drawTitle(){
+  var p = MF.palette(startLevel);
+  ctx.fillStyle = PHYS[p.floor]; ctx.fillRect(0,0,320,256);
+  for(var i=0;i<TITLE_CELLS.length;i++)
+    drawBrickAt(TITLE_CELLS[i][0]*8, TITLE_CELLS[i][1]*8, p);
+
+  udg(MF.UDG.fly,   titleFly.c*8, titleFly.r*8, PHYS[p.figure]);
+  udg(MF.UDG.flyHi, titleFly.c*8, titleFly.r*8, PHYS[p.mortar]);
+
+  BF.print(ctx, "LEVEL (1/9) (1 EASIEST)", 10, 20, PHYS[p.figure]);
+  BF.print(ctx, "" + startLevel, 34, 20, PHYS[p.mortar]);
+  BF.print(ctx, "Z = LEFT",  16, 23, PHYS[p.figure]);
+  BF.print(ctx, "X = RIGHT", 16, 24, PHYS[p.figure]);
+  BF.print(ctx, ": = UP",    16, 25, PHYS[p.figure]);
+  BF.print(ctx, "/ = DOWN",  16, 26, PHYS[p.figure]);
+  if((blink & 1) === 0)
+    BF.print(ctx, "Press any key to continue", 8, 29, PHYS[p.figure]);
+}
+
+/* --- the playfield -------------------------------------------------- */
+function drawPlay(){
+  var p = MF.palette(game.F);
+  /* COLOUR129:CLS then the viewport filled with the floor colour */
+  ctx.fillStyle = PHYS[p.brick]; ctx.fillRect(0,0,320,256);
+  ctx.fillStyle = PHYS[p.floor];
+  ctx.fillRect(cellX(0), cellY(MF.ROWS-1), MF.COLS*8, MF.ROWS*8);
+
+  for(var r=0;r<MF.ROWS;r++) for(var c=0;c<MF.COLS;c++)
+    if(game.grid[r*MF.COLS+c] === MF.BRICK) drawBrickAt(cellX(c), cellY(r), p);
+
+  udg(MF.UDG.man, cellX(game.manC), cellY(game.manR), PHYS[p.figure]);
+  udg(MF.UDG.fly,   cellX(game.flyC), cellY(game.flyR), PHYS[p.figure]);
+  udg(MF.UDG.flyHi, cellX(game.flyC), cellY(game.flyR), PHYS[p.mortar]);
+
+  /* line 1040 - the status line, on a floor-coloured band */
+  ctx.fillStyle = PHYS[p.floor]; ctx.fillRect(0, 8, 320, 8);
+  var fg = PHYS[p.figure];
+  BF.print(ctx, "LEV:" + game.F, 3, 1, fg);
+  BF.print(ctx, "HI-SC:" + game.HI, 10, 1, fg);
+  BF.print(ctx, "SC:" + game.SC, 22, 1, fg);
+  BF.print(ctx, "" + game.CO, 32, 1, fg);
+
+  if(mode === "lost" && (blink & 1) === 0)
+    BF.print(ctx, "GAME OVER", 14, 15, fg);
+  if(mode === "won"){
+    BF.print(ctx, "YOU WIN", 14, 15, fg);
+    if(lastBonus) BF.print(ctx, "BONUS " + lastBonus, 14, 20, PHYS[p.mortar]);
+  }
+}
+
+/* ====================================================================
+   INPUT.  Z X : / with the original's fixed priority, one direction a
+   turn, exactly as the KEY% flag enforced.
+   ==================================================================== */
+var held = {};
+var KEYMAP = { "z":"left", "arrowleft":"left", "x":"right", "arrowright":"right",
+               ":":"up", ";":"up", "arrowup":"up", "/":"down", "arrowdown":"down" };
+var PRIORITY = ["left","right","up","down"];
+
+function anyKey(){
+  Beeb.wake();
+  if(mode === "instructions"){ mode = "title"; return true; }
+  if(mode === "title"){ startGame(); return true; }
+  if(mode === "lost"){ mode = "title"; return true; }
+  return false;
+}
+function startGame(){
+  game.reset(startLevel);
+  mode = "play"; msgT = 0;
+}
+
+window.addEventListener("keydown", function(e){
+  var k = e.key.toLowerCase();
+  var a = KEYMAP[k];
+  if(a){ e.preventDefault(); held[a] = true; lightKey(a,true); if(anyKey()) return; return; }
+  if(k === " "){ e.preventDefault(); lightKey("fire",true); anyKey(); return; }
+  if(k >= "1" && k <= "9" && (mode === "title" || mode === "instructions")){
+    startLevel = +k; Beeb.SOUND(1,-10,120,1); return;
+  }
+  if(k === "s"){ Beeb.on = true; Beeb.SOUND(1,-10,89,2); lightKey("sound",true); return; }
+  if(k === "q"){ Beeb.on = false; lightKey("sound",true); return; }
+  if(k === "escape"){ mode = "title"; return; }
+  anyKey();
+});
+window.addEventListener("keyup", function(e){
+  var k = e.key.toLowerCase(), a = KEYMAP[k];
+  if(a){ held[a] = false; lightKey(a,false); }
+  if(k === " ") lightKey("fire",false);
+  if(k === "s" || k === "q") lightKey("sound",false);
+});
+
+var fkeys = {};
+Array.prototype.forEach.call(document.querySelectorAll(".fkey"), function(b){
+  var a = b.dataset.act; fkeys[a] = b;
+  b.addEventListener("pointerdown", function(ev){
+    ev.preventDefault(); Beeb.wake(); b.classList.add("lit");
+    if(a === "sound"){ Beeb.on = !Beeb.on; if(Beeb.on) Beeb.SOUND(1,-10,89,2); return; }
+    if(a === "fire"){ anyKey(); return; }
+    held[a] = true; anyKey();
+  });
+  var up = function(){ b.classList.remove("lit"); held[a] = false; };
+  b.addEventListener("pointerup", up);
+  b.addEventListener("pointercancel", up);
+  b.addEventListener("pointerleave", up);
+});
+function lightKey(a,on){ if(fkeys[a]) fkeys[a].classList.toggle("lit", on); }
+
+/* ====================================================================
+   THE MAIN LOOP.  Twenty turns a second, the rate the disc conversion
+   pinned the original to.
+   ==================================================================== */
+var lastBonus = 0, acc = 0, prev = 0;
+var STEP = 1000 / MF.TICK_HZ;
+
+function turn(){
+  var dir = null;
+  for(var i=0;i<PRIORITY.length;i++) if(held[PRIORITY[i]]){ dir = PRIORITY[i]; break; }
+
+  var ev = game.step(dir);
+
+  Beeb.SOUND(0,-10,23,1);                       /* line 210, every turn */
+  if(ev.pushed) Beeb.SOUND(1,1,3,1);            /* line 420             */
+  if(ev.lostOverEdge) Beeb.SOUND(0,-9,4,2);
+  if(ev.crunched) Beeb.SOUND(0,-12,5,3);
+
+  if(ev.lost){
+    mode = "lost"; msgT = 0;
+    Beeb.SOUND(0x111,3,20,12); Beeb.SOUND(0x110,4,7,12);
+    Beeb.SOUND(0,-14,6,20);
+  } else if(ev.won){
+    mode = "won"; msgT = 0; lastBonus = ev.bonus;
+    for(var s=1;s<=30;s++) (function(s){
+      setTimeout(function(){ Beeb.SOUND(1,1,s*10,1); }, s*18);
+    })(s);
+  }
+}
+
+function frame(ts){
+  requestAnimationFrame(frame);
+  var dt = prev ? Math.min(200, ts - prev) : 0; prev = ts;
+  blink = (ts / 320) | 0;
+
+  if(mode === "play"){
+    acc += dt;
+    while(acc >= STEP){ acc -= STEP; if(mode === "play") turn(); }
+  } else if(mode === "won" || mode === "lost"){
+    msgT += dt;
+    if(mode === "won" && msgT > 2600){ game.nextSheet(); mode = "play"; acc = 0; }
+    if(mode === "lost" && msgT > 3000){ mode = "title"; }
+  }
+
+  if(mode === "instructions") drawInstructions();
+  else if(mode === "title"){
+    flyT += dt;
+    if(flyT > 90){ flyT = 0; stepTitleFly(); }
+    drawTitle();
+  }
+  else drawPlay();
+}
+var flyT = 0;
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>
