@@ -1,0 +1,1063 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Menace of the Mutant Flies</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo+Narrow:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+  :root{
+    --case:#d9d2c0;
+    --case-hi:#e7e1d2;
+    --case-sh:#b7af9b;
+    --case-dk:#8b8375;
+    --fkey:#b8382c;
+    --fkey-dk:#8d2820;
+    --void:#0b0b0d;
+    --ink:#2e2a24;
+    --ink-soft:#6b6357;
+    --rule:#c4bcaa;
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0;
+    background:#171512;
+    background-image:
+      radial-gradient(120% 90% at 50% 0%, #241f1a 0%, #171512 55%, #0e0d0c 100%);
+    color:var(--ink);
+    font-family:"Archivo Narrow","Helvetica Neue",Arial,sans-serif;
+    min-height:100vh;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    padding:clamp(12px,3vw,40px);
+  }
+  .rig{
+    width:min(760px,100%);
+    display:flex;
+    flex-direction:column;
+    gap:18px;
+  }
+
+  /* ---- the machine ---- */
+  .machine{
+    background:linear-gradient(178deg,var(--case-hi) 0%,var(--case) 22%,var(--case) 78%,var(--case-sh) 100%);
+    border-radius:10px 10px 16px 16px;
+    padding:clamp(14px,2.6vw,24px);
+    display:flex;
+    flex-direction:column;
+    gap:14px;
+    box-shadow:
+      0 1px 0 rgba(255,255,255,.55) inset,
+      0 -2px 0 rgba(0,0,0,.12) inset,
+      0 26px 50px -18px rgba(0,0,0,.85),
+      0 3px 0 var(--case-dk);
+  }
+
+  .crt{
+    position:relative;
+    background:var(--void);
+    border-radius:14px/18px;
+    padding:clamp(8px,1.6vw,14px);
+    box-shadow:
+      0 0 0 2px var(--case-dk),
+      0 0 0 3px rgba(255,255,255,.35),
+      0 10px 24px -8px rgba(0,0,0,.7) inset;
+  }
+  #screen{
+    display:block;
+    width:100%;
+    aspect-ratio:4/3;      /* period-correct: 320x256 stretched to 4:3 */
+    height:auto;
+    background:#000;
+    border-radius:6px/9px;
+    image-rendering:pixelated;
+    image-rendering:crisp-edges;
+    outline:none;
+    touch-action:manipulation;
+  }
+  #screen:focus-visible{box-shadow:0 0 0 3px #ffcf3f}
+  .glass{
+    position:absolute;
+    inset:clamp(8px,1.6vw,14px);
+    border-radius:6px/9px;
+    pointer-events:none;
+    background:
+      linear-gradient(103deg,rgba(255,255,255,.10) 0 18%,rgba(255,255,255,0) 42%),
+      repeating-linear-gradient(180deg,rgba(0,0,0,.22) 0 1px,rgba(0,0,0,0) 1px 3px);
+    mix-blend-mode:screen;
+    opacity:.5;
+  }
+  .glass::after{
+    content:"";position:absolute;inset:0;border-radius:inherit;
+    box-shadow:0 0 60px 18px rgba(0,0,0,.55) inset;
+  }
+
+  /* ---- red function-key strip: live key legend + touch pad ---- */
+  .strip{
+    display:grid;
+    grid-template-columns:repeat(6,1fr);
+    gap:5px;
+    background:var(--fkey-dk);
+    padding:5px;
+    border-radius:4px;
+    box-shadow:0 1px 0 rgba(255,255,255,.4);
+  }
+  .fkey{
+    appearance:none;
+    border:0;
+    font:inherit;
+    cursor:pointer;
+    background:var(--fkey);
+    color:#f6e9e2;
+    border-radius:2px;
+    padding:7px 2px 6px;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    gap:2px;
+    line-height:1;
+    box-shadow:0 1px 0 rgba(255,255,255,.28) inset,0 -2px 0 rgba(0,0,0,.28) inset;
+    transition:background .06s linear,transform .06s linear;
+    touch-action:manipulation;
+    -webkit-tap-highlight-color:transparent;
+  }
+  .fkey .cap{font-size:clamp(13px,2.4vw,17px);font-weight:700;letter-spacing:.02em}
+  .fkey .sub{
+    font-family:"IBM Plex Mono",ui-monospace,monospace;
+    font-size:clamp(7px,1.35vw,9px);
+    letter-spacing:.09em;
+    opacity:.72;
+    text-transform:uppercase;
+  }
+  .fkey:is(:hover,:focus-visible){background:#c9463a}
+  .fkey:focus-visible{outline:2px solid #ffcf3f;outline-offset:1px}
+  .fkey.lit{background:#f0a04a;color:#2b1206;transform:translateY(1px)}
+
+  /* ---- case badge ---- */
+  .badge{
+    display:flex;
+    align-items:baseline;
+    justify-content:space-between;
+    gap:12px;
+    border-top:1px solid var(--rule);
+    padding-top:11px;
+    flex-wrap:wrap;
+  }
+  .badge .model{
+    font-weight:700;
+    font-size:clamp(13px,2.1vw,16px);
+    letter-spacing:.16em;
+    text-transform:uppercase;
+    color:var(--ink);
+  }
+  .badge .model span{color:var(--fkey)}
+  .badge .meta{
+    font-family:"IBM Plex Mono",ui-monospace,monospace;
+    font-size:clamp(9px,1.5vw,11px);
+    letter-spacing:.04em;
+    color:var(--ink-soft);
+    text-align:right;
+  }
+
+  /* ---- provenance ---- */
+  .colophon{
+    margin:0;
+    font-family:"IBM Plex Mono",ui-monospace,monospace;
+    font-size:clamp(9.5px,1.55vw,11.5px);
+    line-height:1.75;
+    letter-spacing:.02em;
+    color:#8d8474;
+    text-align:center;
+  }
+  .colophon b{color:#c9bfa9;font-weight:500}
+  .colophon .sep{color:#5b5449;padding:0 .5em}
+
+  @media (max-width:520px){
+    .fkey .sub{display:none}
+    .fkey{padding:11px 2px}
+  }
+  @media (prefers-reduced-motion:reduce){
+    .fkey{transition:none}
+  }
+</style>
+
+</head>
+<body style="margin:0">
+<main class="rig">
+  <div class="machine">
+    <div class="crt">
+      <canvas id="screen" width="320" height="256" tabindex="0"
+              aria-label="Mutant Fly game screen. Push bricks with Z, X, colon and slash to trap the fly."></canvas>
+      <div class="glass" aria-hidden="true"></div>
+    </div>
+
+    <div class="strip" role="group" aria-label="Game controls">
+      <button class="fkey" data-act="left"  type="button"><span class="cap">Z</span><span class="sub">left</span></button>
+      <button class="fkey" data-act="up"    type="button"><span class="cap">:</span><span class="sub">up</span></button>
+      <button class="fkey" data-act="down"  type="button"><span class="cap">/</span><span class="sub">down</span></button>
+      <button class="fkey" data-act="right" type="button"><span class="cap">X</span><span class="sub">right</span></button>
+      <button class="fkey" data-act="fire"  type="button"><span class="cap">SPACE</span><span class="sub">start</span></button>
+      <button class="fkey" data-act="sound" type="button"><span class="cap">S/Q</span><span class="sub">sound</span></button>
+    </div>
+
+    <div class="badge">
+      <div class="model">Acorn <span>BBC</span> Microcomputer &nbsp;Model&nbsp;B</div>
+      <div class="meta">MODE&nbsp;2 &middot; 20&times;32 &middot; 16 COLOUR &middot; 20K</div>
+    </div>
+  </div>
+
+  <p class="colophon">
+    <b>&ldquo;MENACE OF THE MUTANT FLIES&rdquo;</b> by JOHN McCAULEY<span class="sep">&bull;</span>THE MICRO USER, JULY 1985, PP.&nbsp;66&ndash;69<span class="sep">&bull;</span>LISTING FROM P.&nbsp;168<br>
+    RECREATED FROM THE PUBLISHED ARTICLE &mdash; BBC BASIC PROCEDURE NAMES PRESERVED
+  </p>
+</main>
+
+<script>
+"use strict";
+/* =====================================================================
+   MENACE OF THE MUTANT FLIES
+   John McCauley, The Micro User, July 1985 (pp.66-69, listing p.168)
+   Recreated in JavaScript, 2026.
+
+   The original was BBC BASIC II on an Acorn BBC Microcomputer Model B:
+   a 2MHz 6502, 32K of RAM, and a MODE 2 screen (160x256 pixels, 20x32
+   characters, 16 logical colours) that ate 20K of that RAM on its own.
+
+   The magazine printed the program's procedure and variable tables.
+   Those names are preserved here so the port can be read against the
+   listing:
+
+     PROCEDURES                     -> functions below
+       instructions                 -> PROCinstructions()
+       title_page                   -> PROCtitle_page()
+       move_bricks                  -> PROCmove_bricks()
+       move_fly                     -> PROCmove_fly()
+       next_sheet                   -> PROCnext_sheet()
+       bonus                        -> PROCbonus()
+       loss                         -> PROCloss()
+       level                        -> PROCset_level()
+
+     VARIABLES                      -> V.* below
+       HI%   high score             X1%,Y1% fly's position
+       SC%   score                  OX%,OY% fly's last position
+       R%    random no.             J%,P%   level of difficulty
+       I%    direction bricks move  PB%     number of bricks displayed
+       PA%   rate at which the fly follows the man
+   ===================================================================== */
+
+/* ------------------------------------------------------------------ */
+/* MODE 2 palette. The BBC's 16 logical colours are 8 solid colours    */
+/* built from full-on/full-off R, G and B, plus 8 flashing pairs.      */
+/* ------------------------------------------------------------------ */
+var PAL = ["#000000","#ff0000","#00ff00","#ffff00",
+           "#0000ff","#ff00ff","#00ffff","#ffffff"];
+/* colours 8-15 flash between colour n-8 and its complement 7-(n-8) */
+var flashPhase = 0;
+function ink(c){
+  if(c < 8) return PAL[c];
+  var a = c - 8, b = 7 - a;
+  return flashPhase ? PAL[b] : PAL[a];
+}
+
+/* ------------------------------------------------------------------ */
+/* An 8x8 character set in the spirit of the BBC's own ROM font.       */
+/* Eight rows per glyph, hash = ink.                                   */
+/* ------------------------------------------------------------------ */
+var FONTSRC = {
+" ":"........,........,........,........,........,........,........,........",
+"!":"..##....,..##....,..##....,..##....,..##....,........,..##....,........",
+"#":"........,.#.#....,.#####..,.#.#....,.#####..,.#.#....,........,........",
+"$":"...#....,..####..,.#.#....,..###...,...#.#..,.####...,...#....,........",
+"%":".##...#.,.##..#..,....#...,...#....,..#..##.,.#...##.,........,........",
+"&":"..##....,.#..#...,..##....,.#.#.#..,.#..#...,..##.#..,........,........",
+"'":"..##....,..##....,..#.....,........,........,........,........,........",
+"(":"...#....,..#.....,..#.....,..#.....,..#.....,..#.....,...#....,........",
+")":"..#.....,...#....,...#....,...#....,...#....,...#....,..#.....,........",
+"*":"........,..#.#...,...#....,.#####..,...#....,..#.#...,........,........",
+"+":"........,...#....,...#....,.#####..,...#....,...#....,........,........",
+",":"........,........,........,........,........,..##....,..##....,..#.....",
+"-":"........,........,........,.#####..,........,........,........,........",
+".":"........,........,........,........,........,..##....,..##....,........",
+"/":".....#..,....#...,....#...,...#....,..#.....,..#.....,.#......,........",
+"0":"..###...,.#...#..,.#..##..,.#.#.#..,.##..#..,.#...#..,..###...,........",
+"1":"...#....,..##....,...#....,...#....,...#....,...#....,..###...,........",
+"2":"..###...,.#...#..,.....#..,....#...,...#....,..#.....,.#####..,........",
+"3":".#####..,....#...,...##...,....#...,.....#..,.#...#..,..###...,........",
+"4":"....##..,...#.#..,..#..#..,.#...#..,.#####..,.....#..,.....#..,........",
+"5":".#####..,.#......,.####...,.....#..,.....#..,.#...#..,..###...,........",
+"6":"...##...,..#.....,.#......,.####...,.#...#..,.#...#..,..###...,........",
+"7":".#####..,.....#..,....#...,...#....,..#.....,..#.....,..#.....,........",
+"8":"..###...,.#...#..,.#...#..,..###...,.#...#..,.#...#..,..###...,........",
+"9":"..###...,.#...#..,.#...#..,..####..,.....#..,....#...,..##....,........",
+":":"........,..##....,..##....,........,..##....,..##....,........,........",
+";":"........,..##....,..##....,........,..##....,..##....,..#.....,........",
+"<":"....#...,...#....,..#.....,.#......,..#.....,...#....,....#...,........",
+"=":"........,........,.#####..,........,.#####..,........,........,........",
+">":"..#.....,...#....,....#...,.....#..,....#...,...#....,..#.....,........",
+"?":"..###...,.#...#..,.....#..,....#...,...#....,........,...#....,........",
+"@":"..###...,.#...#..,.#.###..,.#.#.#..,.#.###..,.#......,..####..,........",
+"A":"..###...,.#...#..,.#...#..,.#####..,.#...#..,.#...#..,.#...#..,........",
+"B":".####...,.#...#..,.#...#..,.####...,.#...#..,.#...#..,.####...,........",
+"C":"..####..,.#...#..,.#......,.#......,.#......,.#...#..,..####..,........",
+"D":".####...,.#...#..,.#...#..,.#...#..,.#...#..,.#...#..,.####...,........",
+"E":".#####..,.#......,.#......,.####...,.#......,.#......,.#####..,........",
+"F":".#####..,.#......,.#......,.####...,.#......,.#......,.#......,........",
+"G":"..####..,.#...#..,.#......,.#..##..,.#...#..,.#...#..,..####..,........",
+"H":".#...#..,.#...#..,.#...#..,.#####..,.#...#..,.#...#..,.#...#..,........",
+"I":"..###...,...#....,...#....,...#....,...#....,...#....,..###...,........",
+"J":"..####..,....#...,....#...,....#...,....#...,.#..#...,..##....,........",
+"K":".#...#..,.#..#...,.#.#....,.##.....,.#.#....,.#..#...,.#...#..,........",
+"L":".#......,.#......,.#......,.#......,.#......,.#......,.#####..,........",
+"M":".#...#..,.##.##..,.#.#.#..,.#...#..,.#...#..,.#...#..,.#...#..,........",
+"N":".#...#..,.##..#..,.#.#.#..,.#..##..,.#...#..,.#...#..,.#...#..,........",
+"O":"..###...,.#...#..,.#...#..,.#...#..,.#...#..,.#...#..,..###...,........",
+"P":".####...,.#...#..,.#...#..,.####...,.#......,.#......,.#......,........",
+"Q":"..###...,.#...#..,.#...#..,.#...#..,.#.#.#..,.#..#...,..##.#..,........",
+"R":".####...,.#...#..,.#...#..,.####...,.#.#....,.#..#...,.#...#..,........",
+"S":"..####..,.#...#..,.#......,..###...,.....#..,.#...#..,..###...,........",
+"T":".#####..,...#....,...#....,...#....,...#....,...#....,...#....,........",
+"U":".#...#..,.#...#..,.#...#..,.#...#..,.#...#..,.#...#..,..###...,........",
+"V":".#...#..,.#...#..,.#...#..,.#...#..,.#...#..,..#.#...,...#....,........",
+"W":".#...#..,.#...#..,.#...#..,.#.#.#..,.#.#.#..,.##.##..,.#...#..,........",
+"X":".#...#..,.#...#..,..#.#...,...#....,..#.#...,.#...#..,.#...#..,........",
+"Y":".#...#..,.#...#..,..#.#...,...#....,...#....,...#....,...#....,........",
+"Z":".#####..,.....#..,....#...,...#....,..#.....,.#......,.#####..,........",
+"_":"........,........,........,........,........,........,........,.#####..",
+"{":"..###...,.#...#..,.#.##...,.#.#....,.#.##...,.#...#..,..###...,........",
+"|":"...#....,...#....,...#....,...#....,...#....,...#....,...#....,........"
+};
+var FONT = {};
+(function(){
+  for(var ch in FONTSRC){
+    var rows = FONTSRC[ch].split(","), bits = [];
+    for(var y=0;y<8;y++){
+      var r = rows[y], m = 0;
+      for(var x=0;x<8;x++) if(r.charAt(x) === "#") m |= (1<<x);
+      bits.push(m);
+    }
+    FONT[ch] = bits;
+  }
+})();
+
+/* ------------------------------------------------------------------ */
+/* User-defined graphics. On the real machine these were VDU 23        */
+/* definitions: eight bytes per 8x8 character, four characters glued   */
+/* together to make a 16x16 sprite. Digits are logical colours.        */
+/* ------------------------------------------------------------------ */
+var UDG = {
+  brick: [
+    "................",
+    ".333333.33333333",
+    ".111111.11111111",
+    ".111111.11111111",
+    ".111111.11111111",
+    "................",
+    ".33.3333333.3333",
+    ".11.1111111.1111",
+    ".11.1111111.1111",
+    ".11.1111111.1111",
+    "................",
+    ".333333.33333333",
+    ".111111.11111111",
+    ".111111.11111111",
+    ".111111.11111111",
+    "................"],
+  wall: [
+    "................",
+    "6666666.66666666",
+    "4444444.44444444",
+    "4444444.44444444",
+    "4444444.44444444",
+    "................",
+    "666.6666666.6666",
+    "444.4444444.4444",
+    "444.4444444.4444",
+    "444.4444444.4444",
+    "................",
+    "6666666.66666666",
+    "4444444.44444444",
+    "4444444.44444444",
+    "4444444.44444444",
+    "................"],
+  man: [
+    "......3333......",
+    ".....333333.....",
+    ".....3.33.3.....",
+    ".....333333.....",
+    "......3333......",
+    "....7733333.....",
+    "....77333333....",
+    ".....33333333...",
+    "......3333......",
+    "......3333......",
+    ".....33..33.....",
+    ".....33..33.....",
+    "....33....33....",
+    "....33....33....",
+    "...333....333...",
+    "................"],
+  fly0: [
+    "7..............7",
+    ".77..........77.",
+    "..777......777..",
+    "...777....777...",
+    ".....111111.....",
+    "....11111111....",
+    "....11444411....",
+    ".....444444.....",
+    "....44444444....",
+    "....44444444....",
+    ".....444444.....",
+    ".....444444.....",
+    "......4444......",
+    "......4444......",
+    ".7...7....7...7.",
+    "7....7....7....7"],
+  fly1: [
+    "................",
+    "..77........77..",
+    "..777......777..",
+    "...77......77...",
+    ".....111111.....",
+    "....11111111....",
+    "....11444411....",
+    ".....444444.....",
+    "....44444444....",
+    "....44444444....",
+    ".....444444.....",
+    ".....444444.....",
+    "......4444......",
+    "......4444......",
+    "..7..7....7..7..",
+    ".7...7....7...7."]
+};
+
+/* ------------------------------------------------------------------ */
+/* Screen. 320x256 logical pixels, presented at 4:3 the way a BBC fed  */
+/* a domestic colour television.                                       */
+/* ------------------------------------------------------------------ */
+var SCR = document.getElementById("screen");
+var ctx = SCR.getContext("2d", {alpha:false});
+ctx.imageSmoothingEnabled = false;
+
+var CELL = 16, GW = 20, GH = 14, TOP = 32;
+
+function bake(rows){
+  var c = document.createElement("canvas");
+  c.width = 16; c.height = 16;
+  var g = c.getContext("2d");
+  for(var y=0;y<16;y++){
+    var r = rows[y];
+    for(var x=0;x<16;x++){
+      var ch = r.charAt(x);
+      if(ch === ".") continue;
+      g.fillStyle = PAL[ch.charCodeAt(0) - 48];
+      g.fillRect(x,y,1,1);
+    }
+  }
+  return c;
+}
+var SPR = {};
+for(var k in UDG) SPR[k] = bake(UDG[k]);
+SPR.manL = (function(){
+  var c = document.createElement("canvas"); c.width = 16; c.height = 16;
+  var g = c.getContext("2d");
+  g.translate(16,0); g.scale(-1,1); g.drawImage(SPR.man,0,0);
+  return c;
+})();
+
+function cls(c){ ctx.fillStyle = PAL[c||0]; ctx.fillRect(0,0,320,256); }
+
+/* PRINT TAB(x,y) - text on the 8x8 character grid */
+function plot(str, cx, cy, colour){
+  ctx.fillStyle = ink(colour);
+  var px = cx*8, py = cy*8;
+  for(var i=0;i<str.length;i++){
+    var g = FONT[str.charAt(i)];
+    if(g){
+      for(var y=0;y<8;y++){
+        var m = g[y];
+        if(!m) continue;
+        for(var x=0;x<8;x++) if(m & (1<<x)) ctx.fillRect(px+x, py+y, 1, 1);
+      }
+    }
+    px += 8;
+  }
+}
+function centre(str, cy, colour){ plot(str, Math.round((40-str.length)/2), cy, colour); }
+
+/* ====================================================================
+   SOUND and ENVELOPE
+   The Model B's noise came from a Texas Instruments SN76489: three
+   square-wave tone channels and one noise channel. The MOS exposed it
+   as SOUND C,A,P,D with four programmable ENVELOPEs.
+
+     C  0 = noise, 1..3 = tone
+     A  0 to -15 fixed amplitude, or 1..4 to play under ENVELOPE 1..4
+     P  pitch, 0..255, four units to the semitone, 53 = middle C
+     D  duration in twentieths of a second
+
+     ENVELOPE N,T,PI1,PI2,PI3,PN1,PN2,PN3,AA,AD,AS,AR,ALA,ALD
+     T = step length in hundredths of a second; PIn/PNn = pitch change
+     per step and number of steps for each of three sections; AA/AD/AS/AR
+     = amplitude change per step for attack/decay/sustain/release;
+     ALA/ALD = the levels attack and decay aim at.
+
+   Re-synthesised here in Web Audio rather than emulated sample-exactly.
+   ==================================================================== */
+var Beeb = {
+  ac: null,
+  on: true,
+  master: null,
+  env: {},
+
+  wake: function(){
+    if(this.ac) { if(this.ac.state === "suspended") this.ac.resume(); return; }
+    var AC = window.AudioContext || window.webkitAudioContext;
+    if(!AC) { this.on = false; return; }
+    this.ac = new AC();
+    this.master = this.ac.createGain();
+    this.master.gain.value = 0.22;
+    this.master.connect(this.ac.destination);
+    /* one second of white noise, looped, for channel 0 */
+    var n = this.ac.sampleRate, buf = this.ac.createBuffer(1, n, n), d = buf.getChannelData(0);
+    for(var i=0;i<n;i++) d[i] = Math.random()*2 - 1;
+    this.noise = buf;
+  },
+
+  /* pitch 53 = middle C, four units to the semitone */
+  hz: function(p){ return 261.626 * Math.pow(2, (p - 53) / 48); },
+
+  ENVELOPE: function(n,T,pi1,pi2,pi3,pn1,pn2,pn3,aa,ad,as,ar,ala,ald){
+    this.env[n] = {T:(T&127)/100, pi:[pi1,pi2,pi3], pn:[pn1,pn2,pn3],
+                   aa:aa, ad:ad, as:as, ar:ar, ala:ala, ald:ald};
+  },
+
+  SOUND: function(c,a,p,d){
+    if(!this.on) return;
+    this.wake();
+    if(!this.ac) return;
+    var ac = this.ac, t0 = ac.currentTime, dur = Math.max(0.02, d/20);
+    var g = ac.createGain();
+    g.gain.value = 0;
+    g.connect(this.master);
+
+    var src, isNoise = (c === 0);
+    if(isNoise){
+      src = ac.createBufferSource();
+      src.buffer = this.noise;
+      src.loop = true;
+      var bp = ac.createBiquadFilter();
+      bp.type = "bandpass";
+      /* channel 0 pitches 0-3 are periodic and buzzy, 4-7 are hissier */
+      bp.frequency.value = (p < 4) ? 220 + p*260 : 900 + (p-4)*1500;
+      bp.Q.value = (p < 4) ? 3.2 : 0.7;
+      src.connect(bp); bp.connect(g);
+    } else {
+      src = ac.createOscillator();
+      src.type = "square";
+      src.frequency.setValueAtTime(this.hz(p), t0);
+    }
+
+    var e = (a >= 1) ? this.env[a] : null;
+    if(!e){
+      var lvl = Math.min(15, -a) / 15;
+      g.gain.setValueAtTime(0, t0);
+      g.gain.linearRampToValueAtTime(lvl, t0 + 0.006);
+      g.gain.setValueAtTime(lvl, t0 + dur*0.82);
+      g.gain.exponentialRampToValueAtTime(0.0008, t0 + dur);
+      src.start(t0); src.stop(t0 + dur + 0.02);
+      return;
+    }
+
+    /* amplitude: attack to ALA, decay to ALD, then sustain, then release */
+    var step = Math.max(0.005, e.T), amp = 0, t = t0, guard = 0;
+    g.gain.setValueAtTime(0, t0);
+    while(amp < e.ala && e.aa > 0 && guard++ < 400){
+      amp = Math.min(e.ala, amp + e.aa); t += step;
+      g.gain.linearRampToValueAtTime(amp/126, t);
+    }
+    guard = 0;
+    while(amp > e.ald && e.ad < 0 && guard++ < 400){
+      amp = Math.max(e.ald, amp + e.ad); t += step;
+      g.gain.linearRampToValueAtTime(amp/126, t);
+    }
+    var endS = t0 + dur;
+    if(t < endS){
+      amp = Math.max(0, amp + e.as * ((endS - t)/step));
+      g.gain.linearRampToValueAtTime(Math.max(0,amp)/126, endS);
+    }
+    var rel = e.ar ? Math.min(0.6, Math.abs(amp / e.ar) * step) : 0.05;
+    g.gain.linearRampToValueAtTime(0.0001, endS + rel);
+
+    /* pitch: three sections of PNn steps changing by PIn each */
+    if(!isNoise){
+      var pt = t0, pp = p;
+      for(var s=0;s<3;s++){
+        for(var k=0;k<e.pn[s];k++){
+          pp += e.pi[s]; pt += step;
+          if(pt > endS + rel) break;
+          src.frequency.linearRampToValueAtTime(this.hz(Math.max(0,Math.min(255,pp))), pt);
+        }
+      }
+    }
+    src.start(t0); src.stop(endS + rel + 0.02);
+  }
+};
+
+/* The one ENVELOPE legible in the photographed listing is line 40:
+   ENVELOPE1,1,-10,10,-10,33,33,33,...
+   A one-hundredth-of-a-second step, with the pitch swinging down ten,
+   up ten and down ten again over three sections of 33 steps: a warble
+   about a second long. That is the fly. The four amplitude parameters
+   and two levels were not legible and are chosen to suit.            */
+Beeb.ENVELOPE(1, 1, -10, 10, -10, 33, 33, 33,  8, -1, -1, -3, 90, 72);
+/* a short scrape for a brick dragging over a stone floor */
+Beeb.ENVELOPE(2, 2,  -4,   4,  -4,  4,  4,  4, 40, -6, -8, -9, 96, 60);
+/* the drop away when a brick goes over the edge and is lost */
+Beeb.ENVELOPE(3, 3,  -6,  -6,  -6, 12, 12, 12, 30, -2, -3, -6,100, 80);
+
+var FX = {
+  step:    function(){ Beeb.SOUND(1, -6, 40 + ((Math.random()*6)|0), 1); },
+  push:    function(){ Beeb.SOUND(2,  2, 24, 3); },
+  lost:    function(){ Beeb.SOUND(2,  3, 60, 8); },
+  crunch:  function(){ Beeb.SOUND(0, -13, 5, 6); Beeb.SOUND(2, -9, 12, 5); },
+  blocked: function(){ Beeb.SOUND(0, -6, 2, 1); },
+  buzz:    function(){ Beeb.SOUND(3,  1, 20 + ((Math.random()*8)|0), 6); },
+  trapped: function(){
+    var n = [53,57,60,65,69,72];
+    for(var i=0;i<n.length;i++) (function(p,i){
+      setTimeout(function(){ Beeb.SOUND(1, -12, p, 3); }, i*90);
+    })(n[i], i);
+  },
+  death: function(){
+    Beeb.SOUND(0, -14, 6, 22);
+    for(var i=0;i<14;i++) (function(i){
+      setTimeout(function(){ Beeb.SOUND(2, -11, 90 - i*6, 2); }, i*70);
+    })(i);
+  },
+  tick:  function(){ Beeb.SOUND(1, -7, 120, 1); },
+  bleep: function(){ Beeb.SOUND(1, -10, 89, 2); }
+};
+
+/* ====================================================================
+   THE GAME
+   ==================================================================== */
+var EMPTY = 0, BRICK = 1, WALL = 2;
+var G = new Uint8Array(GW*GH);
+
+var V = {                      /* the magazine's variable table */
+  HI: 0,        /* HI%  high score                      */
+  SC: 0,        /* SC%  score                           */
+  X1: 0, Y1: 0, /* X1%,Y1%  fly's position              */
+  OX: 0, OY: 0, /* OX%,OY%  fly's last position         */
+  J: 1,         /* J%   selected level of difficulty    */
+  P: 1,         /* P%   level of difficulty in play     */
+  PB: 0,        /* PB%  number of bricks displayed      */
+  PA: 0,        /* PA%  rate at which the fly follows   */
+  I: 0          /* I%   direction with brick moves      */
+};
+
+var mx = 2, my = 2, face = 1;
+var bricksLeft = 0, timeLeft = 0, timeLimit = 0, flyMs = 400, flyClock = 0;
+var enraged = false, dust = [], state = "title", stateT = 0, blink = 0;
+var bonusPot = 0, bonusT = 0, tickN = 0, titleFly = {x:-18, y:100, d:1};
+
+function at(x,y){ return (x<0||y<0||x>=GW||y>=GH) ? WALL : G[y*GW+x]; }
+function put(x,y,v){ if(x>=0&&y>=0&&x<GW&&y<GH) G[y*GW+x] = v; }
+function rnd(n){ return (Math.random()*n)|0; }
+
+/* --- PROCset_level: how many bricks, and how sharp the fly is ------ */
+function PROCset_level(){
+  var p = V.P;
+  V.PB = Math.max(26, 84 - p*6);      /* fewer bricks every sheet     */
+  V.PA = Math.min(94, 20 + p*8);      /* and a keener pursuit         */
+  flyMs = Math.max(130, 450 - p*32);
+  timeLimit = Math.max(45, 105 - p*5);
+}
+
+/* --- PROCnext_sheet: lay out the next cellar ----------------------- */
+function PROCnext_sheet(){
+  PROCset_level();
+  G.fill(EMPTY);
+  for(var x=0;x<GW;x++){ put(x,0,WALL); put(x,GH-1,WALL); }
+  for(var y=0;y<GH;y++){ put(0,y,WALL); put(GW-1,y,WALL); }
+
+  mx = 2; my = GH-3; face = 1;
+  V.X1 = GW-3; V.Y1 = 2; V.OX = V.X1; V.OY = V.Y1;
+
+  var placed = 0, tries = 0;
+  while(placed < V.PB && tries++ < 6000){
+    var bx = 1 + rnd(GW-2), by = 1 + rnd(GH-2);
+    if(at(bx,by) !== EMPTY) continue;
+    if(Math.max(Math.abs(bx-mx), Math.abs(by-my)) < 3) continue;
+    if(Math.max(Math.abs(bx-V.X1), Math.abs(by-V.Y1)) < 3) continue;
+    put(bx,by,BRICK); placed++;
+  }
+  bricksLeft = placed;
+  timeLeft = timeLimit;
+  enraged = false;
+  flyClock = 0;
+  dust.length = 0;
+  state = "play";
+}
+
+/* --- PROCmove_bricks: the man walks, and shoves what is in his way -- */
+function PROCmove_bricks(dx,dy){
+  V.I = dx + dy*10;
+  if(dx) face = dx;
+  var nx = mx+dx, ny = my+dy;
+
+  if(nx === V.X1 && ny === V.Y1){ PROCloss(); return; }
+
+  var c = at(nx,ny);
+  if(c === WALL){ FX.blocked(); return; }
+  if(c === EMPTY){ mx = nx; my = ny; FX.step(); checkTrap(); return; }
+
+  /* a run of bricks: find the cell beyond the last of them */
+  var n = 0, tx = nx, ty = ny;
+  while(at(tx,ty) === BRICK){ n++; tx += dx; ty += dy; }
+
+  if(tx === V.X1 && ty === V.Y1){
+    /* pushed straight at the fly - it crunches the lot to powder */
+    for(var k=0;k<n;k++){
+      put(nx+dx*k, ny+dy*k, EMPTY);
+      powder(nx+dx*k, ny+dy*k);
+    }
+    bricksLeft -= n;
+    FX.crunch();
+    return;                                   /* and he does not advance */
+  }
+
+  if(at(tx,ty) === WALL){
+    /* the leading brick goes over the edge of the cellar. Gone. */
+    put(nx,ny,EMPTY);
+    bricksLeft--;
+    powder(tx-dx, ty-dy);
+    FX.lost();
+  } else {
+    put(tx,ty,BRICK);
+    put(nx,ny,EMPTY);
+    FX.push();
+  }
+  mx = nx; my = ny;
+  checkTrap();
+}
+
+/* --- PROCmove_fly: PA% of the time it comes straight for you -------- */
+var STEPS = [[-1,0],[1,0],[0,-1],[0,1]];
+function PROCmove_fly(){
+  V.OX = V.X1; V.OY = V.Y1;
+  var open = [];
+  for(var i=0;i<4;i++){
+    var nx = V.X1+STEPS[i][0], ny = V.Y1+STEPS[i][1];
+    if(at(nx,ny) === EMPTY) open.push([nx,ny]);
+  }
+  if(!open.length) return;
+
+  var pick;
+  if(rnd(100) < V.PA){
+    var best = 1e9, cands = [];
+    for(var j=0;j<open.length;j++){
+      var d = Math.abs(open[j][0]-mx) + Math.abs(open[j][1]-my);
+      if(d < best){ best = d; cands = [open[j]]; }
+      else if(d === best) cands.push(open[j]);
+    }
+    pick = cands[rnd(cands.length)];
+  } else {
+    pick = open[rnd(open.length)];
+  }
+  V.X1 = pick[0]; V.Y1 = pick[1];
+  if(rnd(5) === 0) FX.buzz();
+  if(V.X1 === mx && V.Y1 === my){ PROCloss(); }
+}
+
+/* --- the win condition: it cannot move at all ---------------------- */
+function checkTrap(){
+  for(var i=0;i<4;i++)
+    if(at(V.X1+STEPS[i][0], V.Y1+STEPS[i][1]) === EMPTY) return false;
+  PROCbonus();
+  return true;
+}
+
+/* --- PROCbonus: a bonus in proportion to the time in reserve ------- */
+function PROCbonus(){
+  V.SC += 100 * V.P;
+  bonusPot = Math.max(0, Math.floor(timeLeft)) * 10 * V.P;
+  bonusT = 0;
+  state = "trapped";
+  stateT = 0;
+  FX.trapped();
+}
+
+/* --- PROCloss: curtains -------------------------------------------- */
+function PROCloss(){
+  if(state !== "play") return;
+  state = "dead"; stateT = 0;
+  for(var i=0;i<40;i++) powder(mx,my);
+  FX.death();
+  if(V.SC > V.HI) V.HI = V.SC;
+}
+
+function powder(cx,cy){
+  for(var i=0;i<7;i++)
+    dust.push({ x: cx*CELL+8+rnd(10)-5, y: TOP+cy*CELL+8+rnd(10)-5,
+                vx: (Math.random()-0.5)*40, vy: -8-Math.random()*34,
+                life: 0.5+Math.random()*0.5, c: [1,3,7][rnd(3)] });
+}
+
+/* ====================================================================
+   INPUT.  The original read the keyboard with negative INKEY:
+   Z left, X right, : up, / down.  Arrow keys are added for anyone
+   who no longer has a Model B on the desk.
+   ==================================================================== */
+var held = {}, repeatT = 0, REPEAT = 0.115;
+var KEYMAP = {
+  "z":"left", "arrowleft":"left",
+  "x":"right","arrowright":"right",
+  ":":"up",   ";":"up",  "arrowup":"up",
+  "/":"down", "arrowdown":"down"
+};
+
+function actOf(e){
+  var k = e.key.length === 1 ? e.key.toLowerCase() : e.key.toLowerCase();
+  return KEYMAP[k] || null;
+}
+
+window.addEventListener("keydown", function(e){
+  Beeb.wake();
+  var a = actOf(e);
+  if(a){ e.preventDefault(); if(!held[a]){ held[a] = true; repeatT = 0; step(a); } lightKey(a,true); return; }
+  var k = e.key.toLowerCase();
+  if(k === " " || k === "spacebar"){ e.preventDefault(); lightKey("fire",true); press(); return; }
+  if(k === "s"){ Beeb.on = true; FX.bleep(); lightKey("sound",true); return; }
+  if(k === "q"){ Beeb.on = false; lightKey("sound",true); return; }
+  if(k === "i" && state === "title"){ state = "instructions"; stateT = 0; FX.bleep(); return; }
+  if(k === "p" && (state === "play" || state === "paused")){
+    state = (state === "play") ? "paused" : "play"; return;
+  }
+  if(k === "escape"){ state = "title"; stateT = 0; return; }
+  if(state === "title" && k >= "1" && k <= "9"){ V.J = +k; FX.bleep(); }
+});
+window.addEventListener("keyup", function(e){
+  var a = actOf(e);
+  if(a){ held[a] = false; lightKey(a,false); }
+  var k = e.key.toLowerCase();
+  if(k === " ") lightKey("fire",false);
+  if(k === "s" || k === "q") lightKey("sound",false);
+});
+
+function press(){
+  if(state === "title"){ V.SC = 0; V.P = V.J; PROCnext_sheet(); }
+  else if(state === "instructions"){ state = "title"; stateT = 0; }
+  else if(state === "over"){ state = "title"; stateT = 0; }
+}
+
+function step(a){
+  if(state !== "play") return;
+  if(a === "left")  PROCmove_bricks(-1,0);
+  if(a === "right") PROCmove_bricks(1,0);
+  if(a === "up")    PROCmove_bricks(0,-1);
+  if(a === "down")  PROCmove_bricks(0,1);
+}
+
+/* the red key strip doubles as a live key indicator and a touch pad */
+var fkeys = {};
+Array.prototype.forEach.call(document.querySelectorAll(".fkey"), function(b){
+  var a = b.dataset.act;
+  fkeys[a] = b;
+  var down = function(ev){
+    ev.preventDefault(); Beeb.wake();
+    b.classList.add("lit");
+    if(a === "fire") press();
+    else if(a === "sound"){ Beeb.on = !Beeb.on; if(Beeb.on) FX.bleep(); }
+    else { held[a] = true; repeatT = 0; step(a); }
+  };
+  var up = function(){ b.classList.remove("lit"); if(held[a]) held[a] = false; };
+  b.addEventListener("pointerdown", down);
+  b.addEventListener("pointerup", up);
+  b.addEventListener("pointercancel", up);
+  b.addEventListener("pointerleave", up);
+});
+function lightKey(a,on){ if(fkeys[a]) fkeys[a].classList.toggle("lit", on); }
+
+/* ====================================================================
+   SCREENS
+   ==================================================================== */
+function panel(){
+  var sc = ("00000" + V.SC).slice(-6), hi = ("00000" + V.HI).slice(-6);
+  plot("SCORE " + sc, 1, 0, 3);
+  plot("HI " + hi, 30, 0, 6);
+  plot("CELLAR " + V.P, 1, 2, 7);
+  plot("BRICKS " + ("0" + bricksLeft).slice(-2), 13, 2, bricksLeft < 6 ? 9 : 2);
+  var t = Math.max(0, Math.ceil(timeLeft));
+  plot("TIME " + ("00" + t).slice(-3), 30, 2, (t < 15) ? 9 : 5);
+}
+
+function drawField(){
+  for(var y=0;y<GH;y++) for(var x=0;x<GW;x++){
+    var c = G[y*GW+x];
+    if(c === WALL)  ctx.drawImage(SPR.wall,  x*CELL, TOP+y*CELL);
+    if(c === BRICK) ctx.drawImage(SPR.brick, x*CELL, TOP+y*CELL);
+  }
+  var f = (blink & 1) ? SPR.fly1 : SPR.fly0;
+  if(state !== "dead" || (stateT*8|0) % 2 === 0)
+    ctx.drawImage(f, V.X1*CELL, TOP+V.Y1*CELL);
+  if(state !== "dead")
+    ctx.drawImage(face < 0 ? SPR.manL : SPR.man, mx*CELL, TOP+my*CELL);
+
+  for(var i=0;i<dust.length;i++){
+    var d = dust[i];
+    ctx.fillStyle = PAL[d.c];
+    ctx.fillRect(d.x|0, d.y|0, 2, 2);
+  }
+}
+
+var INSTR = [
+ "",
+ "     THE LOCALS TOLD YOU OF A",
+ "  FORTUNE HIDDEN IN THE CELLARS",
+ "     OF THE RUINS. IT IS NOT",
+ "        UNGUARDED. ON EVERY",
+ "   LEVEL WAITS A MUTANT FLY THE",
+ "           SIZE OF A MAN.",
+ "",
+ "  PUSH THE HOUSE BRICKS AROUND",
+ "  WITH Z X : AND / AND WALL THE",
+ "  BRUTE IN. SURROUND IT. DO NOT",
+ "        TRY TO CRUSH IT -",
+ "",
+ "  BRICKS SHOVED INTO THE FLY GO",
+ "  TO POWDER IN ITS JAWS, AND A",
+ "  BRICK PUSHED OFF THE EDGE OF",
+ "  THE CELLAR IS GONE FOR GOOD.",
+ "",
+ "  TRAP IT AGAINST THE CLOCK FOR",
+ "  A BONUS. EACH CELLAR DOWN HAS",
+ "  FEWER BRICKS AND A KEENER FLY.",
+ "",
+ "     YOU DIE ONCE. THAT IS ALL",
+ "          THE DYING YOU GET."
+];
+
+function PROCinstructions(){
+  cls(0);
+  centre("THE MENACE", 1, 9);
+  for(var i=0;i<INSTR.length;i++) if(INSTR[i]) plot(INSTR[i], 0, 3+i, i%2 ? 6 : 7);
+  if((blink & 1) === 0) centre("SPACE BAR TO CONTINUE", 29, 3);
+}
+
+function PROCtitle_page(){
+  cls(0);
+  centre("MENACE OF THE", 2, 3);
+  centre("MUTANT FLIES", 4, 9);
+  centre("BY JOHN MCCAULEY", 7, 7);
+  centre("{ THE MICRO USER   JULY 1985", 9, 2);
+
+  /* a fly cruising the title screen, as one always did */
+  var bandY = 100;
+  titleFly.x += 0.7;
+  if(titleFly.x > 336) titleFly.x = -18;
+  ctx.drawImage(SPR.man, 26, bandY);
+  ctx.drawImage(SPR.brick, 48, bandY);
+  ctx.drawImage((blink & 1) ? SPR.fly1 : SPR.fly0,
+                titleFly.x|0, bandY + (((blink>>1) & 1) ? -2 : 0));
+
+  centre("SELECT DIFFICULTY  1 TO 9", 17, 6);
+  centre("LEVEL " + V.J, 19, 3);
+  if((blink & 1) === 0) centre("SPACE BAR TO PLAY", 22, 3);
+  centre("I FOR INSTRUCTIONS", 24, 7);
+  centre("S FOR SOUND    Q FOR QUIET", 26, 5);
+  centre("HI-SCORE " + ("00000" + V.HI).slice(-6), 29, 6);
+}
+
+function PROCgame_over(){
+  cls(0);
+  centre("GAME OVER", 8, 9);
+  centre("YOU SCORED " + V.SC, 12, 3);
+  centre("YOU REACHED CELLAR " + V.P, 14, 7);
+  if(V.SC >= V.HI && V.SC > 0) centre("A NEW HIGH SCORE", 17, 10);
+  if((blink & 1) === 0) centre("SPACE BAR FOR ANOTHER GO", 22, 6);
+}
+
+/* ====================================================================
+   THE MAIN LOOP
+   ==================================================================== */
+var last = 0;
+function frame(ts){
+  requestAnimationFrame(frame);
+  var dt = last ? Math.min(0.05, (ts - last)/1000) : 0;
+  last = ts;
+  flashPhase = ((ts/500)|0) & 1;        /* the BBC's default flash rate */
+  blink = (ts/110)|0;
+  stateT += dt;
+
+  /* held keys auto-repeat, as *FX 11 did */
+  if(state === "play"){
+    repeatT += dt;
+    if(repeatT >= REPEAT){
+      repeatT = 0;
+      if(held.left) step("left");
+      else if(held.right) step("right");
+      else if(held.up) step("up");
+      else if(held.down) step("down");
+    }
+    timeLeft -= dt;
+    if(timeLeft <= 0){ timeLeft = 0; if(!enraged){ enraged = true; flyMs = Math.max(90, flyMs*0.55); } }
+    flyClock += dt*1000;
+    while(flyClock >= flyMs){ flyClock -= flyMs; if(state === "play") PROCmove_fly(); }
+  }
+
+  for(var i=dust.length-1;i>=0;i--){
+    var d = dust[i];
+    d.x += d.vx*dt; d.y += d.vy*dt; d.vy += 150*dt; d.life -= dt;
+    if(d.life <= 0) dust.splice(i,1);
+  }
+
+  if(state === "title"){ PROCtitle_page(); return; }
+  if(state === "instructions"){ PROCinstructions(); return; }
+  if(state === "over"){ PROCgame_over(); return; }
+
+  cls(0);
+  panel();
+  drawField();
+
+  if(state === "paused"){
+    if((blink & 1) === 0) centre("PAUSED", 16, 10);
+  }
+  if(state === "play" && enraged && (blink & 1) === 0){
+    centre("THE FLY IS ENRAGED", 30, 9);
+  }
+  if(state === "play" && bricksLeft < 6 && (blink & 1) === 0){
+    centre("BRICKS RUNNING OUT", 31, 9);
+  }
+
+  if(state === "trapped"){
+    centre("TRAPPED", 30, 10);
+    bonusT += dt;
+    if(bonusT > 0.6){
+      var take = Math.min(bonusPot, Math.max(10, Math.ceil(bonusPot/20)));
+      if(bonusPot > 0){
+        bonusPot -= take; V.SC += take;
+        if((tickN++ % 3) === 0) FX.tick();
+      } else if(stateT > 2.4){
+        V.P++; PROCnext_sheet(); return;
+      }
+    }
+    plot("BONUS " + bonusPot, 13, 31, 3);
+  }
+
+  if(state === "dead"){
+    if((blink & 1) === 0) centre("AAARGH", 30, 9);
+    if(stateT > 2.8){ state = "over"; stateT = 0; }
+  }
+}
+
+/* PROCtitle_page is where a BBC game started, and so does this one */
+state = "title";
+requestAnimationFrame(frame);
+</script>
+
+</body>
+</html>
