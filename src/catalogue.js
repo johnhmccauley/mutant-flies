@@ -23,6 +23,45 @@
   /* what a level can be, and the only ways it may move between them */
   var PRIVATE = "private", PUBLIC = "public", HIDDEN = "hidden";
 
+  /* ------------------------------------------------------------------
+     What a dollar buys.
+
+     Five cellars are free, and they are the real five - the 1985 game
+     and the first of the new ones - not a demo. Cellars one to four say
+     nothing about any of this: no editor, no catalogue, nothing but the
+     game. Reach the fifth and both appear at once, greyed: the editor
+     sits in the menu not working, and everybody else's work is there to
+     read - what people have built, what it is called, how it is rated,
+     how many have played it. You just cannot open any of it.
+
+     Showing the locked thing rather than hiding it is deliberate. A
+     player who cannot see what is behind the paywall has no reason to
+     go through it, and a menu that grows a new item the moment you pay
+     feels like a different game arriving. This way the shape of the
+     whole thing is visible from cellar five, and the pound removes the
+     grey rather than adding anything.
+     ------------------------------------------------------------------ */
+  var FREE_CELLARS = 5, EDITOR_AT = 5;
+
+  function gate(who) {
+    var reached = who.reached || 1;
+    var paid = !!who.paid;
+    return {
+      freeCellars: FREE_CELLARS,
+      /* the editor is in the menu from here, working or not */
+      editorShown: reached >= EDITOR_AT,
+      editorEnabled: reached >= EDITOR_AT && paid,
+      /* it arrives with the editor and is readable but never playable */
+      catalogueShown: reached >= EDITOR_AT,
+      cataloguePlayable: paid,
+      /* and the descent itself stops at the fifth cellar */
+      canDescendTo: paid ? Infinity : FREE_CELLARS,
+      paid: paid
+    };
+  }
+
+  function canDescend(who, cellar) { return cellar <= gate(who).canDescendTo; }
+
   function stars(rec) {
     if (!rec.ratings || !rec.ratings.count) return -1;   /* unrated sorts last */
     return rec.ratings.total / rec.ratings.count;
@@ -67,10 +106,12 @@
     return false;
   }
 
+  /* Seeing a level in the list is not the same as being able to open
+     it. A free player browses the whole catalogue and plays none of it,
+     including - since making one needs the editor - their own. */
   function canPlay(rec, who) {
     if (!visibleTo(rec, who)) return false;
-    if (rec.owner && rec.owner === who.id) return true;
-    return !!who.paid;                      /* other people's levels are paid for */
+    return !!who.paid;
   }
 
   /* --------------------------------------------------------------
@@ -81,7 +122,11 @@
      some of them still have it. Hiding is the way back, not deleting.
      -------------------------------------------------------------- */
   function canDelete(rec) { return rec.state === PRIVATE && !rec.everPublic; }
-  function canEdit(rec, who) { return !!rec.owner && rec.owner === who.id; }
+  function canEdit(rec, who) {
+    if (!rec.owner || rec.owner !== who.id) return false;
+    return gate(who).editorEnabled;
+  }
+  function canCreate(who) { return gate(who).editorEnabled; }
 
   var MOVES = {};
   MOVES[PRIVATE] = [PUBLIC];
@@ -125,6 +170,8 @@
 
   root.MutantCatalogue = {
     PRIVATE: PRIVATE, PUBLIC: PUBLIC, HIDDEN: HIDDEN,
+    FREE_CELLARS: FREE_CELLARS, EDITOR_AT: EDITOR_AT,
+    gate: gate, canDescend: canDescend, canCreate: canCreate,
     stars: stars, plays: plays, sortLevels: sortLevels, SORTS: SORTS,
     visibleTo: visibleTo, canPlay: canPlay, canDelete: canDelete,
     canEdit: canEdit, canMove: canMove, move: move,

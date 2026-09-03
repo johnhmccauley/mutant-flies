@@ -43,6 +43,9 @@ jobs:
       - name: Check a level packs into a code and back
         run: node tools/test-levelio.js
 
+      - name: Check a player can be known without logging in
+        run: node tools/test-identity.js
+
       - uses: actions/configure-pages@v5
         with:
           enablement: true

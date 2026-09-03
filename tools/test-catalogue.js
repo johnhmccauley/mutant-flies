@@ -114,9 +114,9 @@ console.log("\nThe order things come in\n");
 }
 
 console.log("\nWho may do what\n");
-const amy = { id: "amy", paid: true, played: {} };
-const bob = { id: "bob", paid: true, played: {} };
-const cid = { id: "cid", paid: false, played: {} };
+const amy = { id: "amy", reached: 9, paid: true, played: {} };
+const bob = { id: "bob", reached: 9, paid: true, played: {} };
+const cid = { id: "cid", reached: 9, paid: false, played: {} };
 {
   const r = lvl("r", { state: C.PRIVATE, everPublic: false });
   ok("a private level is the author's alone",
@@ -145,8 +145,12 @@ const cid = { id: "cid", paid: false, played: {} };
   const r = lvl("r", { state: C.PUBLIC, owner: "amy" });
   ok("other people's levels are for paying players",
      [C.canPlay(r, bob), C.canPlay(r, cid)], [true, false]);
-  ok("but the author never has to pay for their own",
-     C.canPlay(r, { id: "amy", paid: false, played: {} }), true);
+  /* and so are your own. The dollar is what buys the editor, so an
+     author who has not paid is one who has lost their key and started
+     again on a new machine - and they are back to the five free cellars
+     like anybody else until they paste their recovery code in. */
+  ok("including the author's own, if the money is not there",
+     C.canPlay(r, { id: "amy", reached: 9, paid: false, played: {} }), false);
 }
 {
   const r = lvl("r", { state: C.PUBLIC, owner: "amy" });
@@ -171,6 +175,54 @@ console.log("\nStars\n");
      [r.ratings.count, C.stars(r)], [2, 2]);
   C.rate(r, b, 9);
   ok("a rating outside one to five is pulled back into range", r.ratings.by.bob, 5);
+}
+
+
+console.log("\nWhat a dollar buys\n");
+{
+  const early = C.gate({ id: "a", reached: 4, paid: false });
+  ok("cellars one to four say nothing about any of it",
+     [early.editorShown, early.catalogueShown], [false, false]);
+}
+{
+  const early = C.gate({ id: "a", reached: 4, paid: true });
+  ok("and not even if you have paid - it is the fifth that opens it",
+     [early.editorShown, early.catalogueShown], [false, false]);
+}
+{
+  const free = C.gate({ id: "a", reached: 5, paid: false });
+  ok("at the fifth both appear, and neither works",
+     [free.editorShown, free.editorEnabled, free.catalogueShown, free.cataloguePlayable],
+     [true, false, true, false]);
+  ok("and the descent stops there", [C.canDescend({ paid: false }, 5), C.canDescend({ paid: false }, 6)],
+     [true, false]);
+}
+{
+  const paid = C.gate({ id: "a", reached: 5, paid: true });
+  ok("a dollar turns all four on",
+     [paid.editorShown, paid.editorEnabled, paid.catalogueShown, paid.cataloguePlayable],
+     [true, true, true, true]);
+  ok("and lets the descent carry on", C.canDescend({ paid: true }, 400), true);
+}
+{
+  /* a free player browses the whole catalogue and opens none of it -
+     including, since making one needs the editor, their own */
+  const r = lvl("r", { state: C.PUBLIC, owner: "amy" });
+  const looker = { id: "zoe", reached: 9, paid: false, played: {} };
+  ok("a free player can see a level but not play it",
+     [C.visibleTo(r, looker), C.canPlay(r, looker)], [true, false]);
+  const owner = { id: "amy", reached: 9, paid: false, played: {} };
+  ok("and cannot play their own either once the money has lapsed",
+     C.canPlay(r, owner), false);
+  ok("nor edit it", C.canEdit(r, owner), false);
+  ok("nor make a new one", C.canCreate(owner), false);
+}
+{
+  const owner = { id: "amy", reached: 9, paid: true, played: {} };
+  const r = lvl("r", { state: C.PRIVATE, owner: "amy", everPublic: false });
+  ok("a paid author may make and edit", [C.canCreate(owner), C.canEdit(r, owner)], [true, true]);
+  const tooEarly = { id: "amy", reached: 3, paid: true, played: {} };
+  ok("but not before the fifth cellar", C.canCreate(tooEarly), false);
 }
 
 console.log("\n" + pass + " passed, " + fail + " failed");
