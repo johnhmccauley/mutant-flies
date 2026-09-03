@@ -104,9 +104,10 @@ const marble = (g, c, r) => { g.grid[I(c, r)] = MF.MARBLE; const m = { c, r, dc:
   ok("a saw is good for the trees it has and no more", g.saw, 0);
 }
 {
-  /* a tree will hold a monster in, in the deep cellars */
+  /* a tree will hold a monster in, in the deep cellars. Use a spider:
+     what is under test is the fixture, and the fly is two squares long */
   const g = bare();
-  const m = monster(g, "fly", 15, 15);
+  const m = monster(g, "spider", 15, 15);
   g.leash = 0;
   put(g, 16, 15, MF.TREE); put(g, 14, 15); put(g, 15, 16); put(g, 15, 14);
   const ev = g.step(null);
@@ -198,7 +199,7 @@ function roll(g, times) {
 {
   /* a resting marble is as good as a brick for walling something in */
   const g = bare();
-  const mon = monster(g, "fly", 15, 15);
+  const mon = monster(g, "spider", 15, 15);
   g.leash = 0;
   marble(g, 16, 15);
   put(g, 14, 15); put(g, 15, 16); put(g, 15, 14);
@@ -378,6 +379,81 @@ function settle(g, turns) {
   ok("the classic cellar has nothing in it but bricks", found, 0);
 }
 
+/* ================= the fly is two squares long ==================== */
+{
+  const g = bare();
+  const f = monster(g, "fly", 15, 15);
+  ok("the fly lies across two squares",
+     [g.cellsOf(f).length, g.isPartOf(f, 15, 15), g.isPartOf(f, 14, 15)],
+     [2, true, true]);
+  ok("and both of them are it", [!!g.monsterAt(15, 15), !!g.monsterAt(14, 15)], [true, true]);
+}
+{
+  /* four bricks round the head is not enough any more - the tail is out */
+  const g = bare();
+  const f = monster(g, "fly", 15, 15);
+  f.tc = 14; f.tr = 15;
+  g.leash = 0; g.manC = 2; g.manR = 2;
+  put(g, 16, 15); put(g, 15, 16); put(g, 15, 14);
+  ok("walling the head in leaves the tail loose", g.step(null).won, false);
+}
+{
+  /* seal both ends and it is held - six bricks, not four */
+  const g = bare();
+  const f = monster(g, "fly", 15, 15);
+  f.tc = 14; f.tr = 15;
+  g.leash = 0; g.manC = 2; g.manR = 2;
+  put(g, 16, 15); put(g, 15, 16); put(g, 15, 14);
+  put(g, 13, 15); put(g, 14, 16); put(g, 14, 14);
+  const ev = g.step(null);
+  ok("sealing both ends walls it in", [ev.won, f.trapped, f.crushed], [true, true, false]);
+}
+{
+  /* when trapped it cannot be killed - it is held, and alive */
+  const g = bare();
+  const f = monster(g, "fly", 15, 15);
+  f.tc = 14; f.tr = 15; f.trapped = true;
+  g.manC = 2; g.manR = 2;
+  ok("a walled-in fly is alive, not dead", [f.trapped, f.crushed, f.gone], [true, false, undefined || false]);
+}
+{
+  /* a brick driven at it while it still has room is just destroyed */
+  const g = bare();
+  const f = monster(g, "fly", 14, 10);
+  f.tc = 15; f.tr = 10;                       /* tail to the east, room all round */
+  g.leash = 0;
+  put(g, 11, 10); put(g, 12, 10); put(g, 13, 10);   /* run ends on its head */
+  g.manC = 10; g.manR = 10; g.steps = 3;
+  const ev = g.step("right");
+  ok("driven at a fly with room to move, the brick is just eaten",
+     [ev.crunched, ev.squashed.length, f.crushed], [1, 0, false]);
+}
+{
+  /* head in a dead end, tail sticking out: drive a brick into the tail
+     and it has nowhere left to be */
+  const g = bare();
+  const f = monster(g, "fly", 15, 10);
+  f.tc = 14; f.tr = 10;
+  g.leash = 0; g.manC = 12; g.manR = 10; g.steps = 3;
+  /* seal the head end and both flanks, leaving only the way the man came */
+  put(g, 16, 10); put(g, 15, 11); put(g, 15, 9);
+  put(g, 14, 11); put(g, 14, 9);
+  ok("head stuck but tail exposed is not yet walled in", g.isBoxed(f), false);
+  put(g, 13, 10);                              /* the brick he will shove */
+  const ev = g.step("right");
+  ok("a brick driven into the last square crushes it",
+     [ev.squashed.length, f.crushed, f.gone], [1, true, true]);
+  ok("and the brick stays where it landed", g.grid[I(14, 10)], MF.BRICK);
+  ok("crushing clears the cellar", g.won || g.loose() === 0, true);
+}
+{
+  /* the classic fly is one square: VDU226 and 227 are drawn at the same
+     position in two colours, not on two cells */
+  const g = new MF.Game({ classic: true });
+  g.sheet();
+  ok("the 1985 fly is one square", g.cellsOf(g.monsters[0]).length, 1);
+}
+
 /* ================= what stops a shove ============================= */
 {
   /* a line of bricks driven into a tree simply stops, and so does he */
@@ -448,7 +524,7 @@ function settle(g, turns) {
 }
 {
   const g = bare();
-  const m = monster(g, "fly", 15, 15);
+  const m = monster(g, "spider", 15, 15);
   g.leash = 0;
   put(g, 16, 15, MF.CHOPPER); put(g, 14, 15); put(g, 15, 16); put(g, 15, 14);
   ok("a chopper holds a monster in like any other fixture", g.step(null).won, true);

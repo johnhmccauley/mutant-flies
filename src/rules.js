@@ -119,9 +119,14 @@
   var MONSTERS = {
     fly: {
       name: "Fly", colour: 0x3d63c4, dark: 0x1e2c5c, eye: 0x8e1208,
-      blurb: "Wanders, and never lets you get far.",
+      blurb: "The size of a man - it lies across two squares.",
       drone: [0, -10, 23, 1],
-      move: function (m, g) { leashStep(m, g, g.leash); }
+      size: 2,
+      move: function (m, g) {
+        var oc = m.c, or = m.r;
+        leashStep(m, g, g.leash);
+        if (m.c !== oc || m.r !== or) { m.tc = oc; m.tr = or; }   /* the tail follows */
+      }
     },
     spider: {
       name: "Spider", colour: 0x6b4a2a, dark: 0x2e1e10, eye: 0xd8c020,
@@ -310,10 +315,20 @@
     if (v === MARBLE) { var m = this.marbleAt(c, r); return !!m && m.v <= 0; }
     return false;
   };
+  /* every square a monster is lying on */
+  Game.prototype.cellsOf = function (m) {
+    return (m.spec.size === 2 && m.tc !== undefined)
+      ? [[m.c, m.r], [m.tc, m.tr]] : [[m.c, m.r]];
+  };
+  Game.prototype.isPartOf = function (m, c, r) {
+    var cs = this.cellsOf(m);
+    for (var i = 0; i < cs.length; i++) if (cs[i][0] === c && cs[i][1] === r) return true;
+    return false;
+  };
   Game.prototype.monsterAt = function (c, r, except) {
     for (var i = 0; i < this.monsters.length; i++) {
       var m = this.monsters[i];
-      if (m !== except && !m.gone && m.c === c && m.r === r) return m;
+      if (m !== except && !m.gone && this.isPartOf(m, c, r)) return m;
     }
     return null;
   };
@@ -392,14 +407,22 @@
   };
 
   Game.prototype.newMonster = function (kind, c, r) {
-    return { kind: kind, spec: MONSTERS[kind], c: c, r: r,
-             tick: 0, trapped: false, crushed: false, gone: false, ate: false };
+    var m = { kind: kind, spec: MONSTERS[kind], c: c, r: r,
+              tick: 0, trapped: false, crushed: false, gone: false, ate: false };
+    /* The 1985 fly is one square: VDU 226 and 227 are two characters
+       drawn at the SAME graphics position in two colours, not two cells.
+       It only lies across two squares in the deep cellars. */
+    if (!this.classic && MONSTERS[kind].size === 2) {
+      m.tc = Math.max(1, c - 1); m.tr = r;
+    }
+    return m;
   };
 
   Game.prototype.nearMonster = function (c, r) {
     for (var i = 0; i < this.monsters.length; i++) {
-      var m = this.monsters[i];
-      if (Math.abs(m.c - c) <= 1 && Math.abs(m.r - r) <= 1) return true;
+      var cs = this.cellsOf(this.monsters[i]);
+      for (var k = 0; k < cs.length; k++)
+        if (Math.abs(cs[k][0] - c) <= 1 && Math.abs(cs[k][1] - r) <= 1) return true;
     }
     return false;
   };
@@ -473,9 +496,38 @@
     return true;
   };
 
+  /* Walled in: no square it is lying on has anywhere to go. A two-square
+     monster therefore needs a pocket sealed all the way round both ends,
+     which takes six bricks rather than four. */
   Game.prototype.isBoxed = function (m) {
-    return this.solid(m.c + 1, m.r) && this.solid(m.c - 1, m.r) &&
-           this.solid(m.c, m.r + 1) && this.solid(m.c, m.r - 1);
+    var cs = this.cellsOf(m), D = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+    for (var i = 0; i < cs.length; i++) {
+      for (var d = 0; d < 4; d++) {
+        var nc = cs[i][0] + D[d][0], nr = cs[i][1] + D[d][1];
+        if (this.isPartOf(m, nc, nr)) continue;      /* its own other end */
+        /* Outside the playfield POINT read -1, never colour 2, so the
+           cellar edge is no help at all - a cornered monster can never
+           be walled in. That is the original's rule and it stands. */
+        if (!this.inField(nc, nr)) return false;
+        if (!this.solid(nc, nr)) return false;
+      }
+    }
+    return true;
+  };
+
+  /* Could it still shift off the square that is about to be filled? If
+     not, filling that square leaves it nowhere to be and it is crushed. */
+  Game.prototype.canRetreat = function (m, bc, br) {
+    var cs = this.cellsOf(m), D = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+    for (var i = 0; i < cs.length; i++) {
+      for (var d = 0; d < 4; d++) {
+        var nc = cs[i][0] + D[d][0], nr = cs[i][1] + D[d][1];
+        if (nc === bc && nr === br) continue;
+        if (this.isPartOf(m, nc, nr)) continue;
+        if (this.inField(nc, nr) && !this.solid(nc, nr) && !this.monsterAt(nc, nr, m)) return true;
+      }
+    }
+    return false;
   };
   Game.prototype.loose = function () {
     var n = 0;
@@ -511,7 +563,7 @@
                smashed: 0, crushed: [], trappedNow: [], won: false, lost: false,
                lostTo: null, bonus: 0, stuck: false, spawned: null,
                burst: 0, burned: 0, doused: 0, swept: 0, set: 0,
-               blocked: false, chopped_brick: 0 };
+               blocked: false, chopped_brick: 0, squashed: [] };
     if (this.over || this.won) return ev;
 
     /* --- step points ------------------------------------------------
@@ -637,10 +689,21 @@
                   return false;
                 }
               } else if (blocker) {
-                /* driven straight at a monster. The brick lands on its
-                   square and its redraw wipes it, so the leading brick -
-                   and only the leading brick - is destroyed. */
-                ev.crunched = 1; ev.crunchedBy = blocker; this.bricks--;
+                if (!this.canRetreat(blocker, cc, rr)) {
+                  /* it has nowhere left to go. The brick goes in, and what
+                     was lying across two squares is now lying across one. */
+                  this.grid[this.idx(cc, rr)] = BRICK;
+                  blocker.gone = true; blocker.trapped = true;
+                  blocker.crushed = true; blocker.crushedAt = [cc, rr];
+                  ev.squashed.push(blocker);
+                  this.SC += 250;
+                } else {
+                  /* driven straight at a monster with room to shrug it off.
+                     The brick lands on its square and its redraw wipes it,
+                     so the leading brick - and only the leading brick - is
+                     destroyed. */
+                  ev.crunched = 1; ev.crunchedBy = blocker; this.bricks--;
+                }
               } else if (beyond === CHOPPER) {
                 /* the one thing left down here that still takes bricks
                    off you - it comes out the far side as splinters */
@@ -905,7 +968,7 @@
 
       var mon = this.monsterAt(c, r);
       if (mon && !mon.gone) {
-        mon.gone = true; mon.trapped = true; mon.crushed = true;
+        mon.gone = true; mon.trapped = true; mon.burnt = true;
         ev.crushed.push(mon); this.SC += 120;
       }
       /* and it will take a neighbouring vat with it, which is how a
