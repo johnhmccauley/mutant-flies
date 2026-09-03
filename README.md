@@ -11,7 +11,9 @@ program listing from page 168.
 
 Runs in any browser. One file, no dependencies, no build step.
 
-**Play it:** open `index.html`.
+### ▶ Play it: <https://johnhmccauley.github.io/mutant-flies/>
+
+Or open `index.html` from a local copy.
 
 ---
 
@@ -129,14 +131,29 @@ Reconstruction, where the article stops short:
 ## Files
 
 ```
-index.html   the whole game — markup, styles, and script in one file
-tools/       makes the embeddable (headless) copy used for web publishing
+index.html          the whole game — markup, styles and script in one file
+tools/check.js      geometry, syntax and procedure checks
+tools/make-artifact.js  derives the embeddable (headless) copy
+.github/workflows/  publishes the site on every push to main
 ```
 
 ## Versions
 
-- **v1** — the game, playable locally.
-- **v2** — published to the web so it can be played from anywhere.
+- **v1** — the game, playable locally from `index.html`.
+- **v2** — published to the web at
+  <https://johnhmccauley.github.io/mutant-flies/> so it can be played from
+  anywhere, on anything with a browser.
+
+Every push to `main` republishes the site. `.github/workflows/pages.yml` runs
+`tools/check.js` first, so a broken sprite, a malformed font glyph or a syntax
+error stops the deploy instead of shipping a blank screen.
+
+## Checking a change
+
+```
+node tools/check.js          # sprite and font geometry, script parses, procedures intact
+node tools/make-artifact.js  # regenerate the embeddable copy
+```
 
 ## Licence
 
