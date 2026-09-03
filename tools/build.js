@@ -54,4 +54,29 @@ for (const page of PAGES) {
   console.log("  ok    " + page + " - " + changed + " source(s) inlined, " + html.length + " chars");
   total += changed;
 }
+
+/* ------------------------------------------------------------------
+   Stamp the service worker.
+
+   Its cache is named after this hash, so changing any file the game
+   needs offline gives the next visitor a new cache and bins the old
+   one. Bumping a version by hand is how people ship a fix nobody can
+   see, because every browser is still serving last month's copy.
+   ------------------------------------------------------------------ */
+const crypto = require("crypto");
+const SW = path.join(root, "sw.js");
+if (fs.existsSync(SW)) {
+  const src = fs.readFileSync(SW, "utf8");
+  const listed = [...src.matchAll(/^\s*"([^"]+)",?$/gm)].map((m) => m[1]);
+  const h = crypto.createHash("sha256");
+  for (const rel of listed.sort()) {
+    const f = path.join(root, rel.replace(/\/$/, "/index.html"));
+    if (fs.existsSync(f) && fs.statSync(f).isFile()) h.update(fs.readFileSync(f));
+  }
+  const stamp = h.digest("hex").slice(0, 12);
+  const out = src.replace(/const VERSION = "[^"]*";/, 'const VERSION = "' + stamp + '";');
+  if (out !== src) fs.writeFileSync(SW, out);
+  console.log("  ok    sw.js - offline cache stamped " + stamp);
+}
+
 console.log(total ? "\ninlined " + total + " source file(s)" : "\nnothing to inline");

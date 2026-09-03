@@ -4,7 +4,11 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>Mutant Fly</title>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo+Narrow:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="vendor/fonts.css">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<meta name="theme-color" content="#14110c">
+<meta name="mobile-web-app-capable" content="yes">
 <style>
   :root{
     --torch:#ff9b3d; --torch-dim:#c66a1e;
@@ -336,8 +340,8 @@
   </div>
 </div>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
+<script src="vendor/three.min.js"></script>
+<script src="vendor/GLTFLoader.js"></script>
 <!--inline:src/rules.js-->
 <script>
 /* =====================================================================
@@ -4324,12 +4328,18 @@ function syncTerrain() {
   /* and a ramp down every edge where the floor drops */
   /* how far into the low square the slope reaches. A tall step wants a
      longer run or it is a cliff with a bevel on it rather than a slope */
+  /* [dc, dr, which way the slope faces]. The slope is cut out of the
+     HIGH square's own edge and stops dead at the boundary, so it never
+     reaches into the low square. That matters: a square is either flat
+     or it is the edge, and everything the game puts down - bricks,
+     rocks, trees, the man - rests on a flat square. A block sitting on
+     a slope would have to lie at the same angle, and two of them side
+     by side would then be inside each other. So nothing ever does. */
   var SIDES = [
-    /* [dc, dr, offset c, offset r, turn] - which way the slope faces */
-    [ 1,  0,  0.5,  0.0,  Math.PI / 2],
-    [-1,  0, -0.5,  0.0, -Math.PI / 2],
-    [ 0,  1,  0.0,  0.5,  Math.PI],
-    [ 0, -1,  0.0, -0.5,  0]
+    [ 1,  0,  Math.PI / 2],
+    [-1,  0, -Math.PI / 2],
+    [ 0,  1,  Math.PI],
+    [ 0, -1,  0]
   ];
   var nr2 = 0, rc = new THREE.Color();
   for (var r2 = 0; r2 < ROWS; r2++) for (var c2 = 0; c2 < COLS; c2++) {
@@ -4341,8 +4351,12 @@ function syncTerrain() {
       var lo = game.height[nr3 * COLS + nc2];
       if (lo >= hi) continue;
       var dh = (hi - lo) * STEP;
-      var run = Math.min(0.95, 0.3 + dh * 0.45);
-      placeAt(rampMesh, nr2, c2 + S[2], r2 + S[3], hi * STEP, 1, dh, run, S[4]);
+      /* it has to fit inside the square it belongs to, so a tall step is
+         steeper rather than longer - there is nowhere else for it to go */
+      var run = Math.min(0.5, 0.24 + dh * 0.3);
+      placeAt(rampMesh, nr2,
+              c2 + S[0] * (0.5 - run), r2 + S[1] * (0.5 - run),
+              hi * STEP, 1, dh, run, S[2]);
       /* the ramp belongs to the high ground, so it takes its colour */
       var bb = hash2(r2 + 91, c2 + 17);
       var vv = 0.56 + 0.17 * hi + (bb - 0.5) * 0.1;
@@ -5174,6 +5188,17 @@ if (!window.THREE) {
   init3D();
   enterTitle();
   frame();
+}
+</script>
+
+<script>
+/* Offline. Registered after load so it never delays the first cellar,
+   and wrapped because a page opened straight off the disk has no
+   service workers at all - which must not stop the game running. */
+if ("serviceWorker" in navigator && location.protocol.indexOf("http") === 0) {
+  addEventListener("load", function () {
+    navigator.serviceWorker.register("sw.js").catch(function () {});
+  });
 }
 </script>
 </body>

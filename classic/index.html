@@ -4,7 +4,11 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Mutant Fly (1985)</title>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo+Narrow:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="../vendor/fonts.css">
+<link rel="manifest" href="../manifest.webmanifest">
+<link rel="apple-touch-icon" href="../icons/apple-touch-icon.png">
+<meta name="theme-color" content="#14110c">
+<meta name="mobile-web-app-capable" content="yes">
 <style>
   :root{
     --case:#d9d2c0; --case-hi:#e7e1d2; --case-sh:#b7af9b; --case-dk:#8b8375;
@@ -2603,6 +2607,17 @@ function frame(ts){
 }
 var flyT = 0;
 requestAnimationFrame(frame);
+</script>
+
+<script>
+/* Offline. Registered after load so it never delays the first cellar,
+   and wrapped because a page opened straight off the disk has no
+   service workers at all - which must not stop the game running. */
+if ("serviceWorker" in navigator && location.protocol.indexOf("http") === 0) {
+  addEventListener("load", function () {
+    navigator.serviceWorker.register("../sw.js").catch(function () {});
+  });
+}
 </script>
 </body>
 </html>

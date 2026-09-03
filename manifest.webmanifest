@@ -1,0 +1,26 @@
+{
+  "name": "Mutant Fly",
+  "short_name": "Mutant Fly",
+  "description": "A fortune lies in the cellars under the ruins, and something is guarding every level down. You cannot kill it - you can only wall it in.",
+  "id": "./",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#14110c",
+  "theme_color": "#14110c",
+  "categories": ["games"],
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ],
+  "shortcuts": [
+    {
+      "name": "The 1985 screen",
+      "short_name": "1985",
+      "description": "The game as it was on a Model B, in MODE 1",
+      "url": "classic/"
+    }
+  ]
+}

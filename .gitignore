@@ -2,3 +2,6 @@ mutant-flies.html
 classic-1985.html
 assets/*.glb
 tools/_patch_*.py
+
+# the local dev server config lives in the session, not the repo
+.claude/
