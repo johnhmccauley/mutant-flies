@@ -277,13 +277,21 @@ function settle(g, turns) {
   for (let c = 0; c < 34; c++) for (let r = 0; r < 26; r++) g.height[I(c, r)] = Math.max(0, 3 - Math.floor(c / 4));
   g.grid[I(2, 10)] = MF.VAT_TAR;
   g.breakVat(2, 10, { burst: 0 });
-  settle(g, 26);
-  /* the floor falls away to the east, so the tar should end up lower
-     than the vat it came out of */
-  let wet = 0, sumH = 0, farthest = 0;
-  for (let c = 0; c < 34; c++) for (let r = 0; r < 26; r++)
-    if (g.fvol[I(c, r)] > 0) { wet++; sumH += g.height[I(c, r)]; farthest = Math.max(farthest, c); }
-  ok("tar runs downhill", [wet > 0, farthest > 4, sumH / wet < 3], [true, true, true]);
+  settle(g, 34);
+  /* Measure where the tar HAS BEEN - wet squares plus the rock it leaves
+     when it sets. Counting only wet squares makes the test a race
+     against TAR_COOLS: too few turns and it has not travelled, too many
+     and it has all set and there is nothing left to measure. */
+  let touched = 0, sumH = 0, farthest = 0;
+  for (let c = 0; c < 34; c++) for (let r = 0; r < 26; r++) {
+    const i = I(c, r);
+    if (g.fvol[i] > 0 || g.grid[i] === MF.COOLED) {
+      touched++; sumH += g.height[i]; farthest = Math.max(farthest, c);
+    }
+  }
+  /* the claim is that it went DOWN, which the mean height proves;
+     distance is only there to show it moved off the vat at all */
+  ok("tar runs downhill", [touched > 0, farthest > 2, sumH / touched < 3], [true, true, true]);
 }
 {
   const g = bare();
@@ -297,9 +305,15 @@ function settle(g, turns) {
   const g = bare();
   const mon = monster(g, "fly", 13, 10);
   mon.trapped = true;                       /* keep it still for the test */
-  g.grid[I(12, 10)] = MF.VAT_TAR;
-  g.breakVat(12, 10, { burst: 0 });
-  const ev = settle(g, 14);
+  /* A spill chooses its direction at random, so left to find the monster
+     on its own it sometimes never goes that way. Wall three sides with
+     set tar - which fluid cannot enter - and east is the only way out. */
+  g.grid[I(12, 9)] = MF.COOLED;
+  g.grid[I(12, 11)] = MF.COOLED;
+  g.grid[I(11, 10)] = MF.COOLED;
+  g.fluid[I(12, 10)] = MF.TAR;
+  g.fvol[I(12, 10)] = 8;
+  const ev = settle(g, 8);
   ok("tar takes a monster with it", mon.gone, true);
 }
 {

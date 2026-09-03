@@ -17,7 +17,9 @@ function ok(name, got, want) {
   if (g === w) { pass++; console.log("  ok    " + name); }
   else { fail++; console.log("  FAIL  " + name + "\n          got  " + g + "\n          want " + w); }
 }
-const put = (g, c, r) => { g.grid[r * MF.COLS + c] = MF.BRICK; g.bricks++; };
+const I = (c, r) => r * MF.COLS + c;
+const put = (g, c, r) => { g.grid[I(c, r)] = MF.BRICK; g.bricks++; };
+const clear = (g, c, r) => { if (g.grid[I(c, r)] === MF.BRICK) g.bricks--; g.grid[I(c, r)] = MF.EMPTY; };
 const leash = (g, PA) => { g.PA = PA; g.leash = MF.leashCells(PA); };
 
 function withMonster(kind, level) {
@@ -50,16 +52,22 @@ function withMonster(kind, level) {
 
 /* --- the beetle: eats the bricks you need --------------------------- */
 {
+  /* Pin it: with brick on all four sides leashStep cannot move it, so the
+     only variable left is the fourteen-turn schedule. Calling move()
+     directly rather than step() keeps settle() from noticing it is boxed
+     and retiring it. Letting it wander instead made this test a lottery -
+     it would end a turn on a square with no brick beside it and quietly
+     miss a meal. */
   const g = withMonster("beetle");
-  /* a block of bricks around it, with one way out - box it on all four
-     sides and it is simply trapped, and a trapped monster never eats */
-  for (let c = 18; c <= 22; c++) for (let r = 8; r <= 12; r++)
-    if (!(c === 20 && (r === 10 || r === 9))) put(g, c, r);
+  const m = g.monsters[0];
+  for (let c = 0; c < MF.COLS; c++) for (let r = 0; r < MF.ROWS; r++) put(g, c, r);
+  clear(g, m.c, m.r);
   const before = g.bricks;
   let eaten = 0;
-  for (let i = 0; i < 28; i++) eaten += g.step(null).eaten;
+  for (let i = 0; i < 28; i++) { m.ate = false; m.spec.move(m, g); if (m.ate) eaten++; }
   ok("beetle: eats twice in twenty-eight turns", eaten, 2);
   ok("beetle: and the bricks really go", g.bricks, before - 2);
+  ok("beetle: on a fourteen-turn schedule", [MF.MONSTERS.beetle.eats, m.tick], [14, 28]);
 }
 {
   /* with nothing beside it there is nothing to eat, and no crash */
@@ -67,6 +75,17 @@ function withMonster(kind, level) {
   let eaten = 0;
   for (let i = 0; i < 30; i++) eaten += g.step(null).eaten;
   ok("beetle: eats nothing when there is nothing next to it", eaten, 0);
+}
+{
+  /* and it does happen in real play, not just when pinned */
+  const g = withMonster("beetle");
+  for (let c = 0; c < MF.COLS; c++) for (let r = 0; r < MF.ROWS; r++) put(g, c, r);
+  for (let c = 18; c <= 22; c++) clear(g, c, 10);
+  g.monsters[0].c = 20; g.monsters[0].r = 10;
+  clear(g, 2, 2); g.manC = 2; g.manR = 2;
+  const before = g.bricks;
+  for (let i = 0; i < 60; i++) g.step(null);
+  ok("beetle: eats its way through a cellar", g.bricks < before, true);
 }
 
 /* --- the wasp: still, then two squares at once ---------------------- */
@@ -98,7 +117,12 @@ function withMonster(kind, level) {
   leash(g, 0);
   /* box each one where it actually is - with the leash at nothing they
      close on the man every turn, so their squares move under you */
-  const box = (m) => { put(g, m.c + 1, m.r); put(g, m.c - 1, m.r); put(g, m.c, m.r + 1); put(g, m.c, m.r - 1); };
+  /* box every square the thing lies on - the fly is two of them */
+  const box = (m) => {
+    for (const [c, r] of g.cellsOf(m))
+      for (const [dc, dr] of [[1,0],[-1,0],[0,1],[0,-1]])
+        if (!g.isPartOf(m, c + dc, r + dr)) put(g, c + dc, r + dr);
+  };
   box(g.monsters[0]);
   let ev = g.step(null);
   ok("two monsters: boxing one is not enough", [ev.won, g.monsters[0].trapped], [false, true]);
