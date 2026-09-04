@@ -6136,6 +6136,7 @@ var renderer, scene, camera, clock;
 var brickMesh, floorMesh, manRig, motes, debris = [], torches = [], keyLight;
 var BRICK_MAT, BRICK_TEX = {};
 var monsterRigs = [];
+var SURROUND = null;
 var terrain, terrains = [], rampMesh = null, floorSkin = null, props = {}, marbleMeshes = [], cubeCam, cubeT = 0, bobT = 0;
 
 function init3D() {
@@ -6459,7 +6460,10 @@ function buildCellar() {
   apron.receiveShadow = true;
   scene.add(apron);
 
-  var sm = stoneMaps();
+  /* made here, where it is first wanted - the edge walls inside the
+     room share it, and they are built after this */
+  SURROUND = SURROUND || stoneMaps();
+  var sm = SURROUND;
   var wallMat = new THREE.MeshStandardMaterial({ map: sm.map, bumpMap: sm.bump, bumpScale: 0.11, roughness: 0.95, metalness: 0.03 });
   var H = 5.2, T = 2.4, W = COLS, D = ROWS, KERB = 0.5;
   function wall(w, h, d, x, z) {
@@ -6504,12 +6508,22 @@ function buildCellar() {
   pit.material.side = THREE.BackSide;
   scene.add(pit);
 
-  buildProps();
-
+  /* The blocks' textures are made FIRST now: the walls are built out of
+     the wooden one, and buildProps used to run before it existed - so
+     the wall material threw, props.edgeWall was never assigned, and
+     syncEdges fell over on the first frame of the editor. */
   BRICK_TEX.red = brickMaps({ h: 8, s: 46, l: 44 });
   BRICK_TEX.blue = brickMaps({ h: 214, s: 54, l: 46 });
   /* the top cellar is stacked with old timber, not brick */
   BRICK_TEX.wood = brickMaps({ h: 27, s: 34, l: 31 });
+
+  /* The stonework the cellar is walled with, made just above for the
+     big walls round the pit. The edge walls inside the room are the
+     same walls, so they share it rather than having something new
+     invented for them: seen at a grazing angle its wide, low courses
+     read as stacked timber, which is the look the room has always had. */
+  buildProps();
+
   BRICK_MAT = new THREE.MeshStandardMaterial({ map: BRICK_TEX.red.map, bumpMap: BRICK_TEX.red.bump,
                                                bumpScale: 0.05, roughness: 0.92, metalness: 0.02 });
   brickMesh = new THREE.InstancedMesh(new THREE.BoxGeometry(0.94, 0.66, 0.94), BRICK_MAT, 460);
@@ -6525,27 +6539,6 @@ function buildCellar() {
    ------------------------------------------------------------------ */
 /* n baulks stacked to `tall`, with a shadow gap between them, as one
    geometry - so a wall of them is still one instance per square */
-function beamStack(n, tall, wide) {
-  var gap = 0.055, deep = wide;
-  var each = (tall - gap * (n - 1)) / n;
-  var parts = [];
-  for (var i = 0; i < n; i++) {
-    var g = new THREE.BoxGeometry(wide, each, deep).toNonIndexed();
-    g.translate(0, each / 2 + i * (each + gap) - tall / 2, 0);
-    parts.push(g);
-  }
-  var out = new THREE.BufferGeometry();
-  ["position", "normal", "uv"].forEach(function (name) {
-    var size = parts[0].attributes[name].itemSize;
-    var total = 0;
-    parts.forEach(function (g) { total += g.attributes[name].array.length; });
-    var all = new Float32Array(total), at = 0;
-    parts.forEach(function (g) { all.set(g.attributes[name].array, at); at += g.attributes[name].array.length; });
-    out.setAttribute(name, new THREE.BufferAttribute(all, size));
-  });
-  out.computeBoundingSphere();
-  return out;
-}
 
 function inst(geo, mat, n, shadow) {
   var m = new THREE.InstancedMesh(geo, mat, n);
@@ -6614,15 +6607,9 @@ function buildProps() {
      between them, merged into one geometry so it still costs one
      instance per square.
      ------------------------------------------------------------------ */
-  props.edgeWall = inst(beamStack(4, 3.4, 1.02),
-    new THREE.MeshStandardMaterial({ map: BRICK_TEX.wood && BRICK_TEX.wood.map,
-                                     bumpMap: BRICK_TEX.wood && BRICK_TEX.wood.bump,
-                                     bumpScale: 0.05,
-                                     /* dark enough to stay timber under the
-                                        drafting light - a pale colour on a
-                                        big flat face goes to white and takes
-                                        the grain with it */
-                                     color: 0x5c4a2c, roughness: 0.93, metalness: 0.02 }),
+  props.edgeWall = inst(new THREE.BoxGeometry(1.02, 3.4, 1.02),
+    new THREE.MeshStandardMaterial({ map: SURROUND.map, bumpMap: SURROUND.bump,
+                                     bumpScale: 0.11, roughness: 0.95, metalness: 0.03 }),
     COLS * ROWS, true);
   /* the little lip the floor ends in where there is no wall */
   props.edgeLip = inst(new THREE.BoxGeometry(1.02, 0.26, 1.02),
@@ -9766,7 +9753,7 @@ function edTintEdges() {
   if (!_tintC) _tintC = new THREE.Color();
   var lit = (mode === "edit" && ed.view === "walls" && ed.polyShut && ed.segPick >= 0);
 
-  [[props.edgeWall, 0.73, 2.30, 3.85], [props.edgeLip, 1.10, 3.45, 5.90]]
+  [[props.edgeWall, 0.55, 1.45, 3.60], [props.edgeLip, 1.10, 3.45, 5.90]]
   .forEach(function (row) {
     var mesh = row[0];
     if (!mesh.count) return;
@@ -10822,10 +10809,18 @@ function edgePortrait(kind, w, h) {
        will be looking at. Same for the kerb, the floor and the brick.
        ------------------------------------------------------------------ */
     var sc = new THREE.Scene();
-    sc.add(new THREE.HemisphereLight(0x2e2618, 0x0b0908, 0.30));
-    var lamp = new THREE.DirectionalLight(0xffcf9a, 1.0);
-    lamp.position.set(1.4, 4.5, 3.4);
+    /* Lit for the timber, which is a dark wood. The wall and the floor
+       share their materials with the cellar, and the cellar is lit by a
+       drafting lamp three times this strong - so a photograph taken by
+       the light the first version used came out with the wall almost
+       black while the same wall in the room looked pale. */
+    sc.add(new THREE.HemisphereLight(0x3a3020, 0x0f0c09, 0.62));
+    var lamp = new THREE.DirectionalLight(0xffcf9a, 2.1);
+    lamp.position.set(1.4, 4.2, 3.6);
     sc.add(lamp);
+    var fill = new THREE.DirectionalLight(0xbfd0ff, 0.5);
+    fill.position.set(-2.5, 2.0, 1.5);
+    sc.add(fill);
 
     var floorMat = (terrains[0] && terrains[0].material) ||
                    new THREE.MeshStandardMaterial({ color: 0x6d5f49 });
@@ -10845,8 +10840,12 @@ function edgePortrait(kind, w, h) {
     }
 
     if (kind === "wall") {
+      /* the wall's own geometry, not a box standing in for it - the
+         stack of timber blocks, so the picture is the thing */
+      var wallGeo = (props.edgeWall && props.edgeWall.geometry) ||
+                    new THREE.BoxGeometry(1.02, 3.4, 1.02);
       for (var c2 = -3; c2 <= 3; c2++) {
-        var wsl = new THREE.Mesh(new THREE.BoxGeometry(1.02, 3.4, 1.02), wallMat);
+        var wsl = new THREE.Mesh(wallGeo, wallMat);
         wsl.position.set(c2, 1.7, -3);
         sc.add(wsl);
       }
