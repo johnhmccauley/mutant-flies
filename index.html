@@ -558,7 +558,7 @@
 .edItem.here { border-color: #b98c3e; background: #241b13; }
 .edItem.here b { color: #ffe6b8; }
 #edShelfActs { gap: 6px; justify-content: flex-start; margin: 10px 0 0; flex-wrap: wrap; }
-#edShelfActs #edListNew { margin-left: auto; }
+#edShelfActs #edListClose { margin-left: auto; }
 .edItem b { color: #efe4d2; font-weight: 600; }
 .edItem span { color: #8e8172; font-size: 12px; }
 /* the picture of the cellar, drawn as squares rather than smeared */
@@ -894,9 +894,9 @@
     <!-- one set of verbs, about whichever cellar is picked below -->
     <div class="row" id="edShelfActs">
       <button class="edBtn" id="edShelfOpen" type="button">Open</button>
+      <button class="edBtn warm" id="edListNew" type="button">New cellar</button>
       <button class="edBtn" id="edShelfPub" type="button">Publish</button>
       <button class="edBtn" id="edShelfDel" type="button">Delete</button>
-      <button class="edBtn warm" id="edListNew" type="button">New cellar</button>
       <button class="edBtn" id="edListClose" type="button">Back</button>
     </div>
     <div id="edList"></div>
