@@ -8851,7 +8851,7 @@ function edStepBack(stack, other) {
     ed.startC = was.start[0]; ed.startR = was.start[1];
     game.manC = ed.startC; game.manR = ed.startR;
     edRigs(); syncTerrain(); syncEdges(); syncWorld(); drawPlan(); edCount(); edButtons();
-    worldOf(game.manC, game.manR, manWant); manPos.copy(manWant);
+    worldOf(ed.startC, ed.startR, manWant); manPos.copy(manWant);
     edSay("");
   } catch (e) { edOops("Could not go back a step.", e); }
 }
@@ -10816,8 +10816,6 @@ function edPointTo(x, y, andStamp) {
   if (!at) return;
   edHover = at;
   game.manC = at[0]; game.manR = at[1];
-  worldOf(game.manC, game.manR, manWant);
-  manPos.copy(manWant);
   if (andStamp) edStamp(edPainted);
   edPainted = !!andStamp;
   drawPlan();
@@ -10902,8 +10900,8 @@ function edPointTo(x, y, andStamp) {
           game.fluid[si] !== MF.DRY || game.monsterAt(st[0], st[1])) return;
       if (st[0] === ed.startC && st[1] === ed.startR) return;
       ed.startC = st[0]; ed.startR = st[1];
-      game.manC = st[0]; game.manR = st[1];
       ed.dirty = true;
+      worldOf(ed.startC, ed.startR, manWant);
       edRigs();
       return;
     }
@@ -11189,7 +11187,7 @@ function edEnter(rec, back) {
   ed.dirty = false;
   ed.undo.length = 0; ed.redo.length = 0;
   edPaint(); edButtons(); edRigs(); syncTerrain(); syncEdges(); syncWorld(); drawPlan(); edCount();
-  worldOf(game.manC, game.manR, manWant); manPos.copy(manWant);
+  worldOf(ed.startC, ed.startR, manWant); manPos.copy(manWant);
   edSay("");
 }
 
@@ -12801,7 +12799,8 @@ function frame() {
       }
       if (!walking) edPainted = false;      /* the stroke ended */
     }
-    worldOf(game.manC, game.manR, manWant);
+    /* the start square, not the pointer */
+    worldOf(ed.startC, ed.startR, manWant);
   } else if (mode === "play") {
     turnAcc += dt * 1000;
     while (turnAcc >= TURN_MS) { turnAcc -= TURN_MS; if (mode === "play") turn(); }
