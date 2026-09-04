@@ -7251,10 +7251,14 @@ function hash2(c, r) {                 /* cheap, stable, no visible pattern */
    changes when the cellar does, so it rides along with the terrain. */
 function syncEdges() {
   var nW = 0, nL = 0;
+  /* Which square each piece of stonework belongs to, so that clicking
+     the wall itself can be the same as clicking the side it is. */
+  var wallOf = props.edgeWall.userData.cells || (props.edgeWall.userData.cells = []);
+  var lipOf = props.edgeLip.userData.cells || (props.edgeLip.userData.cells = []);
   function put(c, r) {
     var wall = game.edgeAt(c, r) === MF.WALL;
-    if (wall) placeAt(props.edgeWall, nW++, c, r, 1.7);
-    else placeAt(props.edgeLip, nL++, c, r, 0.13);
+    if (wall) { wallOf[nW] = [c, r]; placeAt(props.edgeWall, nW++, c, r, 1.7); }
+    else { lipOf[nL] = [c, r]; placeAt(props.edgeLip, nL++, c, r, 0.13); }
   }
   /* every square that is not in the level but touches one is a piece of
      its boundary, wherever that boundary happens to run */
@@ -7288,8 +7292,9 @@ function syncEdges() {
    [bx.c0 - 1, bx.r1 + 1, bx.c0, bx.r1], [bx.c1 + 1, bx.r1 + 1, bx.c1, bx.r1]
   ].forEach(function (k) {
     var a = game.edgeAt(k[0], k[3]), b2 = game.edgeAt(k[2], k[1]);
-    if (a === MF.WALL || b2 === MF.WALL) placeAt(props.edgeWall, nW++, k[0], k[1], 1.7);
-    else placeAt(props.edgeLip, nL++, k[0], k[1], 0.13);
+    if (a === MF.WALL || b2 === MF.WALL) {
+      wallOf[nW] = [k[0], k[1]]; placeAt(props.edgeWall, nW++, k[0], k[1], 1.7);
+    } else { lipOf[nL] = [k[0], k[1]]; placeAt(props.edgeLip, nL++, k[0], k[1], 0.13); }
   });
   props.edgeWall.count = nW; props.edgeWall.instanceMatrix.needsUpdate = true;
   props.edgeLip.count = nL; props.edgeLip.instanceMatrix.needsUpdate = true;
@@ -8654,22 +8659,31 @@ function edNodeNear(c, r) {
 }
 
 function edEdgeNear(c, r) {
-  var hit = edEdgeAt(c, r);
-  if (hit >= 0) return hit;
-  /* Half the forgiveness a corner gets. Taking hold of a corner is the
-     thing you do most, and adding one is the thing you do occasionally
-     - so a press that could be either has to be a corner, and a press
-     that lands short of a wall should do nothing rather than quietly
-     put a new corner in it. */
-  var reach = Math.max(1, Math.floor(edReach() / 2));
-  for (var ring = 1; ring <= reach; ring++)
-    for (var dc = -ring; dc <= ring; dc++)
-      for (var dr = -ring; dr <= ring; dr++) {
-        if (Math.max(Math.abs(dc), Math.abs(dr)) !== ring) continue;
-        var got = edEdgeAt(c + dc, r + dr);
-        if (got >= 0) return got;
-      }
-  return -1;
+  /* ------------------------------------------------------------------
+     The nearest side, measured - not the side whose drawn line happens
+     to pass through this exact square.
+
+     It used to walk each side square by square and ask whether the one
+     you pressed was among them, then search outwards in rings for one
+     that was. That works along the middle of a straight run and gives
+     up at corners, on anything diagonal, and on a side seen almost
+     edge-on - which is most of the Walls view. Distance from the point
+     to the line is the question actually being asked, so ask it.
+     ------------------------------------------------------------------ */
+  if (ed.poly.length < 2) return -1;
+  var reach = edReach() + 2, best = -1, near = reach * reach;
+  for (var i = 0; i < ed.poly.length; i++) {
+    var a = ed.poly[i], b = ed.poly[(i + 1) % ed.poly.length];
+    var vx = b[0] - a[0], vy = b[1] - a[1];
+    var wx = c - a[0], wy = r - a[1];
+    var len2 = vx * vx + vy * vy;
+    var t = len2 ? (wx * vx + wy * vy) / len2 : 0;
+    t = Math.max(0, Math.min(1, t));
+    var dx = a[0] + t * vx - c, dy = a[1] + t * vy - r;
+    var d = dx * dx + dy * dy;
+    if (d < near) { near = d; best = i; }
+  }
+  return best;
 }
 
 /* which edge runs through this square, if any - the answer is the index
@@ -8835,7 +8849,11 @@ function edPolyDraw() {
      far enough out to be obviously about the edge and not about the
      floor, and sunk to the floor's own level so it reads as a line on
      the ground rather than a rail hovering over it. */
-  var push = 1.4, ox2 = [], oz2 = [];
+  /* Just clear of the floor and at the foot of the wall, where it can
+     be seen from inside the room. Further out than this and the bar for
+     a far side ends up BEHIND the wall it belongs to, hidden by the very
+     thing it is pointing at. */
+  var push = 0.85, ox2 = [], oz2 = [];
   for (var i2 = 0; i2 < n; i2++) {
     var n1 = normOf((i2 - 1 + n) % n), n2 = normOf(i2);
     var sx = n1[0] + n2[0], sz = n1[1] + n2[1];
@@ -8855,8 +8873,15 @@ function edPolyDraw() {
     var segs = edSegs();
     var onEdge = ED_TOOLS[ed.tool] && ED_TOOLS[ed.tool].act === "edge";
     for (var i = 0; i < n; i++) {
-      if (onEdge && i === ed.segPick) side(i, (i + 1) % n, 0.25, 0.69, 1.0);
-      else {
+      if (onEdge) {
+        /* In the Walls view every side is blue, because every side is a
+           thing you can press - the white outline in the Floor view is
+           about corners, and using the same white here would say the
+           same thing about two different jobs. The one you have picked
+           is the bright one. */
+        if (i === ed.segPick) side(i, (i + 1) % n, 0.25, 0.69, 1.0);
+        else side(i, (i + 1) % n, 0.10, 0.28, 0.42);
+      } else {
         var lit = segs[i] ? 1.0 : 0.30;
         side(i, (i + 1) % n, lit, lit, lit);
       }
@@ -9563,6 +9588,51 @@ function cellUnder(clientX, clientY) {
 
 var edHover = null;
 
+/* ====================================================================
+   CLICKING THE WALL IS CLICKING THE SIDE
+
+   Squares are picked by firing a ray at the floor, which works for
+   everything that lies on it and not at all for the one thing that
+   stands up off it. Aim at a wall and the ray goes straight over the
+   top and lands on the floor somewhere beyond, so the obvious way to
+   choose a side of the room - point at the wall - selected whatever
+   happened to be behind it.
+
+   The stonework is asked first, then. Each piece remembers the square
+   it was laid on, that square is outside the room by definition, and
+   the side it belongs to is the one running along the floor next to it.
+   ==================================================================== */
+function edWallUnder(clientX, clientY) {
+  if (!props.edgeWall) return null;
+  var el = renderer.domElement, box = el.getBoundingClientRect();
+  _ndc.x = ((clientX - box.left) / box.width) * 2 - 1;
+  _ndc.y = -((clientY - box.top) / box.height) * 2 + 1;
+  _ray.setFromCamera(_ndc, camera);
+
+  var best = null, near = Infinity;
+  [props.edgeWall, props.edgeLip].forEach(function (mesh) {
+    if (!mesh || !mesh.visible || !mesh.count) return;
+    var hits = _ray.intersectObject(mesh, false);
+    for (var i = 0; i < hits.length; i++) {
+      var id = hits[i].instanceId;
+      if (id === undefined || id >= mesh.count) continue;
+      var cell = mesh.userData.cells && mesh.userData.cells[id];
+      if (!cell) continue;
+      if (hits[i].distance < near) { near = hits[i].distance; best = cell; }
+      break;
+    }
+  });
+  if (!best) return null;
+
+  /* the piece is outside the room; the side is the floor beside it */
+  for (var d = 0; d < 4; d++) {
+    var dd = [[1, 0], [-1, 0], [0, 1], [0, -1]][d];
+    var nc = best[0] + dd[0], nr = best[1] + dd[1];
+    if (game.inField(nc, nr)) return [nc, nr];
+  }
+  return null;
+}
+
 /* After half a dozen squares put down by hand the instruction has done
    its work, and is remembered so it does not greet a returning builder
    who already knows. */
@@ -9743,6 +9813,15 @@ function edPointTo(x, y, andStamp) {
        straight wall bends it - which is how anybody who has used a
        vector tool expects to make a room more interesting. */
     var t0 = ED_TOOLS[ed.tool];
+    if (t0 && t0.act === "edge" && ed.polyShut) {
+      /* the stonework answers before the floor does */
+      var onWall = edWallUnder(e.clientX, e.clientY);
+      if (onWall) {
+        game.manC = onWall[0]; game.manR = onWall[1];
+        edStamp(false);
+        return;
+      }
+    }
     if (t0 && t0.act === "poly" && ed.polyShut) {
       var cell = cellUnder(e.clientX, e.clientY);
       if (cell) {
