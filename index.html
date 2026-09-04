@@ -23,7 +23,10 @@
     font-family:"Archivo Narrow","Helvetica Neue",Arial,sans-serif;
     overflow:hidden;overscroll-behavior:none;
   }
-  canvas#gl{display:block;width:100%;height:100%;position:fixed;left:0;right:0;top:0}
+  /* touch-action:none or a drag on the canvas scrolls the page instead
+     of reaching the editor - on a phone every gesture in here is a drag */
+  canvas#gl{display:block;width:100%;height:100%;position:fixed;left:0;right:0;top:0;
+    touch-action:none;-webkit-tap-highlight-color:transparent}
   .vignette{
     position:fixed;inset:0;pointer-events:none;
     box-shadow:inset 0 0 22vmin 8vmin rgba(0,0,0,.82),inset 0 0 40vmin 2vmin rgba(0,0,0,.45);
@@ -282,8 +285,9 @@
 .edNothing { color: #6f6456; font-size: 11px; padding: 4px 2px; }
 
 /* how wide the ground tools work */
-#edBrush, #edZoom { display: flex; gap: 3px; align-items: center; margin-left: 4px;
+#edBrush, #edZoom, #edPick { display: flex; gap: 5px; align-items: center; margin-left: 4px;
   padding-left: 9px; border-left: 1px solid #372c21; }
+.edPickBtn[aria-pressed="true"] { background: #503c25; border-color: #b98c3e; color: #ffe6b8; }
 .edZoomDot { width: auto; min-width: 22px; padding: 0 4px; }
 #edBrush .edBrushName { color: #7d7365; font-size: 10px; letter-spacing: .1em;
   text-transform: uppercase; margin-right: 2px; }
@@ -499,6 +503,7 @@
   <div class="edRow">
     <div id="edTools"></div>
     <span id="edBrush" hidden></span>
+    <span id="edPick" hidden></span>
     <span id="edZoom"></span>
   </div>
   <div class="edRow">
@@ -6129,7 +6134,7 @@ function init3D() {
   edCursor = new THREE.LineSegments(
     new THREE.EdgesGeometry(new THREE.BoxGeometry(0.98, 0.3, 0.98)),
     new THREE.LineBasicMaterial({ color: 0xffd27a, transparent: true, opacity: 0.85,
-                                  depthTest: false }));
+                                  depthTest: false, toneMapped: false }));
   edCursor.renderOrder = 9;
   edCursor.visible = false;
   scene.add(edCursor);
@@ -6141,7 +6146,7 @@ function init3D() {
   polyGeo.setAttribute("color",
     new THREE.BufferAttribute(new Float32Array((COLS * ROWS + 4) * 3), 3));
   edPolyLine = new THREE.LineSegments(polyGeo,
-    new THREE.LineBasicMaterial({ vertexColors: true, depthTest: false }));
+    new THREE.LineBasicMaterial({ vertexColors: true, depthTest: false, toneMapped: false }));
   edPolyLine.renderOrder = 10;
   edPolyLine.visible = false;
   edPolyLine.frustumCulled = false;
@@ -6149,18 +6154,45 @@ function init3D() {
 
   edNodeMesh = new THREE.InstancedMesh(
     new THREE.BoxGeometry(1, 1, 1),
-    new THREE.MeshBasicMaterial({ depthTest: false }),
+    /* toneMapped off: these are markers, not scenery. ACES filmic
+       grading pulls a saturated colour most of the way to white, which
+       is how a teal handle came out looking like the same pale amber as
+       everything else. */
+    new THREE.MeshBasicMaterial({ depthTest: false, toneMapped: false }),
     256);
   edNodeMesh.renderOrder = 11;
   edNodeMesh.visible = false;
   edNodeMesh.frustumCulled = false;
   scene.add(edNodeMesh);
 
+  /* ------------------------------------------------------------------
+     A picked corner wears a ring.
+
+     Being picked was a change of colour and a little extra size, which
+     is not enough: it asks somebody to remember which shade means what,
+     it disappears against a bright patch of floor, and to anybody who
+     does not separate those two colours it says nothing at all. A ring
+     round the handle is a different SHAPE - there or not there - and
+     that reads at a glance, at any zoom, in any light.
+     ------------------------------------------------------------------ */
+  var ringGeo = new THREE.RingGeometry(0.80, 1.0, 24);
+  ringGeo.rotateX(-Math.PI / 2);
+  edRingMesh = new THREE.InstancedMesh(ringGeo,
+    /* the same blue as the handle it goes round: one thing, picked out,
+       rather than a blue handle wearing a white hoop */
+    new THREE.MeshBasicMaterial({ color: 0x3fb0ff, side: THREE.DoubleSide,
+                                  depthTest: false, toneMapped: false }),
+    256);
+  edRingMesh.renderOrder = 12;
+  edRingMesh.visible = false;
+  edRingMesh.frustumCulled = false;
+  scene.add(edRingMesh);
+
   var bandGeo = new THREE.BufferGeometry();
   bandGeo.setAttribute("position", new THREE.BufferAttribute(new Float32Array(8 * 3), 3));
   edBandLine = new THREE.LineSegments(bandGeo,
     new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.75,
-                                  depthTest: false }));
+                                  depthTest: false, toneMapped: false }));
   edBandLine.renderOrder = 12;
   edBandLine.visible = false;
   edBandLine.frustumCulled = false;
@@ -7969,7 +8001,8 @@ var ed = {
      is the cursor, so without this the starting square was wherever the
      builder happened to leave him when they stopped building - which
      was almost never where they meant the player to begin. */
-  startC: 4, startR: 4, brush: 2, poly: [], polyWall: [], polyShut: false, dragNode: -1, picked: [], band: null, zoom: 1, testing: false,
+  startC: 4, startR: 4, brush: 2, poly: [], polyWall: [], polyShut: false, dragNode: -1, picked: [], band: null,
+  picking: false, zoom: 1, testing: false,
   /* The single most important thing an editor has, and the first
      version did not have it: somewhere to put the last forty things you
      did so you can take one of them back. Whole cellars, because a
@@ -8268,6 +8301,7 @@ function edPickToggle(i) {
   var at = ed.picked.indexOf(i);
   if (at >= 0) ed.picked.splice(at, 1); else ed.picked.push(i);
   edNodesDraw();
+  edPickBar();
   edSay(ed.picked.length ? ed.picked.length + " corner" +
         (ed.picked.length === 1 ? "" : "s") + " picked \u2014 drag any of them to move them together"
         : "nothing picked");
@@ -8277,6 +8311,7 @@ function edPickNone(quiet) {
   if (!ed.picked.length) return;
   ed.picked = [];
   edNodesDraw();
+  edPickBar();
   if (!quiet) edSay("nothing picked");
 }
 
@@ -8351,6 +8386,7 @@ function edBandTake(add) {
     if (ed.picked.indexOf(i) < 0) ed.picked.push(i);
   }
   edNodesDraw();
+  edPickBar();
   edSay(ed.picked.length ? ed.picked.length + " corner" +
         (ed.picked.length === 1 ? "" : "s") + " picked \u2014 drag any of them to move them together"
         : "nothing in there");
@@ -8360,6 +8396,49 @@ function edBandTake(add) {
 function edNodeAt(c, r) {
   for (var i = 0; i < ed.poly.length; i++)
     if (ed.poly[i][0] === c && ed.poly[i][1] === r) return i;
+  return -1;
+}
+
+/* ====================================================================
+   AIMING WITH A FINGER
+
+   Picking is done by square, and a square is not always a big thing:
+   standing back far enough to see the paper a room can grow into, one
+   is a few pixels across, and a fingertip covers a dozen of them. Asking
+   for the exact square a handle sits on is asking for the pixel, which
+   nobody can give you and a phone cannot give you at all.
+
+   So it takes the nearest handle within a few squares, and how many
+   squares that is comes from how far away the camera is standing - the
+   further back, the more forgiving. The same goes for the sides: a
+   room's edge is one square wide and is meant to be pressed on.
+   ==================================================================== */
+function edReach() {
+  return Math.max(1, Math.round(1.6 / Math.max(0.2, ed.zoom)));
+}
+
+function edNodeNear(c, r) {
+  var reach = edReach(), best = -1, near = 1e9;
+  for (var i = 0; i < ed.poly.length; i++) {
+    var dc = ed.poly[i][0] - c, dr = ed.poly[i][1] - r;
+    var d = dc * dc + dr * dr;
+    if (d > reach * reach) continue;
+    if (d < near) { near = d; best = i; }
+  }
+  return best;
+}
+
+function edEdgeNear(c, r) {
+  var hit = edEdgeAt(c, r);
+  if (hit >= 0) return hit;
+  var reach = edReach();
+  for (var ring = 1; ring <= reach; ring++)
+    for (var dc = -ring; dc <= ring; dc++)
+      for (var dr = -ring; dr <= ring; dr++) {
+        if (Math.max(Math.abs(dc), Math.abs(dr)) !== ring) continue;
+        var got = edEdgeAt(c + dc, r + dr);
+        if (got >= 0) return got;
+      }
   return -1;
 }
 
@@ -8382,22 +8461,63 @@ function edNodesDraw() {
   var show = (mode === "edit" && ED_TOOLS[ed.tool] && ED_TOOLS[ed.tool].act === "poly" &&
               ed.poly.length > 0);
   edNodeMesh.visible = show;
-  if (!show) return;
+  if (!show) { if (edRingMesh) edRingMesh.visible = false; return; }
+  /* ------------------------------------------------------------------
+     A handle is the same size whatever the zoom.
+
+     These were boxes a fixed fraction of a square across, so they grew
+     and shrank with everything else: at the widest zoom - which is
+     exactly where you go to drag a corner out into the blank paper -
+     they were a couple of pixels, and at 3x they were the size of a
+     room. A handle is not part of the cellar, it is something to take
+     hold of, and a thing you take hold of should be the same size under
+     your finger wherever you are standing.
+
+     So the world size is worked out backwards from the screen: how tall
+     the view is in world units at that corner's distance, times the
+     fraction of the screen a handle should cover. Per corner, because
+     from three quarters the near ones really are closer than the far.
+     ------------------------------------------------------------------ */
   var pc = new THREE.Color();
+  var lean = Math.tan(camera.fov * Math.PI / 360) * 2;
+  var rings = 0;
   for (var i = 0; i < ed.poly.length && i < edNodeMesh.instanceMatrix.count; i++) {
     worldOf(ed.poly[i][0], ed.poly[i][1], tmp);
-    var big = edPicked(i) ? 0.66 : 0.42;      /* a picked corner is a bigger handle */
-    placeAt(edNodeMesh, i, ed.poly[i][0], ed.poly[i][1], tmp.y + 0.3, big, big, big, 0);
-    pc.setHex(edPicked(i) ? 0xffffff : 0xffd27a);
+    tmp.y += 0.3;
+    var far = Math.max(1, camera.position.distanceTo(tmp));
+    var on = edPicked(i);
+    /* Big enough for a fingertip. */
+    var big = (on ? 0.034 : 0.024) * far * lean;   /* of the view's height */
+    placeAt(edNodeMesh, i, ed.poly[i][0], ed.poly[i][1], tmp.y, big, big, big, 0);
+    /* White with the line it sits on, so the outline reads as one
+       object rather than a line with beads on it. Picked is blue AND
+       ringed - two signals, one of them a shape, so it still reads on a
+       bright floor and to anybody who does not separate the colours. */
+    pc.setHex(on ? 0x3fb0ff : 0xffffff);
     edNodeMesh.setColorAt(i, pc);
+    if (on && edRingMesh && rings < edRingMesh.instanceMatrix.count) {
+      /* A ring is built to radius 1 and a handle to half-extent 0.5, so
+         the same number draws it twice as wide. This leaves a clear gap
+         of floor between the two: at anything tighter the white ring
+         and the white handle inside it merged into one solid disc, and
+         a disc is not obviously a selected square - it is a blob. */
+      var ring = big * 1.15;
+      placeAt(edRingMesh, rings++, ed.poly[i][0], ed.poly[i][1], tmp.y + 0.02,
+              ring, ring, ring, 0);
+    }
   }
   if (edNodeMesh.instanceColor) edNodeMesh.instanceColor.needsUpdate = true;
   edNodeMesh.count = Math.min(ed.poly.length, edNodeMesh.instanceMatrix.count);
   edNodeMesh.instanceMatrix.needsUpdate = true;
+  if (edRingMesh) {
+    edRingMesh.visible = rings > 0;
+    edRingMesh.count = rings;
+    edRingMesh.instanceMatrix.needsUpdate = true;
+  }
 }
 
 /* the outline as you are drawing it, laid on the floor */
-var edPolyLine = null, edNodeMesh = null, edBandLine = null;
+var edPolyLine = null, edNodeMesh = null, edRingMesh = null, edBandLine = null;
 function edPolyDraw() {
   if (!edPolyLine) return;
   var n = ed.poly.length;
@@ -8419,17 +8539,17 @@ function edPolyDraw() {
   }
 
   if (ed.polyShut) {
-    /* stone stretches in amber, open ones dim - so where the room is
-       shut and where it lets you fall out is legible at a glance */
+    /* The outline is white, and a stretch that has been opened is the
+       same white turned right down - so it is plain which sides you can
+       fall out of without introducing a second colour to remember. */
     var segs = edSegs();
     for (var i = 0; i < n; i++) {
-      var on = segs[i];
-      line(ed.poly[i], ed.poly[(i + 1) % n],
-           on ? 1.0 : 0.32, on ? 0.82 : 0.29, on ? 0.48 : 0.25);
+      var lit = segs[i] ? 1.0 : 0.30;
+      line(ed.poly[i], ed.poly[(i + 1) % n], lit, lit, lit);
     }
   } else {
-    for (var j = 0; j + 1 < n; j++) line(ed.poly[j], ed.poly[j + 1], 1.0, 0.82, 0.48);
-    if (n) line(ed.poly[n - 1], [game.manC, game.manR], 0.62, 0.52, 0.32);
+    for (var j = 0; j + 1 < n; j++) line(ed.poly[j], ed.poly[j + 1], 1, 1, 1);
+    if (n) line(ed.poly[n - 1], [game.manC, game.manR], 0.55, 0.55, 0.55);
   }
 
   edPolyLine.geometry.setDrawRange(0, put);
@@ -8665,6 +8785,39 @@ function edViewTo(key) {
   resize();
 }
 
+/* Shift is not a key a phone has. The same job, as a latch you can
+   press: while it is on, touching a handle picks it out instead of
+   dragging it, and a box drawn round several adds them to what is
+   already picked. */
+function edPickBar() {
+  var el = $("edPick");
+  if (!el) return;
+  var t = ED_TOOLS[ed.tool];
+  if (!t || t.act !== "poly") { el.hidden = true; return; }
+  el.hidden = false;
+  el.innerHTML = "";
+  var b = document.createElement("button");
+  b.className = "edBtn edPickBtn";
+  b.type = "button";
+  b.setAttribute("aria-pressed", ed.picking ? "true" : "false");
+  b.textContent = ed.picking ? "Picking" : "Pick";
+  b.title = "Touch corners to pick them out, then drag any one to move them together";
+  b.addEventListener("click", function () {
+    ed.picking = !ed.picking;
+    if (!ed.picking) edPickNone(true);
+    edPickBar();
+    edSay(ed.picking ? "picking \u2014 touch the corners you want, then drag any of them"
+                     : "picking off");
+  });
+  el.appendChild(b);
+  if (ed.picked.length) {
+    var n = document.createElement("span");
+    n.className = "edBrushName";
+    n.textContent = ed.picked.length + " picked";
+    el.appendChild(n);
+  }
+}
+
 function edBrushBar() {
   var el = $("edBrush");
   if (!el) return;
@@ -8747,6 +8900,7 @@ function edPaint() {
   });
 
   edBrushBar();
+  edPickBar();
   edZoomBar();
 }
 
@@ -9058,8 +9212,38 @@ function edPointTo(x, y, andStamp) {
   var el = document.getElementById("gl");
   if (!el) return;
   var down = false, lastX = 0, lastY = 0;
+
+  /* ------------------------------------------------------------------
+     Two fingers mean zoom, and nothing else.
+
+     A phone has no wheel and no bracket keys, so the only way to stand
+     back far enough to see the paper a room can grow into is to pinch.
+     While two are down nothing is dragged, stamped or picked - the
+     second finger landing has to CANCEL whatever the first one had
+     started, or a pinch leaves a corner dropped halfway across the room
+     on the way to zooming out.
+     ------------------------------------------------------------------ */
+  var touches = {}, pinchFrom = 0;
+  function pinchGap() {
+    var ids = Object.keys(touches);
+    if (ids.length < 2) return 0;
+    var a = touches[ids[0]], b = touches[ids[1]];
+    return Math.hypot(a.x - b.x, a.y - b.y);
+  }
   el.addEventListener("pointermove", function (e) {
     if (mode !== "edit") return;
+    if (touches[e.pointerId]) { touches[e.pointerId].x = e.clientX; touches[e.pointerId].y = e.clientY; }
+    if (Object.keys(touches).length >= 2) {
+      var gap = pinchGap();
+      if (pinchFrom > 8 && gap > 8) {
+        var ratio = gap / pinchFrom;
+        /* a step at a time, with the baseline reset after each, so a
+           slow pinch walks the steps instead of jumping the whole way */
+        if (ratio > 1.3) { edZoomStep(1); pinchFrom = gap; }
+        else if (ratio < 0.77) { edZoomStep(-1); pinchFrom = gap; }
+      }
+      return;
+    }
     lastX = e.clientX; lastY = e.clientY;
 
     if (ed.band) {
@@ -9113,6 +9297,15 @@ function edPointTo(x, y, andStamp) {
   el.addEventListener("pointerdown", function (e) {
     if (mode !== "edit") return;
     e.preventDefault();
+    touches[e.pointerId] = { x: e.clientX, y: e.clientY };
+    if (Object.keys(touches).length >= 2) {
+      /* a pinch has begun - undo whatever the first finger was doing */
+      pinchFrom = pinchGap();
+      ed.dragNode = -1;
+      if (ed.band) { ed.band = null; edBandDraw(); }
+      stop();
+      return;
+    }
     if (el.setPointerCapture) { try { el.setPointerCapture(e.pointerId); } catch (err) {} }
     down = true;
     edPainted = false;
@@ -9127,9 +9320,15 @@ function edPointTo(x, y, andStamp) {
     if (t0 && t0.act === "poly" && ed.polyShut) {
       var cell = cellUnder(e.clientX, e.clientY);
       if (cell) {
-        var hit = edNodeAt(cell[0], cell[1]);
-        if (hit < 0) {
-          var eg = edEdgeAt(cell[0], cell[1]);
+        var hit = edNodeNear(cell[0], cell[1]);
+        /* While picking, a press either takes a corner or starts a box
+           round some. It must NOT make a new corner: pressing a side
+           with the latch down was splitting the wall and then selecting
+           the piece it had just made, so choosing two corners of a
+           square quietly turned it into a hexagon. */
+        var picking = e.shiftKey || ed.picking;
+        if (hit < 0 && !picking) {
+          var eg = edEdgeNear(cell[0], cell[1]);
           if (eg >= 0) {
             edMark();
             ed.poly.splice(eg + 1, 0, [cell[0], cell[1]]);
@@ -9140,7 +9339,7 @@ function edPointTo(x, y, andStamp) {
           }
         }
         if (hit >= 0) {
-          if (e.shiftKey) {            /* picking, not dragging */
+          if (picking) {                   /* picking, not dragging */
             edPickToggle(hit);
             game.manC = cell[0]; game.manR = cell[1];
             return;
@@ -9153,7 +9352,7 @@ function edPointTo(x, y, andStamp) {
           return;                      /* taken hold; nothing is stamped */
         }
         /* bare floor: start a rubber band rather than stamping */
-        ed.band = { c0: cell[0], r0: cell[1], c1: cell[0], r1: cell[1], add: !!e.shiftKey };
+        ed.band = { c0: cell[0], r0: cell[1], c1: cell[0], r1: cell[1], add: !!picking };
         game.manC = cell[0]; game.manR = cell[1];
         edBandDraw();
         return;
@@ -9174,7 +9373,11 @@ function edPointTo(x, y, andStamp) {
     }
   });
   ["pointerup", "pointerleave", "pointercancel"].forEach(function (n) {
-    el.addEventListener(n, function () { stop(); });
+    el.addEventListener(n, function (e) {
+      if (e && e.pointerId !== undefined) delete touches[e.pointerId];
+      if (Object.keys(touches).length < 2) pinchFrom = 0;
+      stop();
+    });
   });
   el.addEventListener("wheel", function (e) {
     if (mode !== "edit") return;
