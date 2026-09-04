@@ -284,6 +284,17 @@
 
 .edNothing { color: #6f6456; font-size: 11px; padding: 4px 2px; }
 
+#edTools.cards { gap: 6px; }
+.edCard { position: relative; background: #1d1712; border: 1px solid #372c21;
+  border-radius: 6px; padding: 4px 4px 2px; color: #b8ab99; font: inherit;
+  cursor: pointer; width: 92px; }
+.edCard:hover { border-color: #6b5640; color: #efe4d2; }
+.edCard[aria-pressed="true"] { border-color: #b98c3e; background: #2a2016; color: #ffe6b8; }
+.edCard img { width: 100%; height: auto; display: block; border-radius: 3px; }
+.edCard b { display: block; font-size: 11px; font-weight: 500; padding: 2px 1px 1px; }
+.edCard .edKey { position: absolute; top: 5px; right: 6px; }
+.edCard .edSwatch.big { display: block; width: 100%; height: 58px; border-radius: 3px; }
+
 #edEdges { display: flex; gap: 10px; align-items: stretch; }
 .edEdgePick { display: flex; flex-direction: column; gap: 3px; width: 240px;
   background: #1d1712; border: 1px solid #372c21; border-radius: 6px;
@@ -6210,6 +6221,22 @@ var brickMesh, floorMesh, manRig, motes, debris = [], torches = [], keyLight;
 var BRICK_MAT, BRICK_TEX = {};
 var monsterRigs = [];
 var SURROUND = null, TIMBER = null;
+
+/* ====================================================================
+   THE ROOM THE CELLAR IS IN
+
+   A cellar is shown standing in a pit: big stone walls round it, an
+   apron of floor, torches on brackets, and the dark going down. That is
+   the game's setting and it is right for playing in.
+
+   It is wrong for building in. The editor's camera can see past the
+   level now - it holds a fixed scale rather than framing the room - so
+   all of that turned up round the edges of a level being worked on,
+   and there is no version of "where shall this brick go" that is helped
+   by a torch bracket. It is kept in one list and put away while the
+   editor is open.
+   ==================================================================== */
+var SCENERY = [];
 var terrain, terrains = [], rampMesh = null, floorSkin = null, props = {}, marbleMeshes = [], cubeCam, cubeT = 0, bobT = 0;
 
 function init3D() {
@@ -6531,7 +6558,7 @@ function buildCellar() {
   apron.rotation.x = -Math.PI / 2;
   apron.position.set(COLS / 2, -1.1, ROWS / 2);   /* below the lamp's reach */
   apron.receiveShadow = true;
-  scene.add(apron);
+  scene.add(apron); SCENERY.push(apron);
 
   /* made here, where it is first wanted - the edge walls inside the
      room share it, and they are built after this */
@@ -6543,7 +6570,7 @@ function buildCellar() {
     var m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), wallMat);
     m.position.set(x, h / 2, z);
     m.receiveShadow = true; m.castShadow = true;
-    scene.add(m);
+    scene.add(m); SCENERY.push(m);
   }
   /* No continuous walls any more. Some of the edge is good stone and
      some of it is a hole in the world, and which is which changes with
@@ -6571,6 +6598,7 @@ function buildCellar() {
     var lt = new THREE.PointLight(0xff8c2e, 1.5, 15, 1.7);
     lt.position.y = 0.5; g.add(lt);
     torches.push({ light: lt, flame: flame, seed: Math.random() * 9 });
+    SCENERY.push(g);
     scene.add(g);
   }
 
@@ -6579,7 +6607,7 @@ function buildCellar() {
   var pit = new THREE.Mesh(new THREE.BoxGeometry(W + 14, 30, D + 14), voidMat);
   pit.position.set(W / 2, -15.4, D / 2);
   pit.material.side = THREE.BackSide;
-  scene.add(pit);
+  scene.add(pit); SCENERY.push(pit);
 
   /* The blocks' textures are made FIRST now: the walls are built out of
      the wooden one, and buildProps used to run before it existed - so
@@ -8835,7 +8863,7 @@ function edNodesDraw() {
      - the side highlights on its own when you pick it, which is the
      only thing that needed saying. */
   var act = ED_TOOLS[ed.tool] && ED_TOOLS[ed.tool].act;
-  var show = (mode === "edit" && act === "poly" && ed.poly.length > 0);
+  var show = (mode === "edit" && ed.view === "floor" && act === "poly" && ed.poly.length > 0);
   edNodeMesh.visible = show;
   if (!show) { if (edRingMesh) edRingMesh.visible = false; return; }
   /* ------------------------------------------------------------------
@@ -8927,7 +8955,12 @@ var _segA = null, _segB = null;
 function edPolyDraw() {
   if (!edPolyLine) return;
   var n = ed.poly.length;
-  edPolyLine.visible = (mode === "edit" && n > 0);
+  /* The outline is the subject of two views and clutter in the rest. In
+     Terrain or Blocks it is a set of bright bars laid over the thing you
+     are actually looking at, saying something you are not being asked
+     about. */
+  var mine = (ed.view === "floor" || ed.view === "walls");
+  edPolyLine.visible = (mode === "edit" && mine && n > 0);
   if (!edPolyLine.visible) return;
   if (!_segA) { _segA = new THREE.Vector3(); _segB = new THREE.Vector3(); }
 
@@ -8936,7 +8969,12 @@ function edPolyDraw() {
      should take up */
   var lean = Math.tan(camera.fov * Math.PI / 360) * 2;
   var far = Math.max(1, camera.position.distanceTo(camAim));
-  var thick = 0.011 * far * lean;
+  /* Thin where it is a drawing and thick where it is a thing. In the
+     Floor view the outline is a plan of the room seen from overhead and
+     wants the weight of a pencil line; in the Walls view it marks a
+     side you are meant to press, standing among the walls it belongs
+     to, and a pencil line is lost down there. */
+  var thick = (ed.view === "floor" ? 0.004 : 0.011) * far * lean;
 
   /* ------------------------------------------------------------------
      The corners are moved out, not the sides.
@@ -9228,21 +9266,21 @@ var ED_VIEWS = [
   { key: "walls", name: "Walls", cam: "low", show: "walls",
     tools: ["Wall/drop"],
     how: "Click a side of the room to pick it, then click it again to turn it between good stone and a drop. Stone counts as a side of a trap; a drop does not, and anything shoved over one is gone." },
-  { key: "terrain", name: "Terrain", cam: "room", show: "floor",
+  { key: "terrain", name: "Terrain", cam: "room", show: "walls",
     tools: ["Raise", "Lower", "Paint floor"],
     how: "The lie of the ground, with nothing standing on it. Pick a brush and run it over the floor." },
-  { key: "blocks", name: "Blocks", cam: "room", show: "all",
+  { key: "blocks", name: "Blocks", cam: "room", show: "all", pics: true,
     /* Brick first, because the first tool of the first view is the one
        in your hand when the editor opens, and that should not be Erase */
     tools: ["Brick", "Rock", "Tree", "Marble", "Chopper", "Erase"],
     how: "What the player pushes about, and what pushes back." },
-  { key: "liquid", name: "Liquid", cam: "room", show: "all",
+  { key: "liquid", name: "Liquid", cam: "room", show: "all", pics: true,
     tools: ["Tar vat", "Water vat", "Set tar"],
     how: "Wall a vat in on all four sides or it runs. Tar burns through wood fast, brick slowly, stone never." },
-  { key: "kit", name: "Kit", cam: "room", show: "all",
+  { key: "kit", name: "Kit", cam: "room", show: "all", pics: true,
     tools: ["Boots", "Frost", "Saw", "Jar"],
     how: "Things left lying about for the player to pick up." },
-  { key: "life", name: "Monsters", cam: "room", show: "all",
+  { key: "life", name: "Monsters", cam: "room", show: "all", pics: true,
     tools: ["Fly", "Spider", "Beetle", "Wasp", "Snake", "Start"],
     how: "Who is down here, and where the player comes in. Four bricks is the least that will hold one monster." },
   { key: "look", name: "Look", cam: "close", show: "all",
@@ -9289,6 +9327,11 @@ var edHidden = null;
 
 function edDress() {
   var want = (mode === "edit") ? edViewNow().show : "all";
+
+  /* the pit and its torches belong to playing, not to building - except
+     in Look, which is the view that exists to show what it will be like */
+  var setting = (mode !== "edit" || ed.view === "look");
+  SCENERY.forEach(function (o) { o.visible = setting; });
   /* The paper shows how big a room is allowed to get, which is a
      question in exactly one place: the view where you change how big it
      is. In the Walls view the size is settled and the sheet is only
@@ -9500,19 +9543,31 @@ function edPaint() {
     none.textContent = "nothing to put down here \u2014 have a look round";
     box.appendChild(none);
   }
+  var asCards = !!view.pics;
+  if (asCards) box.classList.add("cards"); else box.classList.remove("cards");
+
   mine.forEach(function (i, n) {
     var t = ED_TOOLS[i];
     var b = document.createElement("button");
-    b.className = "edTool";
     b.type = "button";
     b.setAttribute("aria-pressed", i === ed.tool ? "true" : "false");
-    var pic = (t.act === "mob") ? monsterPortrait(t.v, 64) : null;
-    b.innerHTML = (pic ? '<img class="edToolPic" alt="" src="' + pic + '">'
-                       : '<i class="edSwatch" style="background:' + t.swatch + '"></i>') +
-                  "<span>" + t.name + "</span>" +
-                  ' <i class="edKey">' + (n + 1) + "</i>";
     b.title = t.how + "   (" + (n + 1) + ")";
     b.addEventListener("click", function () { ed.tool = i; edPaint(); edHow(); });
+
+    if (asCards) {
+      /* a picture of the thing, not a square of its colour */
+      var big = (t.act === "mob") ? monsterPortrait(t.v, 128)
+                                  : thingPortrait(t.name, 132, 96);
+      b.className = "edCard";
+      b.innerHTML = (big ? '<img alt="" src="' + big + '">'
+                         : '<i class="edSwatch big" style="background:' + t.swatch + '"></i>') +
+                    "<b>" + t.name + "</b><i class=\"edKey\">" + (n + 1) + "</i>";
+    } else {
+      b.className = "edTool";
+      b.innerHTML = '<i class="edSwatch" style="background:' + t.swatch + '"></i>' +
+                    "<span>" + t.name + "</span>" +
+                    ' <i class="edKey">' + (n + 1) + "</i>";
+    }
     box.appendChild(b);
   });
 
@@ -10192,6 +10247,7 @@ function edEnter(rec, back) {
      are looking at. Opening straight onto ED_TOOLS[0] meant the editor
      started with Erase selected while the Blocks view was showing, and
      every click quietly rubbed out instead of laying a brick. */
+  ed.tool = -1;          /* so the view hands over its own first tool */
   edViewTo(ed.view);
   /* the game's HUD is about a run, and there is no run here */
   $("hud").hidden = true; plan.hidden = false; $("hint").hidden = true;
@@ -10868,6 +10924,135 @@ function monsterPortrait(kind, px) {
    ending, and the dark going on.
    ==================================================================== */
 var EDGE_PICS = {};
+var THING_PICS = {};
+
+/* ====================================================================
+   A PICTURE OF THE THING ITSELF
+
+   A coloured square beside a word is a legend, not a tool. It tells you
+   the game has decided brick is orange; it does not tell you what a
+   brick looks like standing on the floor, how big it is against a
+   square, or that a chopper has a blade going round on it. All of that
+   is already modelled - the editor was just declining to show it.
+
+   Each of these is the real prop: the same geometry, the same material,
+   on a square of the same floor, lit the same way as the edges are. Any
+   piece whose base is not already at nought is dropped so it stands on
+   the ground rather than through it, which is worked out from its own
+   bounding box rather than from a table of numbers to keep wrong.
+   ==================================================================== */
+function standOn(mesh) {
+  mesh.geometry.computeBoundingBox();
+  var bb = mesh.geometry.boundingBox;
+  mesh.position.y -= bb.min.y;
+  return mesh;
+}
+
+function fromProp(prop, tint) {
+  if (!prop) return null;
+  var m = standOn(new THREE.Mesh(prop.geometry, prop.material));
+  /* A near-mirror finish has nothing to mirror in a scene this small,
+     so anything the cellar makes shiny - a blade, a marble - comes out
+     black. For a photograph they are dulled to something that catches
+     the lamp instead of the room that is not there. */
+  if (m.material.metalness > 0.5 || tint) {
+    m.material = m.material.clone();
+    m.material.metalness = Math.min(m.material.metalness, 0.35);
+    m.material.roughness = Math.max(m.material.roughness, 0.3);
+    if (tint) m.material.color = new THREE.Color(tint);
+  }
+  return m;
+}
+
+function thingPortrait(name, w, h) {
+  var key = name + w + "x" + h;
+  if (THING_PICS[key]) return THING_PICS[key];
+  try {
+    var sc = new THREE.Scene();
+    sc.add(new THREE.HemisphereLight(0x3a3020, 0x0f0c09, 0.62));
+    var lamp = new THREE.DirectionalLight(0xffcf9a, 2.1);
+    lamp.position.set(1.3, 3.6, 2.6);
+    sc.add(lamp);
+    var fill = new THREE.DirectionalLight(0xbfd0ff, 0.5);
+    fill.position.set(-2.2, 1.8, 1.4);
+    sc.add(fill);
+
+    /* a patch of the cellar's own floor to stand it on */
+    var floorMat = (terrains[0] && terrains[0].material) ||
+                   new THREE.MeshStandardMaterial({ color: 0x6d5f49 });
+    for (var r = -1; r <= 1; r++) for (var c = -1; c <= 1; c++) {
+      var t = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), floorMat);
+      t.position.set(c, -0.5, -r);
+      t.rotation.y = (((r * 7 + c * 3) % 4 + 4) % 4) * Math.PI / 2;
+      sc.add(t);
+    }
+
+    var put = [];
+    if (name === "Brick" || name === "Rock" || name === "Marble" ||
+        name === "Set tar" || name === "Tar vat" || name === "Water vat") {
+      var of = { Brick: null, Rock: props.rock, Marble: null,
+                 "Set tar": props.cooled, "Tar vat": props.vatT,
+                 "Water vat": props.vatW }[name];
+      if (name === "Brick") {
+        var bm = BRICK_MAT ? BRICK_MAT.clone() : new THREE.MeshStandardMaterial();
+        bm.color = new THREE.Color(0xb8462e);
+        put.push(standOn(new THREE.Mesh(new THREE.BoxGeometry(0.94, 0.66, 0.94), bm)));
+      } else if (name === "Marble") {
+        /* the marble in the cellar mirrors its surroundings, and there
+           are none here - so it is given a plain polished stone instead
+           of coming out as a black ball */
+        put.push(standOn(new THREE.Mesh(new THREE.SphereGeometry(0.42, 20, 16),
+          new THREE.MeshStandardMaterial({ color: 0xcfd6dd, roughness: 0.18,
+                                           metalness: 0.25 }))));
+      } else {
+        /* the cellar colours some of these per instance, so the bare
+           material is white - which is not what a rock looks like */
+        put.push(fromProp(of, name === "Rock" ? 0x6f6559
+                            : name === "Set tar" ? 0x14100e : null));
+      }
+    } else if (name === "Tree") {
+      put.push(fromProp(props.trunk));
+      var crown = fromProp(props.crown);
+      if (crown) { crown.position.y += 0.55; put.push(crown); }
+    } else if (name === "Chopper") {
+      put.push(fromProp(props.chopBed));
+      /* the two arms of the blade, where the cellar puts them */
+      [props.chopBlade, props.chopBlade2].forEach(function (bp) {
+        var bl = fromProp(bp, 0xb9c2c9);
+        if (!bl) return;
+        bl.position.y = 0.26;
+        bl.rotation.y = 0.7;
+        put.push(bl);
+      });
+    } else if (name === "Boots" || name === "Frost" || name === "Saw" || name === "Jar") {
+      var n = { Boots: 1, Frost: 2, Saw: 3, Jar: 4 }[name];
+      var it = fromProp(props["item" + n]);
+      if (it) { it.position.y += 0.22; put.push(it); }
+    } else if (name === "Paint floor") {
+      var pf = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1),
+        new THREE.MeshStandardMaterial({ color: 0x6b8f4e, roughness: 0.95 }));
+      pf.position.set(0, -0.49, 0);
+      sc.add(pf);
+    }
+    put.forEach(function (m) { if (m) sc.add(m); });
+
+    var cam = new THREE.PerspectiveCamera(34, w / h, 0.1, 40);
+    cam.position.set(1.0, 1.55, 2.05);
+    cam.lookAt(0, 0.32, 0);
+
+    var was = new THREE.Vector2();
+    renderer.getSize(was);
+    var wasExp = renderer.toneMappingExposure;
+    renderer.setSize(w, h, false);
+    renderer.toneMappingExposure = 1;
+    renderer.render(sc, cam);
+    var url = renderer.domElement.toDataURL("image/jpeg", 0.88);
+    renderer.setSize(was.x, was.y, false);
+    renderer.toneMappingExposure = wasExp;
+    THING_PICS[key] = url;
+    return url;
+  } catch (e) { return null; }
+}
 
 function edgePortrait(kind, w, h) {
   var key = kind + w + "x" + h;
