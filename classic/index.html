@@ -2590,6 +2590,9 @@
       s.level = level; s.score = score;
       s.best = Math.max(best || 0, s.best || 0);
       s.deepest = Math.max(level, s.deepest || 0);
+      /* when this was last written, which is how the game can tell a
+         run made during the beta from one made after it */
+      s.at = Date.now();
       this.write(s);
     },
     end: function (best) {

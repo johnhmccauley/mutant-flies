@@ -148,6 +148,11 @@
     this.spent = state.spent || 0;
     this.spentBought = state.spentBought || 0;
     this.collected = state.collected || {};    /* level ids already paid out */
+    /* What was bought and not yet used. Buying a life took the credits
+       and gave nothing back before this - the ledger said it had
+       happened and nothing else in the game knew. A shop that takes
+       money and hands over an entry in a log is not a shop. */
+    this.stock = state.stock || {};
     this.ledger = state.ledger || [];
   }
 
@@ -209,13 +214,27 @@
     var fromEarned = Math.min(p, Math.max(0, this.freeLeft()));
     this.spent += p;
     this.spentBought += (p - fromEarned);
+    this.stock[what] = (this.stock[what] || 0) + 1;
     this.note({ kind: "spend", credits: -p, why: SHOP[what].name, at: at || 0 });
-    return { ok: true, bought: what, paid: p, left: this.balance() };
+    return { ok: true, bought: what, paid: p, left: this.balance(),
+             have: this.stock[what] };
+  };
+
+  Wallet.prototype.have = function (what) { return this.stock[what] || 0; };
+
+  /* Taking one out of the cupboard. Returns false rather than going
+     negative, because a life you did not have is not a life. */
+  Wallet.prototype.use = function (what, at) {
+    if (!this.stock[what]) return false;
+    this.stock[what]--;
+    if (!this.stock[what]) delete this.stock[what];
+    this.note({ kind: "used", credits: 0, why: (SHOP[what] || {}).name || what, at: at || 0 });
+    return true;
   };
 
   Wallet.prototype.toJSON = function () {
     return { earned: this.earned, awarded: this.awarded, bought: this.bought, spent: this.spent,
-             spentBought: this.spentBought, collected: this.collected,
+             spentBought: this.spentBought, collected: this.collected, stock: this.stock,
              ledger: this.ledger.slice(-40) };
   };
 

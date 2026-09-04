@@ -332,5 +332,46 @@ console.log("\nThe editor in the beta\n");
      C.canPublish(deep, IN_BETA), true);
 }
 
+
+console.log("\nComing through the release\n");
+{
+  /* forty cellars deep in the beta comes back to ten - and everything
+     that is a number comes through untouched */
+  const save = { level: 40, deepest: 40, best: 91000, at: IN_BETA };
+  const out = C.carryOver(save, AFTER);
+  ok("a deep beta run comes back to the tenth cellar",
+     [out.changed, out.was, out.save.deepest, out.save.level], [true, 40, 10, 10]);
+  ok("and the best score is not touched", out.save.best, 91000);
+}
+{
+  const shallow = { level: 6, deepest: 8, best: 100, at: IN_BETA };
+  const out = C.carryOver(shallow, AFTER);
+  ok("somebody who never got past ten keeps exactly what they had",
+     [out.changed, out.save.deepest], [false, 8]);
+}
+{
+  /* done once: a save already brought through is left alone */
+  const save = { level: 40, deepest: 40, at: IN_BETA };
+  const first = C.carryOver(save, AFTER);
+  first.save.deepest = 22;                    /* played on since */
+  const again = C.carryOver(first.save, AFTER + 86400000);
+  ok("and never a second time", [again.changed, again.save.deepest], [false, 22]);
+}
+{
+  const save = { level: 40, deepest: 40, at: IN_BETA };
+  ok("nothing happens while the beta is still on",
+     C.carryOver(save, IN_BETA).changed, false);
+}
+{
+  const save = { level: 40, deepest: 40, at: AFTER + 1000 };
+  ok("nor to a run that was made after the beta ended",
+     C.carryOver(save, AFTER + 90000000).changed, false);
+}
+{
+  ok("a save from before any of this existed is not mangled",
+     C.carryOver({ level: 3, deepest: 3 }, AFTER).changed, false);
+  ok("and neither is nothing at all", C.carryOver(null, AFTER).changed, false);
+}
+
 console.log("\n" + pass + " passed, " + fail + " failed");
 process.exit(fail ? 1 : 0);

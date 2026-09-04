@@ -80,7 +80,8 @@ console.log("\nThe farm, and why it does not work\n");
 console.log("\nSpending it\n");
 {
   const w = new C.Wallet({ earned: 200 });
-  ok("you can buy what you can afford", w.spend("life"), { ok: true, bought: "life", paid: 150, left: 50 });
+  ok("you can buy what you can afford", w.spend("life"),
+     { ok: true, bought: "life", paid: 150, left: 50, have: 1 });
   ok("and not what you cannot", w.spend("life"), { ok: false, why: "not enough credits", short: 100 });
 }
 {
@@ -141,6 +142,32 @@ console.log("\nWriting it down\n");
   const w = new C.Wallet();
   for (let i = 0; i < 300; i++) w.earn({ kind: "descent", cellar: 1, moves: 500 });
   ok("the ledger does not grow for ever", w.ledger.length <= 200, true);
+}
+
+
+console.log("\nWhat a purchase actually gives you\n");
+{
+  const w = new C.Wallet({ earned: 500 });
+  const r = w.spend("life");
+  ok("buying a life gives you a life, not just a line in a ledger",
+     [r.ok, r.have, w.have("life")], [true, 1, 1]);
+  w.spend("life");
+  ok("and buying two gives you two", w.have("life"), 2);
+}
+{
+  const w = new C.Wallet({ earned: 500 });
+  w.spend("life");
+  ok("using one takes it out of the cupboard", [w.use("life"), w.have("life")], [true, 0]);
+  ok("and using one you have not got is refused rather than going negative",
+     [w.use("life"), w.have("life")], [false, 0]);
+}
+{
+  const w = new C.Wallet({ earned: 900 });
+  w.spend("robotLarge"); w.spend("life");
+  const back = new C.Wallet(JSON.parse(JSON.stringify(w.toJSON())));
+  ok("what you bought survives being saved and loaded",
+     [back.have("robotLarge"), back.have("life"), back.balance()],
+     [1, 1, w.balance()]);
 }
 
 console.log("\n" + pass + " passed, " + fail + " failed");

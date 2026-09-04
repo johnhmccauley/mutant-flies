@@ -2934,6 +2934,9 @@
       s.level = level; s.score = score;
       s.best = Math.max(best || 0, s.best || 0);
       s.deepest = Math.max(level, s.deepest || 0);
+      /* when this was last written, which is how the game can tell a
+         run made during the beta from one made after it */
+      s.at = Date.now();
       this.write(s);
     },
     end: function (best) {
@@ -4732,6 +4735,11 @@
     this.spent = state.spent || 0;
     this.spentBought = state.spentBought || 0;
     this.collected = state.collected || {};    /* level ids already paid out */
+    /* What was bought and not yet used. Buying a life took the credits
+       and gave nothing back before this - the ledger said it had
+       happened and nothing else in the game knew. A shop that takes
+       money and hands over an entry in a log is not a shop. */
+    this.stock = state.stock || {};
     this.ledger = state.ledger || [];
   }
 
@@ -4793,13 +4801,27 @@
     var fromEarned = Math.min(p, Math.max(0, this.freeLeft()));
     this.spent += p;
     this.spentBought += (p - fromEarned);
+    this.stock[what] = (this.stock[what] || 0) + 1;
     this.note({ kind: "spend", credits: -p, why: SHOP[what].name, at: at || 0 });
-    return { ok: true, bought: what, paid: p, left: this.balance() };
+    return { ok: true, bought: what, paid: p, left: this.balance(),
+             have: this.stock[what] };
+  };
+
+  Wallet.prototype.have = function (what) { return this.stock[what] || 0; };
+
+  /* Taking one out of the cupboard. Returns false rather than going
+     negative, because a life you did not have is not a life. */
+  Wallet.prototype.use = function (what, at) {
+    if (!this.stock[what]) return false;
+    this.stock[what]--;
+    if (!this.stock[what]) delete this.stock[what];
+    this.note({ kind: "used", credits: 0, why: (SHOP[what] || {}).name || what, at: at || 0 });
+    return true;
   };
 
   Wallet.prototype.toJSON = function () {
     return { earned: this.earned, awarded: this.awarded, bought: this.bought, spent: this.spent,
-             spentBought: this.spentBought, collected: this.collected,
+             spentBought: this.spentBought, collected: this.collected, stock: this.stock,
              ledger: this.ledger.slice(-40) };
   };
 
@@ -5018,6 +5040,46 @@
   function canCreate(who, now) { return gate(who, now).editorEnabled; }
   function canPublish(who, now) { return gate(who, now).canPublish; }
 
+  /* ------------------------------------------------------------------
+     COMING THROUGH THE RELEASE
+
+     The beta was free and open, and somebody who spent a fortnight in
+     it may be forty cellars down. Carrying that straight into the paid
+     game would mean the release opens with nothing left to find, which
+     is a poor first day for the person it happened to as well as for
+     everybody else.
+
+     So progress comes back to the tenth cellar. Not to the first: they
+     played it, they earned something, and ten is deep enough to have
+     kept the things that are worth having open. Everything that is a
+     NUMBER carries over untouched - credits, lives, robots, the best
+     score, and the unlock itself. It is only how far down they had got
+     that comes back.
+
+     Done once, and only to a save that was actually written during the
+     beta - the timestamp is what tells the two apart, so a player who
+     has already come through cannot be cut back a second time.
+     ------------------------------------------------------------------ */
+  var CARRY_CAP = 10;
+
+  function carryOver(save, now) {
+    now = (now === undefined) ? Date.now() : now;
+    if (!save || typeof save !== "object") return { changed: false, save: save };
+    if (now < BETA_ENDS) return { changed: false, save: save };
+    /* written after the beta ended: nothing to do, and nothing to undo */
+    if (!save.at || save.at >= BETA_ENDS) return { changed: false, save: save };
+    if (!(save.deepest > CARRY_CAP)) {
+      save.at = now;                         /* seen, and left alone */
+      return { changed: false, save: save };
+    }
+    var was = save.deepest;
+    save.deepest = CARRY_CAP;
+    if (save.level && save.level > CARRY_CAP) save.level = CARRY_CAP;
+    save.at = now;
+    save.cameFromBeta = was;
+    return { changed: true, was: was, now: CARRY_CAP, save: save };
+  }
+
   var MOVES = {};
   MOVES[PRIVATE] = [PUBLIC];
   MOVES[PUBLIC] = [HIDDEN];
@@ -5061,7 +5123,7 @@
   root.MutantCatalogue = {
     PRIVATE: PRIVATE, PUBLIC: PUBLIC, HIDDEN: HIDDEN,
     FREE_CELLARS: FREE_CELLARS, EDITOR_AT: EDITOR_AT,
-    BETA_ENDS: BETA_ENDS, inBeta: inBeta,
+    BETA_ENDS: BETA_ENDS, inBeta: inBeta, CARRY_CAP: CARRY_CAP, carryOver: carryOver,
     gate: gate, canDescend: canDescend, canCreate: canCreate, canPublish: canPublish,
     stars: stars, rank: rank, plays: plays, sortLevels: sortLevels, SORTS: SORTS,
     PRIOR: PRIOR, PRIOR_WEIGHT: PRIOR_WEIGHT,
@@ -7044,22 +7106,45 @@ function showDoor() {
     : "Make a cellar of your own - " + g.publishNeeds;
 }
 
+/* Run once at startup: bring a beta save through to the paid game. */
+function carryBetaSave() {
+  var save = MF.save.read();
+  if (!save) return null;
+  var out = MutantCatalogue.carryOver(save, Date.now());
+  if (out.save) MF.save.write(out.save);
+  return out.changed ? out : null;
+}
+
 function sayBeta() {
   var el = $("betaSays");
   if (!el) return;
   var g = MutantCatalogue.gate({ id: "x", reached: 99, paid: false }, Date.now());
   if (!g.beta) { el.textContent = ""; return; }
   var when = new Date(MutantCatalogue.BETA_ENDS);
+  /* Accurate rather than generous. Credits and what they bought are
+     numbers and carry forward; a level is a file in a format that is
+     still moving, and promising it will survive is a promise that
+     might have to be broken. */
   el.textContent = "Free and complete while it is in beta. On " +
     when.toLocaleDateString(undefined, { day: "numeric", month: "long", year: "numeric" }) +
-    " it becomes a paid game - and everything you have played, built or " +
-    "unlocked before then stays yours.";
+    " it becomes a paid game. Everything you unlock before then stays " +
+    "unlocked, and so do your credits, lives and robots. Cellars you build " +
+    "during the beta may not survive it - copy the code of any you would " +
+    "miss.";
 }
 
 function enterTitle() {
   mode = "title";
+  var carried = carryBetaSave();
   sayBeta();
   showDoor();
+  if (carried) {
+    /* said plainly, once, rather than left for them to notice */
+    var el = $("betaSays");
+    if (el) el.textContent = "The beta is over. Your credits, lives, robots and best " +
+      "score have all come through - the descent starts again from cellar " +
+      carried.now + ", where it was cellar " + carried.was + ".";
+  }
   $("hud").hidden = true; plan.hidden = true; $("hint").hidden = true;
   $("banner").hidden = true;
   $("overSheet").hidden = true; $("pauseSheet").hidden = true;
@@ -7741,7 +7826,10 @@ function edSave() {
   vaultPut("levels", id, row).then(function (r) {
     if (!r || !r.ok) return edSay("this browser would not keep it" + (r && r.full ? " - it is out of room" : ""), "bad");
     ed.id = id; ed.dirty = false;
-    edSay("saved" + (bad.length ? " - but " + bad.join("; ") : ""), bad.length ? "bad" : "good");
+    var g = MutantCatalogue.gate({ id: "local", reached: 99, paid: false, played: {} }, Date.now());
+    edSay("saved" + (bad.length ? " - but " + bad.join("; ") : "") +
+          (g.beta ? " &middot; beta cellars may not survive to release - use Code to keep one" : ""),
+          bad.length ? "bad" : "good");
   });
 }
 

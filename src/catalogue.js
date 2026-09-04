@@ -203,6 +203,46 @@
   function canCreate(who, now) { return gate(who, now).editorEnabled; }
   function canPublish(who, now) { return gate(who, now).canPublish; }
 
+  /* ------------------------------------------------------------------
+     COMING THROUGH THE RELEASE
+
+     The beta was free and open, and somebody who spent a fortnight in
+     it may be forty cellars down. Carrying that straight into the paid
+     game would mean the release opens with nothing left to find, which
+     is a poor first day for the person it happened to as well as for
+     everybody else.
+
+     So progress comes back to the tenth cellar. Not to the first: they
+     played it, they earned something, and ten is deep enough to have
+     kept the things that are worth having open. Everything that is a
+     NUMBER carries over untouched - credits, lives, robots, the best
+     score, and the unlock itself. It is only how far down they had got
+     that comes back.
+
+     Done once, and only to a save that was actually written during the
+     beta - the timestamp is what tells the two apart, so a player who
+     has already come through cannot be cut back a second time.
+     ------------------------------------------------------------------ */
+  var CARRY_CAP = 10;
+
+  function carryOver(save, now) {
+    now = (now === undefined) ? Date.now() : now;
+    if (!save || typeof save !== "object") return { changed: false, save: save };
+    if (now < BETA_ENDS) return { changed: false, save: save };
+    /* written after the beta ended: nothing to do, and nothing to undo */
+    if (!save.at || save.at >= BETA_ENDS) return { changed: false, save: save };
+    if (!(save.deepest > CARRY_CAP)) {
+      save.at = now;                         /* seen, and left alone */
+      return { changed: false, save: save };
+    }
+    var was = save.deepest;
+    save.deepest = CARRY_CAP;
+    if (save.level && save.level > CARRY_CAP) save.level = CARRY_CAP;
+    save.at = now;
+    save.cameFromBeta = was;
+    return { changed: true, was: was, now: CARRY_CAP, save: save };
+  }
+
   var MOVES = {};
   MOVES[PRIVATE] = [PUBLIC];
   MOVES[PUBLIC] = [HIDDEN];
@@ -246,7 +286,7 @@
   root.MutantCatalogue = {
     PRIVATE: PRIVATE, PUBLIC: PUBLIC, HIDDEN: HIDDEN,
     FREE_CELLARS: FREE_CELLARS, EDITOR_AT: EDITOR_AT,
-    BETA_ENDS: BETA_ENDS, inBeta: inBeta,
+    BETA_ENDS: BETA_ENDS, inBeta: inBeta, CARRY_CAP: CARRY_CAP, carryOver: carryOver,
     gate: gate, canDescend: canDescend, canCreate: canCreate, canPublish: canPublish,
     stars: stars, rank: rank, plays: plays, sortLevels: sortLevels, SORTS: SORTS,
     PRIOR: PRIOR, PRIOR_WEIGHT: PRIOR_WEIGHT,
