@@ -230,6 +230,55 @@
   }
   #dbg .what b{color:var(--bone);font-weight:500}
   @media (prefers-reduced-motion:reduce){.go{transition:none}}
+
+/* ---- the editor ---------------------------------------------------
+   A thin strip along the bottom, not a panel. The cellar is what you
+   are looking at; the tools are not, and a palette that eats half the
+   room is a palette you cannot build in. So: one scrolling row of
+   chips, one row of controls, and everything above it stays visible.
+
+   The man is the cursor - there is no pointer picking anywhere in this
+   game and building it for one screen would be a lot of machinery to
+   end up somewhere worse - so the strip only has to say which tool is
+   in his hand. */
+#edBar { position: fixed; left: 0; right: 0; bottom: 0; z-index: 40;
+  background: linear-gradient(to top, rgba(12,9,7,.98), rgba(12,9,7,.86));
+  border-top: 1px solid #3a2e22; padding: 6px 8px 7px;
+  font-family: "IBM Plex Mono", ui-monospace, monospace; }
+#edBar .edRow { display: flex; gap: 5px; align-items: center; }
+#edBar .edRow + .edRow { margin-top: 5px; }
+/* one row, and it scrolls rather than wrapping the game off the screen */
+#edTools { display: flex; gap: 3px; flex: 1 1 auto; overflow-x: auto;
+  scrollbar-width: thin; padding-bottom: 2px; }
+.edTool { background: #1d1712; border: 1px solid #372c21; color: #b8ab99;
+  border-radius: 3px; padding: 3px 6px; font: inherit; font-size: 10px;
+  line-height: 1.35; cursor: pointer; white-space: nowrap; flex: 0 0 auto;
+  display: flex; gap: 4px; align-items: center; }
+.edTool:hover { border-color: #6b5640; color: #efe4d2; }
+.edTool[aria-pressed="true"] { background: #503c25; border-color: #b98c3e; color: #ffe6b8; }
+.edSwatch { width: 9px; height: 9px; border-radius: 2px; border: 1px solid rgba(0,0,0,.55); }
+.edKey { opacity: .45; }
+#edBar input[type="text"] { background: #14100c; border: 1px solid #372c21; color: #efe4d2;
+  border-radius: 3px; padding: 3px 7px; font: inherit; font-size: 11px;
+  flex: 0 1 200px; min-width: 120px; }
+.edBtn { background: #241c15; border: 1px solid #46372a; color: #cfc0aa;
+  border-radius: 3px; padding: 3px 8px; font: inherit; font-size: 10px;
+  cursor: pointer; white-space: nowrap; flex: 0 0 auto; }
+.edBtn:hover { border-color: #b98c3e; color: #ffe6b8; }
+.edBtn.warm { border-color: #7a5a2a; color: #ffd27a; }
+#edSay { font-size: 10px; color: #9d8f7c; margin-left: auto; text-align: right;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#edSay .bad { color: #e0785c; }
+#edSay .good { color: #8fc07a; }
+#edList { display: grid; gap: 6px; max-height: 46vh; overflow: auto; margin: 10px 0; }
+.edItem { display: flex; gap: 10px; align-items: center; text-align: left;
+  background: #191410; border: 1px solid #33291f; border-radius: 6px; padding: 8px 10px; }
+.edItem b { color: #efe4d2; font-weight: 600; }
+.edItem span { color: #8e8172; font-size: 12px; }
+.edItem .edBtn { margin-left: auto; }
+#edCode { width: 100%; height: 110px; background: #14100c; color: #c9bba8;
+  border: 1px solid #3a2e22; border-radius: 6px; padding: 8px; font-family: inherit;
+  font-size: 11px; resize: vertical; }
 </style>
 </head>
 <body>
@@ -337,6 +386,52 @@
       <button class="go quiet" id="giveup" type="button">Save &amp; quit</button>
     </div>
     <p class="fine">Your progress is kept in this browser. Come back and continue.</p>
+  </div>
+</div>
+
+
+<!-- The editor. Hidden until a cellar deep enough opens it. -->
+<div id="edBar" hidden>
+  <div class="edRow">
+    <div id="edTools"></div>
+  </div>
+  <div class="edRow">
+    <input type="text" id="edName" maxlength="48" placeholder="Name this cellar" spellcheck="false">
+    <button class="edBtn" id="edSave" type="button">Save</button>
+    <button class="edBtn" id="edOpen" type="button">Open</button>
+    <button class="edBtn" id="edNew" type="button">New</button>
+    <button class="edBtn warm" id="edTest" type="button">Test play</button>
+    <button class="edBtn warm" id="edBot" type="button">Set the bot on it</button>
+    <button class="edBtn" id="edShare" type="button">Code</button>
+    <button class="edBtn" id="edPublish" type="button">Publish</button>
+    <button class="edBtn" id="edQuit" type="button">Leave</button>
+    <div id="edSay"></div>
+  </div>
+</div>
+
+<div class="sheet" id="edListSheet" hidden>
+  <div class="card">
+    <p class="kicker">Your cellars</p>
+    <h1>Open one</h1>
+    <div id="edList"></div>
+    <div class="row">
+      <button class="go quiet" id="edListClose" type="button">Back</button>
+    </div>
+    <p class="fine">Kept in this browser. A cellar that has been published cannot be deleted - other people have played it - but it can be hidden.</p>
+  </div>
+</div>
+
+<div class="sheet" id="edCodeSheet" hidden>
+  <div class="card">
+    <p class="kicker">A cellar, written down</p>
+    <h1>Send it to somebody</h1>
+    <p class="lede">This is the whole cellar. Paste it into a message and whoever gets it can play it - no account, no upload, nothing to sign up to.</p>
+    <textarea id="edCode" spellcheck="false"></textarea>
+    <div class="row">
+      <button class="go" id="edCopy" type="button">Copy</button>
+      <button class="go quiet" id="edPaste" type="button">Load what is in the box</button>
+      <button class="go quiet" id="edCodeClose" type="button">Back</button>
+    </div>
   </div>
 </div>
 
@@ -3289,6 +3384,1391 @@
 })(typeof window !== "undefined" ? window : globalThis);
 </script>
 <!--/inline-->
+<!--inline:src/level-io.js-->
+<script>
+/* =====================================================================
+   LEVEL IO
+
+   Turning a cellar into a short string and back.
+
+   A cellar is a handful of parallel arrays of small numbers, 884 cells
+   apiece, and most of a cellar is the same number over and over - empty
+   floor, level ground, dry stone. So the arrays are run-length coded
+   first and only then turned into text, which takes a level from about
+   twenty thousand characters of JSON down to something you can paste
+   into a message.
+
+   The text alphabet is URL-safe base64 with no padding, so a level code
+   survives being pasted into a chat window, a query string, or a text
+   file somebody has opened in Notepad.
+   ===================================================================== */
+(function (root) {
+  "use strict";
+
+  var A = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
+  var BACK = {};
+  for (var i = 0; i < A.length; i++) BACK[A.charAt(i)] = i;
+
+  /* ------------------------------------------------------------------
+     Run-length coding.
+
+     A run is a value and a count. Counts run to 255 and a longer run is
+     simply written as several runs, which costs two bytes per 255 cells
+     and saves a great deal of thinking. Values must be bytes, which
+     every array in a cellar is - heights, cell kinds, fluids, volumes
+     and the rest are all small.
+     ------------------------------------------------------------------ */
+  function rle(bytes) {
+    var out = [], n = bytes.length, i = 0;
+    while (i < n) {
+      var v = bytes[i], run = 1;
+      while (i + run < n && bytes[i + run] === v && run < 255) run++;
+      out.push(v & 255, run);
+      i += run;
+    }
+    return out;
+  }
+
+  function unrle(pairs, want) {
+    var out = new Uint8Array(want), at = 0;
+    for (var i = 0; i + 1 < pairs.length; i += 2) {
+      var v = pairs[i], run = pairs[i + 1];
+      for (var k = 0; k < run && at < want; k++) out[at++] = v;
+    }
+    return out;
+  }
+
+  /* three bytes to four characters, the usual way round */
+  function toText(bytes) {
+    var s = "", i;
+    for (i = 0; i + 2 < bytes.length; i += 3) {
+      var w = (bytes[i] << 16) | (bytes[i + 1] << 8) | bytes[i + 2];
+      s += A.charAt((w >> 18) & 63) + A.charAt((w >> 12) & 63) +
+           A.charAt((w >> 6) & 63) + A.charAt(w & 63);
+    }
+    var left = bytes.length - i;
+    if (left === 1) {
+      var w1 = bytes[i] << 16;
+      s += A.charAt((w1 >> 18) & 63) + A.charAt((w1 >> 12) & 63);
+    } else if (left === 2) {
+      var w2 = (bytes[i] << 16) | (bytes[i + 1] << 8);
+      s += A.charAt((w2 >> 18) & 63) + A.charAt((w2 >> 12) & 63) + A.charAt((w2 >> 6) & 63);
+    }
+    return s;
+  }
+
+  function fromText(s) {
+    var out = [], i;
+    for (i = 0; i + 3 < s.length; i += 4) {
+      var w = (BACK[s.charAt(i)] << 18) | (BACK[s.charAt(i + 1)] << 12) |
+              (BACK[s.charAt(i + 2)] << 6) | BACK[s.charAt(i + 3)];
+      out.push((w >> 16) & 255, (w >> 8) & 255, w & 255);
+    }
+    var left = s.length - i;
+    if (left === 2) {
+      var w1 = (BACK[s.charAt(i)] << 18) | (BACK[s.charAt(i + 1)] << 12);
+      out.push((w1 >> 16) & 255);
+    } else if (left === 3) {
+      var w2 = (BACK[s.charAt(i)] << 18) | (BACK[s.charAt(i + 1)] << 12) |
+               (BACK[s.charAt(i + 2)] << 6);
+      out.push((w2 >> 16) & 255, (w2 >> 8) & 255);
+    }
+    return out;
+  }
+
+  /* an array of small numbers, as a short string */
+  function packArray(arr) { return toText(rle(arr)); }
+  function unpackArray(text, want) {
+    if (typeof text !== "string" || !text) return new Uint8Array(want);
+    for (var i = 0; i < text.length; i++)
+      if (BACK[text.charAt(i)] === undefined) return null;   /* not ours */
+    return unrle(fromText(text), want);
+  }
+
+  /* ------------------------------------------------------------------
+     A check digit over the whole record, so a code that got truncated
+     in a chat window says so instead of loading as a cellar with one
+     wall missing. Not security - there is nothing to secure against
+     here - just a way of telling damaged from merely unfamiliar.
+     ------------------------------------------------------------------ */
+  function sum(text) {
+    var h = 2166136261;
+    for (var i = 0; i < text.length; i++) {
+      h ^= text.charCodeAt(i);
+      h = (h + ((h << 1) + (h << 4) + (h << 7) + (h << 8) + (h << 24))) >>> 0;
+    }
+    return h >>> 0;
+  }
+  function seal(text) { return text + "." + sum(text).toString(36); }
+  function unseal(sealed) {
+    if (typeof sealed !== "string") return null;
+    var cut = sealed.lastIndexOf(".");
+    if (cut < 0) return null;
+    var body = sealed.slice(0, cut);
+    return sum(body).toString(36) === sealed.slice(cut + 1) ? body : null;
+  }
+
+  root.MutantLevelIO = {
+    packArray: packArray, unpackArray: unpackArray,
+    rle: rle, unrle: unrle, toText: toText, fromText: fromText,
+    seal: seal, unseal: unseal, sum: sum
+  };
+})(typeof window !== "undefined" ? window : globalThis);
+</script>
+<!--/inline-->
+<!--inline:src/level-format.js-->
+<script>
+/* =====================================================================
+   A LEVEL, WRITTEN DOWN
+
+   Capturing a cellar exactly as it stands and putting it back exactly as
+   it was - and doing that through a string short enough to paste into a
+   message.
+
+   Which is the whole point. A level travels as a code. No server, no
+   account, no upload: you make a cellar, you copy it, you send it to
+   somebody, they paste it in and play it. That is how levels travelled
+   in 1985 - as type-in listings in the back of a magazine - and it means
+   the editor, naming, sharing and playing other people's work all
+   function before a single line of server code exists.
+
+   The one thing that does NOT go in the code is the seed. The generator
+   deliberately splits what it seeds from what it deals fresh: the same
+   seed gives the same landscape, trees, water and tar, but different
+   bricks, a different starting square and different monsters every time.
+   So a seed cannot recreate a cellar. Everything has to be written down.
+
+   What has to be written down, verified against the engine:
+
+     nine per-square arrays   grid height item fluid fvol sealed
+                              gnaw burn stress                   884 each
+     four edges               W E (26)  S N (34)
+     the actors               monsters (with the fly's tail and the
+                              snake's whole body), marbles, robots,
+                              and any fluid still pouring
+     the scalars              which cellar, how many bricks, where the
+                              man is, what he is carrying
+
+   And on the way back in, four things have to be redone by hand, because
+   loading a level has to bypass the entire generator - makeEdges,
+   makeHeights, smooth, makeFurniture, makePools, openSpot, the brick
+   scatter, the settling loop, all of it:
+
+     1  the seeded generator, so anything that still draws on it later
+        (a snake being cut, a jar being opened) behaves
+     2  the level's own numbers - bricks to lay, leash, features, timber
+     3  every monster's `spec`, which is a live shared object and cannot
+        survive being written to text
+     4  settle(), to work out afresh which monsters are walled in
+   ===================================================================== */
+(function (root) {
+  "use strict";
+  var MF = root.MutantFly, IO = root.MutantLevelIO;
+  var N = MF.COLS * MF.ROWS;
+
+  var PLANES = ["grid", "height", "item", "fluid", "fvol", "sealed", "gnaw", "burn", "stress"];
+  var SIDES = [["W", MF.ROWS], ["E", MF.ROWS], ["S", MF.COLS], ["N", MF.COLS]];
+
+  /* ------------------------------------------------------------------
+     VERSIONS, AND SURVIVING THEM
+
+     Levels people made are going to outlive several versions of this
+     game, and they will be sitting in other people's browsers and
+     pasted into other people's messages when the next element gets
+     added. A format that refuses anything it does not recognise turns
+     every one of those into rubbish the first time the game changes.
+
+     So there are two numbers, not one:
+
+       v          what wrote it
+       needs      the oldest reader that can still make sense of it
+
+     A reader will load anything whose `needs` it satisfies, even from a
+     version it has never heard of. Adding a new item, a new cell kind
+     or a new plane does NOT raise `needs`, because a reader that skips
+     what it does not know still gets a playable cellar. `needs` only
+     goes up for a change that would make an old reader get the cellar
+     WRONG rather than merely incomplete - and then it says so plainly
+     instead of loading something subtly broken.
+
+     Three rules keep that promise honest:
+
+       planes are read by NAME, never by position, and a plane that is
+         missing reads as zeroes - which is what every one of them means
+         when it is absent
+       fields nobody recognises are KEPT, not dropped, so a level opened
+         in an old game and saved again does not quietly lose whatever
+         the new game put in it
+       old records are migrated forward on the way in, in one place,
+         rather than sprinkling `if (v < 3)` through the reader
+     ------------------------------------------------------------------ */
+  var VERSION = 2;        /* what this writes */
+  var NEEDS = 1;          /* the oldest reader that can still read it */
+
+  /* Everything a record carries that is not a plane, an edge, or an
+     actor. Anything not in here is somebody else's field and is carried
+     through untouched. */
+  var KNOWN = ["v", "needs", "F", "cols", "rows", "cells", "edge", "man", "bricks",
+               "marbleCount", "carry", "CO", "monsters", "marbles", "robots",
+               "sources", "name", "author", "made", "note"];
+
+  /* One step per version, applied in order. A record from v1 goes
+     through migrate[2] and comes out current. */
+  var MIGRATE = {
+    2: function (rec) {
+      /* v1 had no `needs` and no `coins`; both are absent rather than
+         wrong, which is exactly the case this whole scheme is for */
+      if (rec.needs === undefined) rec.needs = 1;
+      return rec;
+    }
+  };
+
+  /* ---- taking a copy ------------------------------------------------ */
+  function capture(g, about) {
+    var rec = { v: VERSION, needs: NEEDS, F: g.F, cols: MF.COLS, rows: MF.ROWS,
+                cells: {}, edge: {} };
+    /* whatever a newer game put in here, put back - the level was only
+       passing through */
+    if (g._extra) for (var xk in g._extra) if (KNOWN.indexOf(xk) < 0) rec[xk] = g._extra[xk];
+    for (var i = 0; i < PLANES.length; i++) rec.cells[PLANES[i]] = IO.packArray(g[PLANES[i]]);
+    for (var s = 0; s < SIDES.length; s++) rec.edge[SIDES[s][0]] = IO.packArray(g.edge[SIDES[s][0]]);
+
+    rec.man = [g.manC, g.manR];
+    rec.bricks = g.bricks;
+    rec.marbleCount = g.marbleCount;
+    rec.carry = { steps: g.steps, boots: g.boots, frost: g.frost, saw: g.saw };
+    rec.CO = g.CO;
+
+    rec.monsters = g.monsters.map(function (m) {
+      var out = { kind: m.kind, c: m.c, r: m.r, tick: m.tick | 0 };
+      if (m.tc !== undefined) { out.tc = m.tc; out.tr = m.tr; }
+      if (m.body) { out.body = m.body.map(function (b) { return [b[0], b[1]]; });
+                    out.full = m.full; out.growth = m.growth | 0; }
+      if (m.gone) out.gone = 1;
+      if (m.crushed) out.crushed = 1;
+      return out;
+    });
+    rec.marbles = g.marbles.filter(function (m) { return !m.gone; }).map(function (m) {
+      return { c: m.c, r: m.r, dc: m.dc, dr: m.dr, v: Math.round(m.v * 100) / 100, size: m.size || 1 };
+    });
+    rec.robots = g.robots.filter(function (b) { return !b.gone; }).map(function (b) {
+      return { c: b.c, r: b.r, size: b.size, running: !!b.running,
+               power: b.power, life: b.life, wait: b.wait };
+    });
+    rec.sources = g.sources.map(function (s2) {
+      return { c: s2.c, r: s2.r, kind: s2.kind, left: s2.left };
+    });
+
+    if (about) {
+      if (about.name) rec.name = String(about.name).slice(0, 48);
+      if (about.author) rec.author = about.author;
+      if (about.made) rec.made = about.made;
+      if (about.note) rec.note = String(about.note).slice(0, 200);
+    }
+    return rec;
+  }
+
+  /* ---- putting it back ---------------------------------------------- */
+  function apply(g, rec) {
+    if (!rec || typeof rec !== "object") throw new Error("that is not a level");
+    rec = upgrade(rec);
+    if (rec.cols !== MF.COLS || rec.rows !== MF.ROWS)
+      throw new Error("that level is a different shape from this cellar");
+
+    /* hold on to anything a newer game wrote that this one has no idea
+       about, so saving it again does not throw it away */
+    g._extra = {};
+    for (var xk in rec) if (KNOWN.indexOf(xk) < 0) g._extra[xk] = rec[xk];
+
+    /* the level's own numbers, without running the generator */
+    g.F = rec.F;
+    var lv = MF.levelOf(g.F, g.classic);
+    g.PE = lv.PE;
+    g.PA = lv.PA;
+    g.leash = MF.leashCells(lv.PA);
+    g.feat = lv.feat;
+    g.wood = g.classic || g.F === 1;
+    /* anything that still draws on the seeded stream later - a snake
+       being cut, a jar being opened - needs one to draw on */
+    g.rng = MF.mulberry32(((g.seed | 0) ^ (g.F * 2654435761)) >>> 0);
+
+    for (var i = 0; i < PLANES.length; i++) {
+      var packed = rec.cells[PLANES[i]];
+      /* a plane this level does not carry is a plane of nothing, which
+         is what every one of them means when it is absent - so a level
+         written before a plane existed still loads */
+      if (packed === undefined || packed === null) { g[PLANES[i]].fill(0); continue; }
+      var got = IO.unpackArray(packed, N);
+      if (!got) throw new Error("the " + PLANES[i] + " of that level is damaged");
+      g[PLANES[i]].set(got);
+    }
+    for (var s = 0; s < SIDES.length; s++) {
+      var side = SIDES[s][0];
+      var e = IO.unpackArray(rec.edge[side], SIDES[s][1]);
+      if (!e) throw new Error("the edge of that level is damaged");
+      g.edge[side].set(e);
+    }
+
+    g.manC = rec.man[0]; g.manR = rec.man[1];
+    g.bricks = rec.bricks | 0;
+    g.marbleCount = rec.marbleCount | 0;
+    g.CO = rec.CO | 0;
+    g.steps = rec.carry.steps | 0;
+    g.boots = rec.carry.boots | 0;
+    g.frost = rec.carry.frost | 0;
+    g.saw = rec.carry.saw | 0;
+    g.over = false; g.won = false;
+
+    g.monsters = (rec.monsters || []).map(function (m) {
+      var spec = MF.MONSTERS[m.kind];
+      /* the one thing that genuinely cannot be skipped: a monster whose
+         behaviour this build does not have is not a cellar you can play
+         a bit of, it is one you would play WRONG */
+      if (!spec) throw new Error("this level has a " + m.kind +
+        " in it, which needs a newer version of the game");
+      /* `spec` is a live shared object with a move() on it - it cannot
+         survive being written to text, so it is re-linked by kind */
+      var out = { kind: m.kind, spec: spec, c: m.c, r: m.r, tick: m.tick | 0,
+                  trapped: false, crushed: !!m.crushed, gone: !!m.gone, ate: null };
+      if (m.tc !== undefined) { out.tc = m.tc; out.tr = m.tr; }
+      if (m.body) {
+        out.body = m.body.map(function (b) { return [b[0], b[1]]; });
+        out.full = m.full;
+        out.growth = m.growth | 0;
+      }
+      return out;
+    });
+    g.marbles = (rec.marbles || []).map(function (m) {
+      return { c: m.c, r: m.r, dc: m.dc, dr: m.dr, v: m.v, size: m.size || 1 };
+    });
+    g.robots = (rec.robots || []).map(function (b) {
+      return { c: b.c, r: b.r, size: b.size, running: !!b.running,
+               power: b.power, life: b.life, wait: b.wait, gone: false };
+    });
+    g.sources = (rec.sources || []).map(function (s2) {
+      return { c: s2.c, r: s2.r, kind: s2.kind, left: s2.left };
+    });
+
+    /* which monsters are walled in is not stored - it is worked out, so
+       that a level hand-edited into a winning position cannot claim to
+       be one */
+    g.settle({ trappedNow: [], freed: [] });
+    return g;
+  }
+
+  /* ------------------------------------------------------------------
+     Bring a record up to date, or say why it cannot be.
+
+     A record from the FUTURE is fine as long as it says an old reader
+     can cope - which is the usual case, because most changes add things
+     rather than change what the old things mean.
+     ------------------------------------------------------------------ */
+  function upgrade(rec) {
+    var v = rec.v | 0;
+    if (v <= 0) throw new Error("that level does not say what wrote it");
+
+    if (v > VERSION) {
+      var needs = rec.needs === undefined ? v : (rec.needs | 0);
+      if (needs > VERSION)
+        throw new Error("this level was made by a newer version of the game, and needs it");
+      return rec;                        /* newer, but it says we can cope */
+    }
+
+    var out = rec;
+    for (var step = v + 1; step <= VERSION; step++)
+      if (MIGRATE[step]) out = MIGRATE[step](out) || out;
+    out.v = VERSION;
+    return out;
+  }
+
+  /* ---- the code ------------------------------------------------------ */
+  function toCode(rec) { return IO.seal(JSON.stringify(rec)); }
+
+  function fromCode(code) {
+    var body = IO.unseal(String(code || "").replace(/\s+/g, ""));
+    if (body === null) throw new Error("that code is damaged or incomplete");
+    var rec;
+    try { rec = JSON.parse(body); } catch (e) { throw new Error("that code is not a level"); }
+    return rec;
+  }
+
+  /* ------------------------------------------------------------------
+     Is it playable at all?
+
+     Not "is it good" - that is what the AI bot is for - but the handful
+     of things that make a cellar impossible rather than hard, which are
+     worth telling an author before anybody else sees it.
+     ------------------------------------------------------------------ */
+  function faults(rec) {
+    var bad = [];
+    var g = { grid: IO.unpackArray(rec.cells.grid, N) };
+    if (!g.grid) return ["the level is damaged"];
+
+    if (!rec.monsters || !rec.monsters.length) bad.push("there is nothing down here to wall in");
+    /* rec.bricks, NOT a count of brick squares. They are not the same
+       number: a pool's ring is laid as brick and counted, and then the
+       scatter overwrites the total with what it laid - 184 brick squares
+       against a count of 136 on a real cellar 20. The count is what
+       canStillWin() reads, so it is the one that decides whether a level
+       can be finished. */
+    var bricks = rec.bricks | 0;
+    var loose = (rec.monsters || []).filter(function (m) { return !m.gone; }).length;
+    if (loose && bricks < loose * 4)
+      bad.push("only " + bricks + " bricks for " + loose +
+               (loose === 1 ? " monster - four is the least that will hold one" :
+                              " monsters - four apiece is the least that will hold them"));
+
+    var man = rec.man || [];
+    if (man[0] === undefined || g.grid[man[1] * MF.COLS + man[0]] !== MF.EMPTY)
+      bad.push("the man is standing inside something");
+    (rec.monsters || []).forEach(function (m) {
+      if (m.c === man[0] && m.r === man[1]) bad.push("a monster is standing on the man");
+    });
+    return bad;
+  }
+
+  root.MutantLevelFormat = {
+    VERSION: VERSION, NEEDS: NEEDS, PLANES: PLANES, KNOWN: KNOWN, upgrade: upgrade,
+    capture: capture, apply: apply, toCode: toCode, fromCode: fromCode, faults: faults
+  };
+})(typeof window !== "undefined" ? window : globalThis);
+</script>
+<!--/inline-->
+<!--inline:src/vault.js-->
+<script>
+/* =====================================================================
+   THE VAULT
+
+   Where a player's things actually live: their progress, the levels they
+   have built, the levels they have collected, and anything waiting to be
+   sent up when there is a network again.
+
+   This used to be one localStorage key holding one small JSON object,
+   which was fine when the only thing worth keeping was a high score. It
+   is not fine for levels somebody spent an evening building. localStorage
+   is a few megabytes of synchronous strings shared with everything else
+   on the origin, and it is the first thing a browser throws away.
+
+   So: IndexedDB, four stores, and three things that matter more than the
+   database choice.
+
+   FIRST, ASK TO BE KEPT. navigator.storage.persist() asks the browser not
+   to evict this origin under pressure. It is a request and not a promise:
+   Chrome grants or silently denies it on engagement heuristics, Firefox
+   asks the player, Safari decides for itself. It is asked for on the
+   first level SAVE rather than on page load, because every engagement
+   heuristic rewards the later moment - a player who has built something
+   has demonstrably earned the storage. What it returned is remembered, so
+   the game can be honest about it.
+
+   SECOND, SAFARI FORGETS. WebKit deletes ALL script-writable storage for
+   an origin - IndexedDB, localStorage, the Cache API and the service
+   worker with it - after seven days of browser use without the player
+   visiting. It is not an edge case, it is the default for any site opened
+   in Safari. A player who goes away for a fortnight comes back to
+   nothing. The documented exemption is a web app added to the Home
+   Screen, which keeps its own counter. That is why installing matters,
+   and why `warnings()` says so out loud rather than hoping.
+
+   THIRD, AND WORSE: on iOS a Home Screen web app gets a SEPARATE storage
+   partition from Safari. A player who builds levels in a tab and then
+   installs the game to their Home Screen launches into an empty vault.
+   So the game must never push the install prompt before the player has a
+   way to carry their work across - which is what the level codes and the
+   recovery code are for.
+
+   Which is the real conclusion: none of this is a guarantee. The only
+   durable backup is the one the player is holding - a level code pasted
+   somewhere, a recovery code written down. The vault does its best and
+   tells the truth about how good its best is.
+   ===================================================================== */
+(function (root) {
+  "use strict";
+
+  var DB = "mutantfly", DB_VERSION = 1;
+  var STORES = ["progress", "levels", "collected", "outbox"];
+  var OLD_KEY = "mutantfly.v1";          /* the single localStorage key */
+
+  /* ---- a store that lives only as long as the page ------------------ */
+  function memDriver() {
+    var data = {};
+    STORES.forEach(function (s) { data[s] = {}; });
+    return {
+      kind: "memory",
+      durable: false,
+      get: function (store, key) { return Promise.resolve(data[store][key] || null); },
+      put: function (store, key, value) { data[store][key] = value; return Promise.resolve(true); },
+      del: function (store, key) { delete data[store][key]; return Promise.resolve(true); },
+      all: function (store) {
+        return Promise.resolve(Object.keys(data[store]).map(function (k) { return data[store][k]; }));
+      },
+      count: function (store) { return Promise.resolve(Object.keys(data[store]).length); },
+      wipe: function (store) { data[store] = {}; return Promise.resolve(true); }
+    };
+  }
+
+  /* ---- the real one ------------------------------------------------- */
+  function idbDriver(idb) {
+    var open = null;
+    function db() {
+      if (open) return open;
+      open = new Promise(function (resolve, reject) {
+        var req = idb.open(DB, DB_VERSION);
+        req.onupgradeneeded = function () {
+          var d = req.result;
+          STORES.forEach(function (s) {
+            if (!d.objectStoreNames.contains(s)) d.createObjectStore(s);
+          });
+        };
+        req.onsuccess = function () { resolve(req.result); };
+        req.onerror = function () { reject(req.error || new Error("indexeddb refused")); };
+        req.onblocked = function () { reject(new Error("indexeddb blocked")); };
+      });
+      return open;
+    }
+    function run(store, mode, fn) {
+      return db().then(function (d) {
+        return new Promise(function (resolve, reject) {
+          var tx = d.transaction(store, mode);
+          var req = fn(tx.objectStore(store));
+          tx.onabort = tx.onerror = function () { reject(tx.error || new Error("write refused")); };
+          if (req) req.onsuccess = function () { resolve(req.result); };
+          else tx.oncomplete = function () { resolve(true); };
+        });
+      });
+    }
+    return {
+      kind: "indexeddb",
+      durable: true,
+      get: function (s, k) { return run(s, "readonly", function (o) { return o.get(k); })
+        .then(function (v) { return v === undefined ? null : v; }); },
+      put: function (s, k, v) { return run(s, "readwrite", function (o) { return o.put(v, k); })
+        .then(function () { return true; }); },
+      del: function (s, k) { return run(s, "readwrite", function (o) { return o.delete(k); })
+        .then(function () { return true; }); },
+      all: function (s) { return run(s, "readonly", function (o) { return o.getAll(); })
+        .then(function (v) { return v || []; }); },
+      count: function (s) { return run(s, "readonly", function (o) { return o.count(); }); },
+      wipe: function (s) { return run(s, "readwrite", function (o) { return o.clear(); })
+        .then(function () { return true; }); }
+    };
+  }
+
+  function Vault(driver) {
+    this.d = driver;
+    this.asked = false;
+    this.granted = null;
+  }
+
+  Vault.prototype.kind = function () { return this.d.kind; };
+  Vault.prototype.get = function (s, k) { return this.d.get(s, k); };
+  Vault.prototype.del = function (s, k) { return this.d.del(s, k); };
+  Vault.prototype.all = function (s) { return this.d.all(s); };
+  Vault.prototype.count = function (s) { return this.d.count(s); };
+  Vault.prototype.wipe = function (s) { return this.d.wipe(s); };
+
+  /* A write that fails must say so rather than looking like it worked -
+     a player whose level quietly did not save has lost an evening and
+     does not know it yet. */
+  Vault.prototype.put = function (s, k, v) {
+    var self = this;
+    return this.d.put(s, k, v).then(function () { return { ok: true }; },
+      function (err) {
+        var full = err && /quota|full|exceeded/i.test(String(err.name || "") + String(err.message || ""));
+        return { ok: false, full: !!full, why: String((err && err.message) || err) };
+      });
+  };
+
+  /* ------------------------------------------------------------------
+     Saving a level is the moment to ask to be kept - not page load. The
+     player has just made something, which is exactly the engagement
+     every browser's heuristic is looking for.
+     ------------------------------------------------------------------ */
+  Vault.prototype.askToBeKept = function (storage) {
+    var self = this;
+    storage = storage || (root.navigator && root.navigator.storage);
+    if (!storage || !storage.persist) return Promise.resolve(null);
+    if (self.asked) return Promise.resolve(self.granted);
+    self.asked = true;
+    return Promise.resolve()
+      .then(function () {
+        return storage.persisted ? storage.persisted() : false;
+      })
+      .then(function (already) { return already ? true : storage.persist(); })
+      .then(function (got) { self.granted = !!got; return self.granted; },
+            function () { self.granted = false; return false; });
+  };
+
+  Vault.prototype.room = function (storage) {
+    storage = storage || (root.navigator && root.navigator.storage);
+    if (!storage || !storage.estimate) return Promise.resolve(null);
+    return storage.estimate().then(function (e) {
+      return { used: e.usage || 0, quota: e.quota || 0 };
+    }, function () { return null; });
+  };
+
+  /* ------------------------------------------------------------------
+     What to tell the player, in the player's terms. Every one of these
+     is a real way to lose an evening's work, and none of them announces
+     itself when it happens.
+     ------------------------------------------------------------------ */
+  Vault.prototype.warnings = function (env) {
+    env = env || {};
+    var out = [];
+    if (this.d.kind === "memory")
+      out.push({ level: "bad", say: "This browser will not keep anything. Levels you build here last until you close the tab - copy the code out if you want to keep one." });
+    else if (this.granted === false)
+      out.push({ level: "warn", say: "The browser has not promised to keep your levels, and may clear them if it runs short of room. Keep a copy of anything you would miss." });
+    if (env.webkit && !env.installed)
+      out.push({ level: "warn", say: "On this browser a site left alone for a week has everything cleared - levels, progress, the lot. Adding the game to your Home Screen stops that." });
+    if (env.webkit && env.installed === false && env.hasLevels)
+      out.push({ level: "warn", say: "Adding to the Home Screen starts a fresh, separate store on this browser, so copy your level codes out FIRST or you will open an empty game." });
+    return out;
+  };
+
+  /* ---- the old single key, brought across once ---------------------- */
+  Vault.prototype.migrate = function (readOld) {
+    var self = this;
+    return self.get("progress", "run").then(function (already) {
+      if (already) return { moved: false, why: "already here" };
+      var old = readOld ? readOld() : null;
+      if (!old) return { moved: false, why: "nothing to move" };
+      return self.put("progress", "run", old).then(function (r) {
+        return { moved: !!r.ok, from: "localStorage", carried: old };
+      });
+    });
+  };
+
+  /* Pick the best store available, and never throw: a browser that has
+     switched IndexedDB off must still be able to play. */
+  function open(env) {
+    env = env || {};
+    var idb = env.indexedDB || (typeof root !== "undefined" && root.indexedDB);
+    if (!idb) return Promise.resolve(new Vault(memDriver()));
+    var v = new Vault(idbDriver(idb));
+    /* prove it actually works before believing in it - a private window
+       can hand you an indexedDB that throws on first use */
+    return v.count("progress").then(function () { return v; },
+                                    function () { return new Vault(memDriver()); });
+  }
+
+  root.MutantVault = {
+    open: open, Vault: Vault, memDriver: memDriver, idbDriver: idbDriver,
+    STORES: STORES, DB: DB, DB_VERSION: DB_VERSION, OLD_KEY: OLD_KEY
+  };
+})(typeof window !== "undefined" ? window : globalThis);
+</script>
+<!--/inline-->
+<!--inline:src/credits.js-->
+<script>
+/* =====================================================================
+   CREDITS
+
+   Clear a cellar and you are paid for it. Clear it quickly and you are
+   paid more. What you are paid buys the two things that make a bad
+   cellar survivable: another life, and a robot to do half the work.
+
+   THE HOLE THIS IS BUILT AROUND. The moment players can author levels
+   AND be paid for completing levels, somebody makes a cellar with one
+   monster already three-quarters walled in, finishes it in nine moves,
+   and does that four hundred times. Any economy that pays out per
+   completion has this hole in it, and it is not a small one - it makes
+   the currency worthless, which makes buying it insulting.
+
+   So the rules are:
+
+     the descent pays          every procedural cellar, every time
+     your own levels pay nothing, ever
+     somebody else's level pays once and once only, the first time you
+                               finish it, and only if it is published
+
+   Which leaves nothing to farm. You cannot mint credits from your own
+   work, and you cannot mint them twice from anybody else's. The only
+   repeatable income is the game itself, which is the thing the credits
+   are supposed to be encouraging you to play.
+
+   WHAT IS AND IS NOT WORTH DEFENDING. Credits you EARN are counted on
+   your own machine, because the game has to work with no network and no
+   login, and a determined person can therefore give themselves a
+   thousand. That is a fair trade: this is a single-player game, and
+   somebody who cheats it has only cheated themselves out of it. Credits
+   you BUY are a different matter entirely - real money changed hands -
+   so those are the server's, counted there, and never taken on the
+   client's word. The two are kept apart for exactly that reason.
+   ===================================================================== */
+(function (root) {
+  "use strict";
+
+  /* ------------------------------------------------------------------
+     What a cellar pays.
+
+     Deeper is worth more because it is worth more. The speed tiers are
+     the 1985 game's own bonus table - 100 moves, 400, 500, 600, 700 -
+     which measure up well against how long a cellar actually takes: a
+     bot that clears one uses between 20 and 440 moves, median about 320.
+     So the top tier is a genuinely fast clear and the bottom one is the
+     player who ground it out, and both are paid.
+     ------------------------------------------------------------------ */
+  function baseFor(cellar) { return 20 + 5 * Math.max(1, cellar | 0); }
+
+  function speedMultiple(moves) {
+    if (moves <= 100) return 2;
+    if (moves < 400) return 1.5;
+    if (moves < 500) return 1.25;
+    if (moves < 600) return 1.1;
+    if (moves < 700) return 1;
+    return 0.9;
+  }
+
+  var MADE_LEVEL_FEE = 15;      /* somebody else's level, the first time */
+
+  /* ------------------------------------------------------------------
+     What an author earns from the people playing their work.
+
+     A royalty per counted play, and a bonus for the three most played
+     levels each month. Both reopen the farm hole from the other side -
+     if plays pay the author, an author can pay themselves - so both are
+     defended in the same three ways, and all three are the SERVER's job
+     rather than this file's:
+
+       a play by the author on their own level never counts
+       a player counts once per level per day, however many times they
+         open it, enforced by a UNIQUE index rather than by a check
+       playing anybody's level at all requires having paid
+
+     The last one is the real defence. Minting a second identity is free
+     and takes a second; minting one that can play a level costs the
+     price of the game. An author farming their own work has to buy a
+     copy per sock puppet, which is a business model rather than an
+     exploit.
+
+     The podium is over the month's counted plays, tie-broken the way
+     the board itself is - stars, then newest - so it rewards the thing
+     the catalogue is already sorted by.
+     ------------------------------------------------------------------ */
+  var ROYALTY = 2;              /* credits to the author, per counted play */
+  var PODIUM = [
+    { place: "gold",   award: 1000 },
+    { place: "silver", award: 600 },
+    { place: "bronze", award: 300 }
+  ];
+
+  /* What this clear is worth, and why - the why is shown to the player,
+     because "you earned 96" means nothing and "cellar 12, cleared in 84
+     moves, doubled" means something. */
+  function earnFor(run) {
+    run = run || {};
+    var kind = run.kind === "made" ? "made" : "descent";
+
+    if (kind === "made") {
+      if (!run.levelId) return { credits: 0, why: "no level" };
+      if (run.authorId && run.playerId && run.authorId === run.playerId)
+        return { credits: 0, why: "your own level" };
+      if (run.alreadyPaid) return { credits: 0, why: "already collected" };
+      if (run.state && run.state !== "public" && run.state !== "hidden")
+        return { credits: 0, why: "not published" };
+      return { credits: MADE_LEVEL_FEE, why: "somebody else's level, first time" };
+    }
+
+    var base = baseFor(run.cellar);
+    var mult = speedMultiple(run.moves === undefined ? 9999 : run.moves);
+    return {
+      credits: Math.round(base * mult),
+      base: base,
+      multiple: mult,
+      why: "cellar " + (run.cellar | 0) + ", " + (run.moves | 0) + " moves" +
+           (mult > 1 ? ", x" + mult : "")
+    };
+  }
+
+  /* ------------------------------------------------------------------
+     What credits buy. Both of these make a cellar easier to survive;
+     neither makes it easier to SOLVE, which is the line worth holding -
+     a puzzle you can buy the answer to is not a puzzle.
+     ------------------------------------------------------------------ */
+  var SHOP = {
+    life:        { price: 150, name: "A life",        blurb: "Take the cellar again instead of the run ending." },
+    robotSmall:  { price: 60,  name: "A small robot", blurb: "Three rocks' worth of shove, and about forty turns of it." },
+    robotMedium: { price: 110, name: "A robot",       blurb: "Four rocks, and it lasts half as long again." },
+    robotLarge:  { price: 180, name: "A big robot",   blurb: "Five rocks, seventy turns, and it takes some catching." }
+  };
+
+  function priceOf(what) { return SHOP[what] ? SHOP[what].price : null; }
+
+  /* ------------------------------------------------------------------
+     The purse.
+
+     Earned and bought are counted separately and spent earned-first, so
+     that credits somebody paid real money for are the last to go. If a
+     player ever asks for a refund, what they bought is still sitting
+     there to be taken back.
+     ------------------------------------------------------------------ */
+  function Wallet(state) {
+    state = state || {};
+    this.earned = state.earned || 0;      /* played for, counted here     */
+    this.awarded = state.awarded || 0;    /* royalties and podium, server */
+    this.bought = state.bought || 0;      /* paid for, server             */
+    this.spent = state.spent || 0;
+    this.spentBought = state.spentBought || 0;
+    this.collected = state.collected || {};    /* level ids already paid out */
+    this.ledger = state.ledger || [];
+  }
+
+  Wallet.prototype.balance = function () {
+    return (this.earned + this.awarded + this.bought) - this.spent;
+  };
+  /* what is left that was not paid for with money - spent first, so a
+     refund always has something to take back */
+  Wallet.prototype.freeLeft = function () {
+    return (this.earned + this.awarded) - (this.spent - this.spentBought);
+  };
+
+  Wallet.prototype.note = function (entry) {
+    this.ledger.push(entry);
+    if (this.ledger.length > 200) this.ledger.shift();
+    return entry;
+  };
+
+  Wallet.prototype.earn = function (run, at) {
+    var got = earnFor(run);
+    if (!got.credits) return this.note({ kind: "nothing", why: got.why, credits: 0, at: at || 0 });
+    if (run.kind === "made") this.collected[run.levelId] = 1;
+    this.earned += got.credits;
+    return this.note({ kind: "earn", credits: got.credits, why: got.why, at: at || 0 });
+  };
+
+  /* The server's numbers are TOTALS, never deltas - so a webhook seen
+     twice, a retried sync, or a client asking the same question
+     repeatedly cannot conjure a second pack or a second royalty out of
+     it. This is the whole reason royalties and purchases are counted
+     there and only mirrored here. */
+  Wallet.prototype.syncServer = function (totals) {
+    totals = totals || {};
+    var bought = Math.max(0, totals.bought | 0);
+    var awarded = Math.max(0, totals.awarded | 0);
+    var moved = false;
+    if (bought !== this.bought) {
+      this.note({ kind: "bought", credits: bought - this.bought, why: "credits bought", at: 0 });
+      this.bought = bought; moved = true;
+    }
+    if (awarded !== this.awarded) {
+      this.note({ kind: "awarded", credits: awarded - this.awarded,
+                  why: "royalties and podium", at: 0 });
+      this.awarded = awarded; moved = true;
+    }
+    return moved;
+  };
+
+  Wallet.prototype.canAfford = function (what) {
+    var p = priceOf(what);
+    return p !== null && this.balance() >= p;
+  };
+
+  Wallet.prototype.spend = function (what, at) {
+    var p = priceOf(what);
+    if (p === null) return { ok: false, why: "there is no such thing to buy" };
+    if (this.balance() < p) return { ok: false, why: "not enough credits", short: p - this.balance() };
+    /* earned first, so bought credits are the last to be used up */
+    var fromEarned = Math.min(p, Math.max(0, this.freeLeft()));
+    this.spent += p;
+    this.spentBought += (p - fromEarned);
+    this.note({ kind: "spend", credits: -p, why: SHOP[what].name, at: at || 0 });
+    return { ok: true, bought: what, paid: p, left: this.balance() };
+  };
+
+  Wallet.prototype.toJSON = function () {
+    return { earned: this.earned, awarded: this.awarded, bought: this.bought, spent: this.spent,
+             spentBought: this.spentBought, collected: this.collected,
+             ledger: this.ledger.slice(-40) };
+  };
+
+  root.MutantCredits = {
+    Wallet: Wallet, earnFor: earnFor, baseFor: baseFor, speedMultiple: speedMultiple,
+    SHOP: SHOP, priceOf: priceOf, MADE_LEVEL_FEE: MADE_LEVEL_FEE,
+    ROYALTY: ROYALTY, PODIUM: PODIUM
+  };
+})(typeof window !== "undefined" ? window : globalThis);
+</script>
+<!--/inline-->
+<!--inline:src/catalogue.js-->
+<script>
+/* =====================================================================
+   THE CATALOGUE
+
+   Levels people made themselves: who owns one, whether anybody else can
+   see it, what they thought of it, and what order to show them in.
+
+   The ordering is the fiddly part, because the two modes are not the
+   same rule with the keys swapped round - they are mirror images of
+   each other, and both end on the same third key:
+
+     by stars   stars, then times played, then newest
+     by plays   times played, then stars, then newest
+
+   "Stars" is the average of the ratings, and a level nobody has rated
+   yet has none rather than nought - so it sorts below a one-star level
+   instead of tying with one. Ties on the average are common when a
+   level has only been rated once or twice, which is exactly why there
+   are two more keys under it.
+   ===================================================================== */
+(function (root) {
+  "use strict";
+
+  /* what a level can be, and the only ways it may move between them */
+  var PRIVATE = "private", PUBLIC = "public", HIDDEN = "hidden";
+
+  /* ------------------------------------------------------------------
+     What a dollar buys.
+
+     Five cellars are free, and they are the real five - the 1985 game
+     and the first of the new ones - not a demo. Cellars one to four say
+     nothing about any of this: no editor, no catalogue, nothing but the
+     game. Reach the fifth and both appear at once, greyed: the editor
+     sits in the menu not working, and everybody else's work is there to
+     read - what people have built, what it is called, how it is rated,
+     how many have played it. You just cannot open any of it.
+
+     Showing the locked thing rather than hiding it is deliberate. A
+     player who cannot see what is behind the paywall has no reason to
+     go through it, and a menu that grows a new item the moment you pay
+     feels like a different game arriving. This way the shape of the
+     whole thing is visible from cellar five, and the pound removes the
+     grey rather than adding anything.
+     ------------------------------------------------------------------ */
+  var FREE_CELLARS = 5, EDITOR_AT = 5;
+
+  function gate(who) {
+    var reached = who.reached || 1;
+    var paid = !!who.paid;
+    return {
+      freeCellars: FREE_CELLARS,
+      /* the editor is in the menu from here, working or not */
+      editorShown: reached >= EDITOR_AT,
+      editorEnabled: reached >= EDITOR_AT && paid,
+      /* it arrives with the editor and is readable but never playable */
+      catalogueShown: reached >= EDITOR_AT,
+      cataloguePlayable: paid,
+      /* and the descent itself stops at the fifth cellar */
+      canDescendTo: paid ? Infinity : FREE_CELLARS,
+      paid: paid
+    };
+  }
+
+  function canDescend(who, cellar) { return cellar <= gate(who).canDescendTo; }
+
+  /* ------------------------------------------------------------------
+     Stars, and what to sort on.
+
+     What a level SHOWS is the plain average, because that is what a
+     player means by four stars. What it is RANKED on is not, because a
+     plain average is trivially gamed: one five from the author's other
+     device beats a level with two hundred genuine ratings averaging
+     4.8, and the top of the board fills up with levels nobody has
+     played. It is the oldest bug in ratings and it is worth not
+     shipping.
+
+     So ranking pulls every level towards the middle by a fixed number
+     of imaginary average votes - ten of them, at three and a half.
+     A single five becomes (10x3.5 + 5) / 11 = 3.64, which is barely
+     above an unrated level and nowhere near the top; two hundred real
+     ratings at 4.8 come out at 4.74, because by then the ten imaginary
+     ones hardly matter. Votes have to be earned before they count for
+     much, and there is no threshold to game because the effect fades
+     smoothly as real ratings arrive.
+
+     A level nobody has rated scores exactly the prior. That is the
+     right answer as well as the convenient one: unrated means unknown,
+     not bad, and a new level that sorted below every one-star in the
+     catalogue would never be seen long enough to get rated at all.
+     ------------------------------------------------------------------ */
+  var PRIOR = 3.5, PRIOR_WEIGHT = 10;
+
+  /* what the level shows: the honest average, or nothing at all */
+  function stars(rec) {
+    if (!rec.ratings || !rec.ratings.count) return null;
+    return rec.ratings.total / rec.ratings.count;
+  }
+
+  /* what the level is ranked on: the average pulled towards the middle */
+  function rank(rec) {
+    var count = (rec.ratings && rec.ratings.count) || 0;
+    var total = (rec.ratings && rec.ratings.total) || 0;
+    return (PRIOR_WEIGHT * PRIOR + total) / (PRIOR_WEIGHT + count);
+  }
+  function plays(rec) { return rec.plays || 0; }
+  function born(rec) { return rec.created || 0; }
+
+  /* Newest first, and if two were made in the same millisecond the id
+     breaks it, so the order is total and a list never reshuffles itself
+     between one render and the next. The id runs the same way as
+     everything else - descending - because the server pages the board
+     by comparing whole rows, and a single key running the other way
+     makes a page boundary skip whatever tied above it. */
+  function newest(a, b) {
+    return (born(b) - born(a)) || String(b.id).localeCompare(String(a.id));
+  }
+
+  var SORTS = {
+    stars: function (a, b) {
+      return (rank(b) - rank(a)) || (plays(b) - plays(a)) || newest(a, b);
+    },
+    plays: function (a, b) {
+      return (plays(b) - plays(a)) || (rank(b) - rank(a)) || newest(a, b);
+    }
+  };
+
+  function sortLevels(list, by) {
+    var cmp = SORTS[by] || SORTS.stars;
+    return list.slice().sort(cmp);
+  }
+
+  /* --------------------------------------------------------------
+     What each player is allowed to see.
+
+     A hidden level is not withdrawn from the people already playing
+     it - it is only closed to newcomers. Anybody who has played it
+     keeps it; anybody who has not never learns it existed. The author
+     always sees their own.
+     -------------------------------------------------------------- */
+  function visibleTo(rec, who) {
+    if (rec.owner && rec.owner === who.id) return true;
+    if (rec.state === PRIVATE) return false;
+    if (rec.state === PUBLIC) return true;
+    if (rec.state === HIDDEN) return !!(who.played && who.played[rec.id]);
+    return false;
+  }
+
+  /* Seeing a level in the list is not the same as being able to open
+     it. A free player browses the whole catalogue and plays none of it,
+     including - since making one needs the editor - their own. */
+  function canPlay(rec, who) {
+    if (!visibleTo(rec, who)) return false;
+    return !!who.paid;
+  }
+
+  /* --------------------------------------------------------------
+     What the author is allowed to do.
+
+     Deleting stops the moment a level goes public, and it does not
+     start again when it is hidden: other people have played it, and
+     some of them still have it. Hiding is the way back, not deleting.
+     -------------------------------------------------------------- */
+  function canDelete(rec) { return rec.state === PRIVATE && !rec.everPublic; }
+  function canEdit(rec, who) {
+    if (!rec.owner || rec.owner !== who.id) return false;
+    return gate(who).editorEnabled;
+  }
+  function canCreate(who) { return gate(who).editorEnabled; }
+
+  var MOVES = {};
+  MOVES[PRIVATE] = [PUBLIC];
+  MOVES[PUBLIC] = [HIDDEN];
+  MOVES[HIDDEN] = [PUBLIC];
+
+  function canMove(rec, to) {
+    var from = rec.state || PRIVATE;
+    return (MOVES[from] || []).indexOf(to) >= 0;
+  }
+
+  function move(rec, to) {
+    if (!canMove(rec, to)) return false;
+    rec.state = to;
+    if (to === PUBLIC) rec.everPublic = true;
+    return true;
+  }
+
+  /* --------------------------------------------------------------
+     Ratings. One per player per level, changeable, and not your own
+     level - a man marking his own homework is not a rating.
+     -------------------------------------------------------------- */
+  function canRate(rec, who) {
+    if (rec.owner && rec.owner === who.id) return false;
+    if (!(who.played && who.played[rec.id])) return false;   /* play it first */
+    return rec.state === PUBLIC || rec.state === HIDDEN;
+  }
+
+  function rate(rec, who, score) {
+    if (!canRate(rec, who)) return false;
+    score = Math.max(1, Math.min(5, Math.round(score)));
+    if (!rec.ratings) rec.ratings = { total: 0, count: 0, by: {} };
+    if (!rec.ratings.by) rec.ratings.by = {};
+    var had = rec.ratings.by[who.id];
+    if (had) rec.ratings.total -= had;                       /* changing a vote */
+    else rec.ratings.count++;
+    rec.ratings.by[who.id] = score;
+    rec.ratings.total += score;
+    return true;
+  }
+
+  root.MutantCatalogue = {
+    PRIVATE: PRIVATE, PUBLIC: PUBLIC, HIDDEN: HIDDEN,
+    FREE_CELLARS: FREE_CELLARS, EDITOR_AT: EDITOR_AT,
+    gate: gate, canDescend: canDescend, canCreate: canCreate,
+    stars: stars, rank: rank, plays: plays, sortLevels: sortLevels, SORTS: SORTS,
+    PRIOR: PRIOR, PRIOR_WEIGHT: PRIOR_WEIGHT,
+    visibleTo: visibleTo, canPlay: canPlay, canDelete: canDelete,
+    canEdit: canEdit, canMove: canMove, move: move,
+    canRate: canRate, rate: rate
+  };
+})(typeof window !== "undefined" ? window : globalThis);
+</script>
+<!--/inline-->
+<!--inline:src/identity.js-->
+<script>
+/* =====================================================================
+   WHO YOU ARE, WITHOUT LOGGING IN
+
+   The game must open and play with no account and no network. But a
+   level has an author, a rating has somebody who gave it, and a level
+   that has gone public must only ever be edited by the person who made
+   it. So the game needs to know who you are - it just must not ask.
+
+   So it does not issue you a name. On first run it generates a signing
+   key in the browser and never sends the private half anywhere. Your
+   identity IS that key: your player id is a thumbprint of its public
+   half, and everything you upload is signed with the private half.
+
+   Which means nobody has to be trusted to hand out identities, and
+   nobody can claim to be you: a server presented with a level edit
+   signed by the key whose thumbprint matches the level's author does
+   not need an account system to know it is genuine, and one that is not
+   cannot be faked by anybody who has not got your key. It is the same
+   trick as an ssh key, minus the part where you have to set it up.
+
+   The costs are real and worth stating plainly:
+
+     - Clear your site data and the key is gone, and with it your levels.
+       So there is a recovery code: the key, written out, short enough to
+       paste into a note. That is the backup, and it is the ONLY backup.
+     - Anyone holding that code is you. It is a password that cannot be
+       reset, which is the price of never having to set one.
+     - A new device is a new person until you paste the code in.
+     - Nothing here proves you are a HUMAN, only that you are the same
+       one as last time. Stopping one person from being a thousand people
+       is a different problem and needs the server's help.
+
+   Everything above works offline. The key is made on the device, the
+   signing happens on the device, and none of it needs a network - the
+   network only ever checks the signatures afterwards.
+   ===================================================================== */
+(function (root) {
+  "use strict";
+
+  var KEY = "mutantfly.who.v1";
+  var ALGO = { name: "ECDSA", namedCurve: "P-256" };
+  var SIGN = { name: "ECDSA", hash: { name: "SHA-256" } };
+
+  function subtle() {
+    var c = root.crypto || (typeof crypto !== "undefined" ? crypto : null);
+    return c && c.subtle ? c.subtle : null;
+  }
+
+  /* localStorage throws outright in some places - a private window, an
+     opaque origin, a browser told to block site data - and the game has
+     to keep working when it does. So it degrades to memory: you are
+     still somebody for this session, you just are not the same somebody
+     next time, and the game can say so. */
+  function browserStore() {
+    var mem = {};
+    var real = null;
+    try {
+      real = root.localStorage;
+      real.setItem(KEY + ".probe", "1");
+      real.removeItem(KEY + ".probe");
+    } catch (e) { real = null; }
+    return {
+      durable: !!real,
+      get: function (k) {
+        try { return real ? real.getItem(k) : (mem[k] === undefined ? null : mem[k]); }
+        catch (e) { return mem[k] === undefined ? null : mem[k]; }
+      },
+      set: function (k, v) {
+        try { if (real) { real.setItem(k, v); return true; } } catch (e) { /* full, or refused */ }
+        mem[k] = v;
+        return false;
+      },
+      clear: function (k) {
+        try { if (real) real.removeItem(k); } catch (e) { /* nothing to do */ }
+        delete mem[k];
+      }
+    };
+  }
+
+  function b64(bytes) {
+    var s = "";
+    for (var i = 0; i < bytes.length; i++) s += String.fromCharCode(bytes[i]);
+    return (root.btoa ? root.btoa(s) : Buffer.from(bytes).toString("base64"))
+      .replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+  }
+  function unb64(text) {
+    var s = String(text).replace(/-/g, "+").replace(/_/g, "/");
+    while (s.length % 4) s += "=";
+    var raw = root.atob ? root.atob(s) : Buffer.from(s, "base64").toString("binary");
+    var out = new Uint8Array(raw.length);
+    for (var i = 0; i < raw.length; i++) out[i] = raw.charCodeAt(i);
+    return out;
+  }
+  function bytes(text) {
+    var out = [], i, ch;
+    for (i = 0; i < text.length; i++) {
+      ch = text.charCodeAt(i);
+      if (ch < 128) out.push(ch);
+      else if (ch < 2048) out.push(192 | (ch >> 6), 128 | (ch & 63));
+      else out.push(224 | (ch >> 12), 128 | ((ch >> 6) & 63), 128 | (ch & 63));
+    }
+    return new Uint8Array(out);
+  }
+
+  /* A player id is a thumbprint of the public key, written in groups so
+     that a person can read one out or check two are the same at a
+     glance. Sixteen bytes of a SHA-256 is far more than enough to make a
+     collision something that will not happen. */
+  function thumbprint(raw) {
+    return subtle().digest("SHA-256", raw).then(function (h) {
+      var b = new Uint8Array(h), s = "";
+      for (var i = 0; i < 10; i++) s += ("0" + b[i].toString(16)).slice(-2);
+      return s.slice(0, 4) + "-" + s.slice(4, 8) + "-" + s.slice(8, 12) +
+             "-" + s.slice(12, 16) + "-" + s.slice(16, 20);
+    });
+  }
+
+  function Who(store) {
+    this.store = store || browserStore();
+    this.id = null;
+    this.pub = null;
+    this.priv = null;
+    this.name = null;
+  }
+
+  /* the key, made once and kept - or made now if this is the first time */
+  Who.prototype.open = function () {
+    var self = this;
+    if (!subtle()) return Promise.reject(new Error("no WebCrypto here"));
+    var saved = self.store.get(KEY);
+    if (saved) {
+      var rec;
+      try { rec = JSON.parse(saved); } catch (e) { rec = null; }
+      if (rec && rec.priv && rec.pub) {
+        return self.adopt(rec.priv, rec.pub).then(function () {
+          self.name = rec.name || null;
+          return self;
+        }).catch(function () { return self.mint(); });
+      }
+    }
+    return self.mint();
+  };
+
+  Who.prototype.mint = function () {
+    var self = this;
+    return subtle().generateKey(ALGO, true, ["sign", "verify"]).then(function (pair) {
+      return Promise.all([
+        subtle().exportKey("jwk", pair.privateKey),
+        subtle().exportKey("raw", pair.publicKey)
+      ]).then(function (out) {
+        self.priv = pair.privateKey;
+        self.pubRaw = new Uint8Array(out[1]);
+        self.pub = b64(self.pubRaw);
+        return thumbprint(self.pubRaw).then(function (id) {
+          self.id = id;
+          self.privJwk = out[0];
+          self.save();
+          return self;
+        });
+      });
+    });
+  };
+
+  Who.prototype.adopt = function (privJwk, pub) {
+    var self = this;
+    var raw = unb64(pub);
+    return Promise.all([
+      subtle().importKey("jwk", privJwk, ALGO, true, ["sign"]),
+      thumbprint(raw)
+    ]).then(function (out) {
+      self.priv = out[0];
+      self.privJwk = privJwk;
+      self.pub = pub;
+      self.pubRaw = raw;
+      self.id = out[1];
+      return self;
+    });
+  };
+
+  Who.prototype.save = function () {
+    return this.store.set(KEY, JSON.stringify({
+      priv: this.privJwk, pub: this.pub, name: this.name
+    }));
+  };
+
+  Who.prototype.setName = function (name) {
+    this.name = String(name || "").slice(0, 24);
+    this.save();
+    return this.name;
+  };
+
+  Who.prototype.sign = function (text) {
+    var self = this;
+    return subtle().sign(SIGN, self.priv, bytes(text)).then(function (sig) {
+      return b64(new Uint8Array(sig));
+    });
+  };
+
+  /* Anybody can check this, including a server that has never heard of
+     the signer: the id is derived from the key, so a signature that
+     verifies against a key whose thumbprint is the claimed id is proof,
+     with nothing to look up and nobody to ask. */
+  function verify(id, pub, text, sig) {
+    if (!subtle()) return Promise.resolve(false);
+    var raw;
+    try { raw = unb64(pub); } catch (e) { return Promise.resolve(false); }
+    return thumbprint(raw).then(function (t) {
+      if (t !== id) return false;             /* that key is not that person */
+      return subtle().importKey("raw", raw, ALGO, true, ["verify"])
+        .then(function (key) {
+          return subtle().verify(SIGN, key, unb64(sig), bytes(text));
+        })
+        .catch(function () { return false; });
+    }).catch(function () { return false; });
+  }
+
+  /* ------------------------------------------------------------------
+     The recovery code.
+
+     This is the whole identity written out - so it is worth being blunt
+     in the UI: it is the only way back to your levels, and anybody who
+     has it is you.
+     ------------------------------------------------------------------ */
+  Who.prototype.recoveryCode = function () {
+    var body = b64(bytes(JSON.stringify({ p: this.privJwk, k: this.pub, n: this.name })));
+    return "MF1-" + body.replace(/(.{40})/g, "$1\n");
+  };
+
+  Who.prototype.restore = function (code) {
+    var self = this;
+    var body = String(code || "").replace(/\s+/g, "");
+    if (body.indexOf("MF1-") !== 0) return Promise.reject(new Error("not a recovery code"));
+    var rec;
+    try {
+      var text = "";
+      var raw = unb64(body.slice(4));
+      for (var i = 0; i < raw.length; i++) text += String.fromCharCode(raw[i]);
+      rec = JSON.parse(decodeURIComponent(escape(text)));
+    } catch (e) { return Promise.reject(new Error("that code is damaged")); }
+    if (!rec || !rec.p || !rec.k) return Promise.reject(new Error("that code is damaged"));
+    return self.adopt(rec.p, rec.k).then(function () {
+      self.name = rec.n || null;
+      self.save();
+      return self;
+    });
+  };
+
+  root.MutantWho = {
+    Who: Who, verify: verify, browserStore: browserStore,
+    b64: b64, unb64: unb64, KEY: KEY
+  };
+})(typeof window !== "undefined" ? window : globalThis);
+</script>
+<!--/inline-->
 <script>
 "use strict";
 /* =====================================================================
@@ -4321,7 +5801,8 @@ var FX = {
    GAME GLUE
    ================================================================== */
 var game = new MF.Game();
-var mode = "title";          /* title | play | paused | won | over */
+var mode = "title";          /* title | play | paused | won | over | edit */
+var edAcc = 0;
 var held = {}, turnAcc = 0;
 var manPos = new THREE.Vector3(), manWant = new THREE.Vector3();
 var manFace = 0, manFaceWant = 0;
@@ -4956,6 +6437,357 @@ function pause(on) {
   if (!on) turnAcc = 0;
 }
 
+
+/* ====================================================================
+   THE EDITOR
+
+   The man is the cursor.
+
+   There is no pointer picking anywhere in this game - no raycaster, no
+   mousedown on the canvas - and building one for a single screen would
+   be a lot of machinery to end up somewhere worse. The man already
+   moves on Z X : /, the camera already follows him, and drawPlan()
+   already draws a top-down map of the whole cellar. So he is the
+   cursor: walk him to a square, press space, and whatever is in his
+   hand goes down. It costs nothing, it works on a phone through the
+   same buttons the game already has, and it is the idiom the 1985 game
+   used for everything.
+
+   The palette is ordinary DOM, because a row of buttons is a row of
+   buttons and there is no reason to draw it in WebGL.
+
+   Nothing here writes through the engine's rules. An editor that had to
+   obey gravity while you were laying a floor would be unusable, so it
+   writes the arrays directly and settles the cellar only when you test
+   it - which is also when you find out whether what you built holds
+   together.
+   ==================================================================== */
+/* `mode` is the only thing that says whether the editor is open. An
+   `ed.on` beside it was two flags that could disagree, and they did:
+   edEnter set the mode and left the flag false, so every stamp went
+   quietly nowhere. */
+var ed = {
+  tool: 0, rec: null, id: null, state: "private",
+  everPublic: false, dirty: false, backTo: "title"
+};
+
+var ED_TOOLS = [
+  { name: "Erase",     key: "1", swatch: "#2a231c", act: "cell", v: 0 },
+  { name: "Brick",     key: "2", swatch: "#b8462e", act: "cell", v: 1 },
+  { name: "Rock",      key: "3", swatch: "#8d8578", act: "cell", v: 8 },
+  { name: "Tree",      key: "4", swatch: "#2f4a24", act: "cell", v: 2 },
+  { name: "Marble",    key: "5", swatch: "#cfd6dd", act: "marble" },
+  { name: "Tar vat",   key: "6", swatch: "#4a2410", act: "cell", v: 4 },
+  { name: "Water vat", key: "7", swatch: "#2a5f7a", act: "cell", v: 5 },
+  { name: "Set tar",   key: "8", swatch: "#14100e", act: "cell", v: 6 },
+  { name: "Chopper",   key: "9", swatch: "#6b6b74", act: "cell", v: 7 },
+  { name: "Boots",     key: "q", swatch: "#a86b32", act: "item", v: 1 },
+  { name: "Frost",     key: "w", swatch: "#7fb6d8", act: "item", v: 2 },
+  { name: "Saw",       key: "e", swatch: "#c8c0a8", act: "item", v: 3 },
+  { name: "Jar",       key: "t", swatch: "#8a7fb0", act: "item", v: 4 },
+  { name: "Fly",       key: "f", swatch: "#3d63c4", act: "mob", v: "fly" },
+  { name: "Spider",    key: "s", swatch: "#6b4a2a", act: "mob", v: "spider" },
+  { name: "Beetle",    key: "b", swatch: "#2c6a3a", act: "mob", v: "beetle" },
+  { name: "Wasp",      key: "a", swatch: "#c8a017", act: "mob", v: "wasp" },
+  { name: "Snake",     key: "n", swatch: "#4c8a2e", act: "mob", v: "snake" },
+  { name: "Start",     key: "g", swatch: "#ffd27a", act: "man" },
+  { name: "Raise",     key: "+", swatch: "#7a6a52", act: "hi", v: 1 },
+  { name: "Lower",     key: "-", swatch: "#4a4034", act: "hi", v: -1 },
+  { name: "Wall/drop", key: "h", swatch: "#574c42", act: "edge" }
+];
+
+function edSay(text, cls) {
+  $("edSay").innerHTML = cls ? '<span class="' + cls + '">' + text + "</span>" : text;
+}
+
+function edPaint() {
+  var box = $("edTools");
+  if (!box.childNodes.length) {
+    ED_TOOLS.forEach(function (t, i) {
+      var b = document.createElement("button");
+      b.className = "edTool";
+      b.type = "button";
+      b.innerHTML = '<i class="edSwatch" style="background:' + t.swatch + '"></i>' +
+                    t.name + ' <i class="edKey">' + t.key + "</i>";
+      b.addEventListener("click", function () { ed.tool = i; edPaint(); });
+      box.appendChild(b);
+    });
+  }
+  Array.prototype.forEach.call(box.childNodes, function (b, i) {
+    b.setAttribute("aria-pressed", i === ed.tool ? "true" : "false");
+  });
+}
+
+/* --- what goes down when you press space -------------------------- */
+function edStamp() {
+  if (mode !== "edit") return;
+  var t = ED_TOOLS[ed.tool], c = game.manC, r = game.manR, i = r * COLS + c;
+
+  if (t.act === "cell") {
+    /* a marble is a grid square AND an object, so erasing one has to
+       take both away or the cellar comes back with a ghost in it */
+    if (game.grid[i] === MF.MARBLE) game.marbles = game.marbles.filter(function (m) {
+      return !(m.c === c && m.r === r);
+    });
+    game.grid[i] = t.v;
+    if (t.v === 0) game.fluid[i] = MF.DRY, game.fvol[i] = 0, game.sealed[i] = 0;
+  } else if (t.act === "marble") {
+    if (game.grid[i] === MF.MARBLE) return edSay("there is one there already");
+    game.grid[i] = MF.MARBLE;
+    game.marbles.push({ c: c, r: r, dc: 0, dr: 0, v: 0, size: 1 + (game.marbles.length % 3) });
+  } else if (t.act === "item") {
+    game.item[i] = game.item[i] === t.v ? 0 : t.v;
+  } else if (t.act === "mob") {
+    var had = game.monsterAt(c, r);
+    if (had) {
+      game.monsters = game.monsters.filter(function (m) { return m !== had; });
+      edSay("took the " + had.spec.name.toLowerCase() + " away");
+    } else {
+      game.grid[i] = MF.EMPTY;
+      game.monsters.push(game.newMonster(t.v, c, r));
+    }
+    edRigs();
+  } else if (t.act === "man") {
+    game.grid[i] = MF.EMPTY;
+    game.manC = c; game.manR = r;
+    edSay("this is where you start");
+  } else if (t.act === "hi") {
+    game.height[i] = Math.max(0, Math.min(MF.MAX_H, game.height[i] + t.v));
+    syncTerrain(); syncEdges();
+  } else if (t.act === "edge") {
+    /* only means anything on the border, where there IS an edge */
+    var side = (c === 0) ? "W" : (c === COLS - 1) ? "E" : (r === 0) ? "S" : (r === ROWS - 1) ? "N" : null;
+    if (!side) return edSay("stand against a wall to change it", "bad");
+    var at = (side === "W" || side === "E") ? r : c;
+    game.edge[side][at] = game.edge[side][at] === MF.WALL ? MF.DROP : MF.WALL;
+    edSay("that stretch is now " + (game.edge[side][at] === MF.WALL ? "good stone" : "a drop"));
+    syncEdges();
+  }
+  ed.dirty = true;
+  FX.step(1);
+  syncWorld(); drawPlan(); edCount();
+}
+
+function edRigs() {
+  makeRigs(game.monsters.map(function (m) { return m.kind; }));
+  for (var i = 0; i < game.monsters.length; i++) {
+    var m = game.monsters[i], rig = monsterRigs[i];
+    if (!rig) continue;
+    worldOf(m.c, m.r, rig.userData.want);
+    rig.userData.pos.copy(rig.userData.want);
+    setTailWant(m, rig);
+    rig.userData.tailPos.copy(rig.userData.tailWant);
+    rig.position.copy(rig.userData.pos);
+  }
+}
+
+function edCount() {
+  var bricks = 0;
+  for (var i = 0; i < COLS * ROWS; i++) if (game.grid[i] === MF.BRICK) bricks++;
+  game.bricks = bricks;
+  $("hBricks").textContent = bricks;
+  $("hCellar").textContent = game.F;
+}
+
+/* --- opening and leaving ------------------------------------------ */
+function edEnter(rec, back) {
+  ed.backTo = back || "title";
+  mode = "edit";
+  ai.on = false;
+  $("titleSheet").hidden = true; $("overSheet").hidden = true;
+  $("briefSheet").hidden = true; $("pauseSheet").hidden = true;
+  $("edBar").hidden = false;
+  $("hud").hidden = false; plan.hidden = false; $("hint").hidden = true;
+
+  game.over = false; game.won = false;
+  if (rec) {
+    MutantLevelFormat.apply(game, rec.body ? MutantLevelFormat.fromCode(rec.body) : rec);
+    ed.id = rec.id || null;
+    ed.state = rec.state || "private";
+    ed.everPublic = !!rec.everPublic;
+    $("edName").value = rec.name || "";
+  } else {
+    /* a bare room to build in, not a generated cellar - somebody who
+       wanted a generated one would have pressed play */
+    game.F = Math.max(5, Math.min(40, (MF.save.read() || {}).deepest || 5));
+    game.sheet();
+    game.grid.fill(MF.EMPTY);
+    game.item.fill(0); game.fluid.fill(MF.DRY); game.fvol.fill(0);
+    game.sealed.fill(0); game.gnaw.fill(0); game.burn.fill(0); game.stress.fill(0);
+    game.height.fill(0);
+    game.marbles.length = 0; game.sources.length = 0; game.coins.length = 0;
+    game.monsters.length = 0; game.robots.length = 0;
+    game.manC = 4; game.manR = 4;
+    ed.id = null; ed.state = "private"; ed.everPublic = false;
+    $("edName").value = "";
+  }
+  ed.dirty = false;
+  edPaint(); edRigs(); syncTerrain(); syncEdges(); syncWorld(); drawPlan(); edCount();
+  worldOf(game.manC, game.manR, manWant); manPos.copy(manWant);
+  edSay("Walk with Z X : / - space puts down whatever is in your hand.");
+}
+
+function edLeave() {
+  $("edBar").hidden = true;
+  $("edListSheet").hidden = true;
+  $("edCodeSheet").hidden = true;
+  enterTitle();
+}
+
+/* --- testing it --------------------------------------------------- */
+function edTestPlay() {
+  var rec = MutantLevelFormat.capture(game, { name: $("edName").value });
+  var bad = MutantLevelFormat.faults(rec);
+  if (bad.length) return edSay(bad.join(" &middot; "), "bad");
+  ed.rec = rec;
+  $("edBar").hidden = true;
+  MutantLevelFormat.apply(game, rec);
+  mode = "play"; turnAcc = 0;
+  edSay("");
+  banner("YOUR CELLAR", $("edName").value || "untitled", [], 1400);
+}
+
+/* The bot, run flat out with no drawing, several times over, because
+   one run tells you nothing - a cellar the bot clears once in twenty is
+   not a hard cellar, it is a lucky one. */
+function edBotTest() {
+  var rec = MutantLevelFormat.capture(game, { name: $("edName").value });
+  var bad = MutantLevelFormat.faults(rec);
+  if (bad.length) return edSay(bad.join(" &middot; "), "bad");
+  edSay("setting the bot on it...");
+  setTimeout(function () {
+    var RUNS = 12, LIMIT = 900, won = 0, caught = 0, stuck = 0, turns = [];
+    for (var i = 0; i < RUNS; i++) {
+      var g = new MF.Game({ seed: 1 + i });
+      g.F = rec.F; g.sheet();
+      MutantLevelFormat.apply(g, rec);
+      for (var t = 0; t < LIMIT; t++) {
+        var evv = g.step(MutantBot.play(g, null));
+        if (evv.won) { won++; turns.push(g.CO); break; }
+        if (evv.lost) { caught++; break; }
+        if (evv.stuck) { stuck++; break; }
+      }
+    }
+    var verdict;
+    if (!won) verdict = ["the bot never finished it in " + RUNS + " goes - it may not be finishable at all", "bad"];
+    else if (won === RUNS) verdict = ["the bot cleared it every time, in about " +
+      Math.round(turns.reduce(function (a, b) { return a + b; }, 0) / turns.length) +
+      " moves - this may be too kind", ""];
+    else verdict = ["the bot cleared it " + won + " times in " + RUNS +
+      (turns.length ? ", median " + turns.sort(function (a, b) { return a - b; })[turns.length >> 1] + " moves" : "") +
+      (stuck ? " (" + stuck + " ran out of bricks)" : ""), "good"];
+    edSay(verdict[0], verdict[1]);
+  }, 30);
+}
+
+/* --- keeping it --------------------------------------------------- */
+function edSave() {
+  var name = $("edName").value.trim();
+  if (!name) { $("edName").focus(); return edSay("give it a name first", "bad"); }
+  var rec = MutantLevelFormat.capture(game, { name: name });
+  var bad = MutantLevelFormat.faults(rec);
+  var id = ed.id || ("lv" + Date.now().toString(36) + Math.floor(Math.random() * 1296).toString(36));
+  var row = {
+    id: id, name: name, body: MutantLevelFormat.toCode(rec),
+    cellar: game.F, state: ed.state, everPublic: ed.everPublic,
+    created: ed.created || Date.now(), edited: Date.now()
+  };
+  vaultPut("levels", id, row).then(function (r) {
+    if (!r || !r.ok) return edSay("this browser would not keep it" + (r && r.full ? " - it is out of room" : ""), "bad");
+    ed.id = id; ed.dirty = false;
+    edSay("saved" + (bad.length ? " - but " + bad.join("; ") : ""), bad.length ? "bad" : "good");
+  });
+}
+
+function edList() {
+  vaultAll("levels").then(function (rows) {
+    var box = $("edList");
+    box.innerHTML = "";
+    if (!rows.length) box.innerHTML = '<p class="fine">Nothing here yet.</p>';
+    rows.sort(function (a, b) { return (b.edited || 0) - (a.edited || 0) });
+    rows.forEach(function (row) {
+      var el = document.createElement("div");
+      el.className = "edItem";
+      el.innerHTML = "<div><b>" + esc(row.name) + "</b><br><span>cellar " + row.cellar +
+        " &middot; " + row.state + (row.everPublic ? " &middot; has been public" : "") + "</span></div>";
+      var open = document.createElement("button");
+      open.className = "edBtn"; open.type = "button"; open.textContent = "Open";
+      open.addEventListener("click", function () { $("edListSheet").hidden = true; edEnter(row); });
+      el.appendChild(open);
+      var del = document.createElement("button");
+      del.className = "edBtn"; del.type = "button";
+      del.textContent = row.everPublic ? "Published" : "Delete";
+      del.disabled = !!row.everPublic;
+      if (!row.everPublic) del.addEventListener("click", function () {
+        vaultDel("levels", row.id).then(edList);
+      });
+      el.appendChild(del);
+      box.appendChild(el);
+    });
+    $("edListSheet").hidden = false;
+  });
+}
+
+function esc(t) {
+  return String(t).replace(/[<>&"]/g, function (c) {
+    return ({ "<": "&lt;", ">": "&gt;", "&": "&amp;", '"': "&quot;" })[c];
+  });
+}
+
+/* --- a level as a string ------------------------------------------ */
+function edShare() {
+  var rec = MutantLevelFormat.capture(game, { name: $("edName").value.trim() });
+  $("edCode").value = MutantLevelFormat.toCode(rec);
+  $("edCodeSheet").hidden = false;
+}
+
+function edLoadCode() {
+  var text = $("edCode").value.trim();
+  if (!text) return;
+  try {
+    var rec = MutantLevelFormat.fromCode(text);
+    $("edCodeSheet").hidden = true;
+    edEnter(rec);
+    ed.id = null;                    /* somebody else's - yours now, as a copy */
+    edSay("loaded" + (rec.name ? ': "' + esc(rec.name) + '"' : ""), "good");
+  } catch (e) {
+    edSay(e.message, "bad");
+  }
+}
+
+/* --- publishing --------------------------------------------------- */
+function edPublish() {
+  if (!ed.id) return edSay("save it first", "bad");
+  edSay("sending it up...");
+  catalogueSend(ed).then(function (r) {
+    if (r.ok) { ed.state = "public"; ed.everPublic = true; edSay("published - other people can find it now", "good"); }
+    else edSay(r.why, "bad");
+  });
+}
+
+/* The catalogue is the one part that needs a network, and it does not
+   pretend otherwise: with no connection the level is still saved here
+   and still shareable as a code. */
+function catalogueSend() {
+  return Promise.resolve({ ok: false, why: navigator.onLine
+    ? "the catalogue is not switched on yet - your cellar is saved here, and the Code button will send it to anybody"
+    : "no connection - your cellar is saved here, and the Code button will send it to anybody" });
+}
+
+/* --- the vault, wrapped so the editor need not care --------------- */
+var VAULT = null;
+function vaultReady() {
+  if (VAULT) return Promise.resolve(VAULT);
+  return MutantVault.open({}).then(function (v) { VAULT = v; return v; });
+}
+function vaultPut(store, key, val) {
+  return vaultReady().then(function (v) {
+    return v.askToBeKept().then(function () { return v.put(store, key, val); });
+  });
+}
+function vaultAll(store) { return vaultReady().then(function (v) { return v.all(store); }); }
+function vaultDel(store, key) { return vaultReady().then(function (v) { return v.del(store, key); }); }
+
 /* ==================================================================
    INPUT
    ================================================================== */
@@ -4966,8 +6798,22 @@ addEventListener("keydown", function (e) {
   if (a) { e.preventDefault(); held[a] = true; Beeb.wake(); return; }
   if (k === " ") {
     e.preventDefault();
-    if (mode === "title") ($("continue").hidden ? newGame() : continueGame());
+    if (mode === "edit") edStamp();
+    else if (mode === "title") ($("continue").hidden ? newGame() : continueGame());
     else if (mode === "brief") beginTurns();
+    return;
+  }
+  if (mode === "edit") {
+    /* a tool by its letter, and nothing else while building */
+    if (document.activeElement && document.activeElement.tagName === "INPUT") return;
+    for (var ti = 0; ti < ED_TOOLS.length; ti++) {
+      if (ED_TOOLS[ti].key === k || (k === "=" && ED_TOOLS[ti].key === "+")) {
+        e.preventDefault(); ed.tool = ti; edPaint(); return;
+      }
+    }
+    if (k === "[") { e.preventDefault(); ed.tool = (ed.tool + ED_TOOLS.length - 1) % ED_TOOLS.length; edPaint(); return; }
+    if (k === "]") { e.preventDefault(); ed.tool = (ed.tool + 1) % ED_TOOLS.length; edPaint(); return; }
+    if (k === "escape") { e.preventDefault(); edLeave(); return; }
     return;
   }
   if (k === "d") { e.preventDefault(); dbgToggle(); return; }
@@ -4984,6 +6830,26 @@ addEventListener("keyup", function (e) {
   if (a) held[a] = false;
 });
 addEventListener("blur", function () { held = {}; if (mode === "play") pause(true); });
+
+
+  /* the editor's buttons */
+  var edWire = {
+    edSave: edSave, edOpen: edList, edNew: function () { edEnter(null); },
+    edTest: edTestPlay, edBot: edBotTest, edShare: edShare,
+    edPublish: edPublish, edQuit: edLeave,
+    edListClose: function () { $("edListSheet").hidden = true; },
+    edCodeClose: function () { $("edCodeSheet").hidden = true; },
+    edPaste: edLoadCode
+  };
+  for (var wk in edWire) (function (id, fn) {
+    var el = $(id); if (el) el.addEventListener("click", fn);
+  })(wk, edWire[wk]);
+  if ($("edCopy")) $("edCopy").addEventListener("click", function () {
+    var box = $("edCode");
+    box.select();
+    (navigator.clipboard ? navigator.clipboard.writeText(box.value) : Promise.reject())
+      .then(function () { edSay("copied", "good"); }, function () { edSay("select it and copy"); });
+  });
 
 Array.prototype.forEach.call(document.querySelectorAll(".pad button[data-act]"), function (b) {
   var a = b.dataset.act;
@@ -5115,7 +6981,22 @@ function frame() {
   requestAnimationFrame(frame);
   var dt = Math.min(0.05, clock.getDelta()), now = clock.elapsedTime;
 
-  if (mode === "play") {
+  if (mode === "edit") {
+    /* the man walks, and nothing else in the cellar moves - an editor
+       where the monsters wandered off while you were building would be
+       a practical joke */
+    edAcc = (edAcc || 0) + dt * 1000;
+    while (edAcc >= 110) {
+      edAcc -= 110;
+      for (var ei = 0; ei < PRIORITY.length; ei++) if (held[PRIORITY[ei]]) {
+        var d = { left: [-1, 0], right: [1, 0], up: [0, 1], down: [0, -1] }[PRIORITY[ei]];
+        var nc = game.manC + d[0], nr = game.manR + d[1];
+        if (game.inField(nc, nr)) { game.manC = nc; game.manR = nr; drawPlan(); }
+        break;
+      }
+    }
+    worldOf(game.manC, game.manR, manWant);
+  } else if (mode === "play") {
     turnAcc += dt * 1000;
     while (turnAcc >= TURN_MS) { turnAcc -= TURN_MS; if (mode === "play") turn(); }
   } else if (mode === "title") {
@@ -5151,7 +7032,7 @@ function frame() {
   }
   /* rebuilt every frame so the loose items turn on the spot and the
      fire breathes - it is under a thousand matrix writes */
-  if (mode === "play" || mode === "brief") syncWorld();
+  if (mode === "play" || mode === "brief" || mode === "edit") syncWorld();
 
   manPos.lerp(manWant, k);
   manFace += (function (d) { while (d > Math.PI) d -= 6.28318; while (d < -Math.PI) d += 6.28318; return d; })(manFaceWant - manFace) * Math.min(1, dt * 13);

@@ -48,11 +48,68 @@
 
   var PLANES = ["grid", "height", "item", "fluid", "fvol", "sealed", "gnaw", "burn", "stress"];
   var SIDES = [["W", MF.ROWS], ["E", MF.ROWS], ["S", MF.COLS], ["N", MF.COLS]];
-  var VERSION = 1;
+
+  /* ------------------------------------------------------------------
+     VERSIONS, AND SURVIVING THEM
+
+     Levels people made are going to outlive several versions of this
+     game, and they will be sitting in other people's browsers and
+     pasted into other people's messages when the next element gets
+     added. A format that refuses anything it does not recognise turns
+     every one of those into rubbish the first time the game changes.
+
+     So there are two numbers, not one:
+
+       v          what wrote it
+       needs      the oldest reader that can still make sense of it
+
+     A reader will load anything whose `needs` it satisfies, even from a
+     version it has never heard of. Adding a new item, a new cell kind
+     or a new plane does NOT raise `needs`, because a reader that skips
+     what it does not know still gets a playable cellar. `needs` only
+     goes up for a change that would make an old reader get the cellar
+     WRONG rather than merely incomplete - and then it says so plainly
+     instead of loading something subtly broken.
+
+     Three rules keep that promise honest:
+
+       planes are read by NAME, never by position, and a plane that is
+         missing reads as zeroes - which is what every one of them means
+         when it is absent
+       fields nobody recognises are KEPT, not dropped, so a level opened
+         in an old game and saved again does not quietly lose whatever
+         the new game put in it
+       old records are migrated forward on the way in, in one place,
+         rather than sprinkling `if (v < 3)` through the reader
+     ------------------------------------------------------------------ */
+  var VERSION = 2;        /* what this writes */
+  var NEEDS = 1;          /* the oldest reader that can still read it */
+
+  /* Everything a record carries that is not a plane, an edge, or an
+     actor. Anything not in here is somebody else's field and is carried
+     through untouched. */
+  var KNOWN = ["v", "needs", "F", "cols", "rows", "cells", "edge", "man", "bricks",
+               "marbleCount", "carry", "CO", "monsters", "marbles", "robots",
+               "sources", "name", "author", "made", "note"];
+
+  /* One step per version, applied in order. A record from v1 goes
+     through migrate[2] and comes out current. */
+  var MIGRATE = {
+    2: function (rec) {
+      /* v1 had no `needs` and no `coins`; both are absent rather than
+         wrong, which is exactly the case this whole scheme is for */
+      if (rec.needs === undefined) rec.needs = 1;
+      return rec;
+    }
+  };
 
   /* ---- taking a copy ------------------------------------------------ */
   function capture(g, about) {
-    var rec = { v: VERSION, F: g.F, cols: MF.COLS, rows: MF.ROWS, cells: {}, edge: {} };
+    var rec = { v: VERSION, needs: NEEDS, F: g.F, cols: MF.COLS, rows: MF.ROWS,
+                cells: {}, edge: {} };
+    /* whatever a newer game put in here, put back - the level was only
+       passing through */
+    if (g._extra) for (var xk in g._extra) if (KNOWN.indexOf(xk) < 0) rec[xk] = g._extra[xk];
     for (var i = 0; i < PLANES.length; i++) rec.cells[PLANES[i]] = IO.packArray(g[PLANES[i]]);
     for (var s = 0; s < SIDES.length; s++) rec.edge[SIDES[s][0]] = IO.packArray(g.edge[SIDES[s][0]]);
 
@@ -93,8 +150,15 @@
 
   /* ---- putting it back ---------------------------------------------- */
   function apply(g, rec) {
-    if (!rec || rec.v !== VERSION) throw new Error("that level came from a different version");
-    if (rec.cols !== MF.COLS || rec.rows !== MF.ROWS) throw new Error("that level is a different shape");
+    if (!rec || typeof rec !== "object") throw new Error("that is not a level");
+    rec = upgrade(rec);
+    if (rec.cols !== MF.COLS || rec.rows !== MF.ROWS)
+      throw new Error("that level is a different shape from this cellar");
+
+    /* hold on to anything a newer game wrote that this one has no idea
+       about, so saving it again does not throw it away */
+    g._extra = {};
+    for (var xk in rec) if (KNOWN.indexOf(xk) < 0) g._extra[xk] = rec[xk];
 
     /* the level's own numbers, without running the generator */
     g.F = rec.F;
@@ -109,7 +173,12 @@
     g.rng = MF.mulberry32(((g.seed | 0) ^ (g.F * 2654435761)) >>> 0);
 
     for (var i = 0; i < PLANES.length; i++) {
-      var got = IO.unpackArray(rec.cells[PLANES[i]], N);
+      var packed = rec.cells[PLANES[i]];
+      /* a plane this level does not carry is a plane of nothing, which
+         is what every one of them means when it is absent - so a level
+         written before a plane existed still loads */
+      if (packed === undefined || packed === null) { g[PLANES[i]].fill(0); continue; }
+      var got = IO.unpackArray(packed, N);
       if (!got) throw new Error("the " + PLANES[i] + " of that level is damaged");
       g[PLANES[i]].set(got);
     }
@@ -132,7 +201,11 @@
 
     g.monsters = (rec.monsters || []).map(function (m) {
       var spec = MF.MONSTERS[m.kind];
-      if (!spec) throw new Error("that level has a " + m.kind + " in it, which this game has never heard of");
+      /* the one thing that genuinely cannot be skipped: a monster whose
+         behaviour this build does not have is not a cellar you can play
+         a bit of, it is one you would play WRONG */
+      if (!spec) throw new Error("this level has a " + m.kind +
+        " in it, which needs a newer version of the game");
       /* `spec` is a live shared object with a move() on it - it cannot
          survive being written to text, so it is re-linked by kind */
       var out = { kind: m.kind, spec: spec, c: m.c, r: m.r, tick: m.tick | 0,
@@ -161,6 +234,31 @@
        be one */
     g.settle({ trappedNow: [], freed: [] });
     return g;
+  }
+
+  /* ------------------------------------------------------------------
+     Bring a record up to date, or say why it cannot be.
+
+     A record from the FUTURE is fine as long as it says an old reader
+     can cope - which is the usual case, because most changes add things
+     rather than change what the old things mean.
+     ------------------------------------------------------------------ */
+  function upgrade(rec) {
+    var v = rec.v | 0;
+    if (v <= 0) throw new Error("that level does not say what wrote it");
+
+    if (v > VERSION) {
+      var needs = rec.needs === undefined ? v : (rec.needs | 0);
+      if (needs > VERSION)
+        throw new Error("this level was made by a newer version of the game, and needs it");
+      return rec;                        /* newer, but it says we can cope */
+    }
+
+    var out = rec;
+    for (var step = v + 1; step <= VERSION; step++)
+      if (MIGRATE[step]) out = MIGRATE[step](out) || out;
+    out.v = VERSION;
+    return out;
   }
 
   /* ---- the code ------------------------------------------------------ */
@@ -210,7 +308,7 @@
   }
 
   root.MutantLevelFormat = {
-    VERSION: VERSION, PLANES: PLANES,
+    VERSION: VERSION, NEEDS: NEEDS, PLANES: PLANES, KNOWN: KNOWN, upgrade: upgrade,
     capture: capture, apply: apply, toCode: toCode, fromCode: fromCode, faults: faults
   };
 })(typeof window !== "undefined" ? window : globalThis);

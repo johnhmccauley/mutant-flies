@@ -149,14 +149,62 @@ console.log("\nSending it to somebody\n");
   let threw = null;
   try { LF.apply(back, rec); } catch (e) { threw = e.message; }
   ok("a level with a monster this game has never heard of is refused",
-     /never heard of/.test(threw || ""), true);
+     /needs a newer version of the game/.test(threw || ""), true);
+}
+
+console.log("\nOutliving the game that made it\n");
+{
+  /* a level written before this version existed */
+  const old = LF.capture(built(8, 8));
+  old.v = 1;
+  delete old.needs;
+  delete old.cells.stress;                 /* a plane that did not exist then */
+  const back = new MF.Game({ seed: 71 }); back.F = 1; back.sheet();
+  LF.apply(back, old);
+  let clean = true;
+  for (let i = 0; i < N; i++) if (back.stress[i] !== 0) clean = false;
+  ok("a level from an older version still loads", [back.manC >= 0, clean], [true, true]);
+}
+{
+  /* one from a NEWER version that says an old reader can cope */
+  const rec = LF.capture(built(8, 8));
+  rec.v = LF.VERSION + 5;
+  rec.needs = LF.VERSION;
+  rec.somethingNew = { paintedWalls: true };
+  rec.cells.aPlaneFromTheFuture = "AAAA";
+  const back = new MF.Game({ seed: 72 }); back.F = 1; back.sheet();
+  LF.apply(back, rec);
+  ok("and one from a newer version loads, if it says it can be read", back.bricks, rec.bricks);
+  const again = LF.capture(back);
+  ok("with whatever the newer game put in it carried through untouched",
+     [again.somethingNew, again.v], [{ paintedWalls: true }, LF.VERSION]);
+}
+{
+  /* and one that genuinely cannot be read says so, rather than loading
+     something subtly wrong */
+  const rec = LF.capture(built(8, 8));
+  rec.v = LF.VERSION + 5;
+  rec.needs = LF.VERSION + 5;
+  let threw = null;
+  try { LF.apply(new MF.Game({ seed: 73 }), rec); } catch (e) { threw = e.message; }
+  ok("a level that needs a newer game says exactly that",
+     /newer version of the game, and needs it/.test(threw || ""), true);
 }
 {
   const rec = LF.capture(built(8, 8));
-  rec.v = 99;
+  delete rec.v;
   let threw = null;
-  try { LF.apply(new MF.Game({ seed: 7 }), rec); } catch (e) { threw = e.message; }
-  ok("and one from a different version says so", /different version/.test(threw || ""), true);
+  try { LF.apply(new MF.Game({ seed: 74 }), rec); } catch (e) { threw = e.message; }
+  ok("and one that does not say what wrote it is refused",
+     /does not say what wrote it/.test(threw || ""), true);
+}
+{
+  const rec = LF.capture(built(8, 8));
+  rec.monsters[0].kind = "basilisk";
+  let threw = null;
+  try { LF.apply(new MF.Game({ seed: 75 }), rec); } catch (e) { threw = e.message; }
+  ok("a monster this build has never heard of names the real problem",
+     /needs a newer version of the game/.test(threw || ""), true);
 }
 {
   /* being walled in is worked out, never taken on trust - or a level
