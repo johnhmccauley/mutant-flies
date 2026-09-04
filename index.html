@@ -8773,7 +8773,9 @@ function pause(on) {
   mode = on ? "paused" : "play";
   var kinds = game.monsters.filter(function (m) { return !m.trapped; })
                            .map(function (m) { return m.spec.name.toLowerCase(); });
-  $("pauseNote").textContent = "Cellar " + game.F + ". " + game.bricks + " bricks left, " +
+  $("pauseNote").textContent = (ed.testing ? "Testing " + ($("edName").value || "your cellar")
+                                           : "Cellar " + game.F) + ". " +
+    game.bricks + " bricks left, " +
     (kinds.length ? kinds.length + " still loose: " + kinds.join(", ") + "." : "nothing loose.");
   $("pauseSheet").hidden = !on;
   if (!on) turnAcc = 0;
@@ -12076,6 +12078,7 @@ $("quit").addEventListener("click", enterTitle);
 $("resume").addEventListener("click", function () { pause(false); });
 $("restart").addEventListener("click", restartCellar);
 $("giveup").addEventListener("click", function () {
+  if (edStopTest("", "back to the bench — nothing saved from the test")) return;
   MF.save.keep(game.F, game.SC, Math.max(game.HI, game.SC));
   enterTitle();
 });
