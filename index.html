@@ -23,7 +23,7 @@
     font-family:"Archivo Narrow","Helvetica Neue",Arial,sans-serif;
     overflow:hidden;overscroll-behavior:none;
   }
-  canvas#gl{display:block;width:100%;height:100%;position:fixed;inset:0}
+  canvas#gl{display:block;width:100%;height:100%;position:fixed;left:0;right:0;top:0}
   .vignette{
     position:fixed;inset:0;pointer-events:none;
     box-shadow:inset 0 0 22vmin 8vmin rgba(0,0,0,.82),inset 0 0 40vmin 2vmin rgba(0,0,0,.45);
@@ -261,7 +261,7 @@
 #edBar .edRow + .edRow { margin-top: 5px; }
 /* Wrapping, not scrolling: twenty-three tools in one row needed 1674
    pixels and hid more than half of themselves on any normal screen. */
-#edTools { display: flex; gap: 4px 10px; flex: 1 1 auto; flex-wrap: wrap;
+#edTools { display: flex; gap: 4px; flex: 1 1 auto; flex-wrap: wrap;
   align-items: center; max-height: 30vh; overflow-y: auto; overflow-x: hidden; }
 .edGroup { display: flex; gap: 3px; align-items: center; flex-wrap: wrap;
   padding: 2px 6px 2px 0; border-right: 1px solid #2b2219; }
@@ -272,6 +272,30 @@
 /* its own name: edPic was already taken by the level list thumbnail,
    which is 96x60 and declared later, so it quietly won */
 .edToolPic { width: 18px; height: 18px; border-radius: 2px; display: block; flex: 0 0 auto; }
+/* the group tabs - what used to be six wrapping rows of everything */
+.edTab { background: transparent; border: 0; border-bottom: 2px solid transparent;
+  color: #7d7365; font: inherit; font-size: 10px; letter-spacing: .12em;
+  text-transform: uppercase; padding: 3px 7px 4px; cursor: pointer; }
+.edTab:hover { color: #cbbfab; }
+.edTab[aria-pressed="true"] { color: #ffe6b8; border-bottom-color: #b98c3e; }
+
+#edViews { display: flex; gap: 1px; align-items: center; margin-right: 6px;
+  padding-right: 8px; border-right: 1px solid #372c21; }
+#edViews .edViewName { color: #7d7365; font-size: 10px; letter-spacing: .1em;
+  text-transform: uppercase; margin-right: 3px; }
+.edView { text-transform: none; letter-spacing: 0; font-size: 11px; }
+
+/* how wide the ground tools work */
+#edBrush { display: flex; gap: 3px; align-items: center; margin-left: 4px;
+  padding-left: 9px; border-left: 1px solid #372c21; }
+#edBrush .edBrushName { color: #7d7365; font-size: 10px; letter-spacing: .1em;
+  text-transform: uppercase; margin-right: 2px; }
+.edBrushDot { background: #1d1712; border: 1px solid #372c21; color: #b8ab99;
+  border-radius: 4px; width: 22px; height: 22px; padding: 0; font: inherit;
+  font-size: 11px; cursor: pointer; }
+.edBrushDot:hover { border-color: #6b5640; color: #efe4d2; }
+.edBrushDot[aria-pressed="true"] { background: #503c25; border-color: #b98c3e; color: #ffe6b8; }
+
 .edTool { background: #1d1712; border: 1px solid #372c21; color: #b8ab99;
   border-radius: 3px; padding: 2px 6px; font: inherit; font-size: 10px;
   line-height: 1.35; cursor: pointer; white-space: nowrap; flex: 0 0 auto;
@@ -319,18 +343,13 @@
    the editor works was in the status line, so the first fault or bot
    result wiped it - and then nothing anywhere said the little figure
    was the pointer. */
-/* Wraps rather than hides. It was set to disappear below 900px, which
-   is precisely the width where somebody is most likely to be lost and
-   least likely to guess - the instruction has to survive the narrow
-   window, not be the first thing dropped from it. It does stand down
-   once a builder has plainly got the idea. */
-#edTop .edHow { color: #6f6456; }
-#edTop.gotIt .edHow { display: none; }
-/* it takes the rest of the line, and takes a line of its own rather
-   than being crushed when there is not room - it is the only thing the
-   editor has to talk with */
-#edSay { color: #b3a691; flex: 1 1 24ch; text-align: right;
-  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* A whole line, and it wraps. It was one line with an ellipsis, which
+   is fine for a label and wrong for the only thing the editor has to
+   talk with: it cut its own sentences off mid-word - "about 6 degrees
+   (nothi..." - and the clipped half is always the half that says what
+   actually happened. */
+#edSay { color: #b3a691; flex: 1 1 100%; }
 #edSay .bad { color: #e0785c; }
 #edSay .good { color: #8fc07a; }
 /* the new-version notice: quiet, but not so quiet nobody sees it */
@@ -475,32 +494,41 @@
   <span class="edWhat" id="edTitle">untitled</span>
   <span class="edDot" id="edDirty" title="unsaved changes"></span>
   <span class="edFacts" id="edFacts"></span>
-  <span class="edHow">Click a square to put the tool down &middot; drag to draw &middot;
-    hold on Raise to grow a hill</span>
   <span id="edSay"></span>
 </div>
 
 <div id="edBar" hidden>
+  <div class="edRow" id="edTabs">
+    <span id="edViews"></span>
+  </div>
   <div class="edRow">
     <div id="edTools"></div>
+    <span id="edBrush" hidden></span>
   </div>
   <div class="edRow">
     <input type="text" id="edName" maxlength="48" placeholder="Name this cellar" spellcheck="false">
     <input type="color" id="edColour" value="#6b8f4e" title="The colour Paint floor puts down">
 
+    <button class="edBtn warm" id="edTest" type="button">Test play</button>
     <button class="edBtn" id="edSave" type="button">Save</button>
+    <button class="edBtn" id="edUndo" type="button" title="Ctrl+Z">Undo</button>
+    <button class="edBtn" id="edRedo" type="button">Redo</button>
+    <button class="edBtn" id="edMore" type="button" aria-pressed="false"
+            title="Everything else">More</button>
+    <button class="edBtn" id="edQuit" type="button">Leave</button>
+  </div>
+  <!-- The things you reach for once a session, rather than once a
+       minute. They were all in the front row at equal weight, which is
+       how Undo ended up buried between Publish and Paint. -->
+  <div class="edRow" id="edRest" hidden>
     <button class="edBtn" id="edOpen" type="button">Open</button>
     <button class="edBtn" id="edNew" type="button">New</button>
-    <button class="edBtn warm" id="edTest" type="button">Test play</button>
     <button class="edBtn warm" id="edBot" type="button">Set the bot on it</button>
     <button class="edBtn" id="edShare" type="button">Code</button>
     <button class="edBtn" id="edPublish" type="button">Publish</button>
-    <button class="edBtn" id="edUndo" type="button" title="Ctrl+Z">Undo</button>
-    <button class="edBtn" id="edRedo" type="button">Redo</button>
     <button class="edBtn" id="edPaint" type="button" aria-pressed="false"
             title="Lay as you walk, instead of pressing space on every square">Paint</button>
     <button class="edBtn" id="edStampBtn" type="button" title="Same as space">Put down</button>
-    <button class="edBtn" id="edQuit" type="button">Leave</button>
   </div>
 </div>
 
@@ -5916,7 +5944,7 @@ var renderer, scene, camera, clock;
 var brickMesh, floorMesh, manRig, motes, debris = [], torches = [], keyLight;
 var BRICK_MAT, BRICK_TEX = {};
 var monsterRigs = [];
-var terrain, terrains = [], rampMesh = null, props = {}, marbleMeshes = [], cubeCam, cubeT = 0, bobT = 0;
+var terrain, terrains = [], rampMesh = null, floorSkin = null, props = {}, marbleMeshes = [], cubeCam, cubeT = 0, bobT = 0;
 
 function init3D() {
   /* preserveDrawingBuffer so a picture can be taken of the cellar. Without
@@ -5990,11 +6018,48 @@ function init3D() {
   loadAssets();
 
   addEventListener("resize", resize);
+  /* the chrome changes height on its own - a longer message wraps, More
+     opens, the tabs reflow on a narrow window - and the canvas has to
+     follow it, so it is watched rather than guessed at */
+  if (window.ResizeObserver) {
+    var watch = new ResizeObserver(function () { resize(); });
+    ["edTop", "edBar"].forEach(function (id) { var el = $(id); if (el) watch.observe(el); });
+  }
   resize();
 }
+/* ====================================================================
+   The canvas stops where the chrome starts.
+
+   It used to run the whole window with the editor's header and palette
+   sitting on top of it, so the camera framed the room for 712 pixels of
+   height while the bottom 162 of those were behind the palette. The
+   room came out centred - in the part of the canvas nobody could see -
+   and every bit of the slack piled up as a black band above the far
+   wall. It read as the camera being badly aimed. It was the canvas
+   being the wrong size.
+
+   Playing, the HUD is a thin strip and the canvas is the window, as it
+   always was. Building, the canvas is what is left between the header
+   and the palette, and the framing solves for that.
+   ==================================================================== */
+function viewBox() {
+  var top = 0, bottom = 0;
+  if (mode === "edit") {
+    var t = $("edTop"), b = $("edBar");
+    if (t && !t.hidden) top = t.getBoundingClientRect().height;
+    if (b && !b.hidden) bottom = b.getBoundingClientRect().height;
+  }
+  var h = Math.max(120, innerHeight - top - bottom);
+  return { top: Math.round(top), h: Math.round(h) };
+}
+
 function resize() {
-  renderer.setSize(innerWidth, innerHeight, false);
-  camera.aspect = innerWidth / innerHeight;
+  var box = viewBox();
+  var gl = renderer.domElement;
+  gl.style.top = box.top + "px";
+  gl.style.height = box.h + "px";
+  renderer.setSize(innerWidth, box.h, false);
+  camera.aspect = innerWidth / box.h;
   camera.updateProjectionMatrix();
 }
 
@@ -6014,6 +6079,42 @@ function buildCellar() {
     terrains.push(t);
   }
   terrain = terrains[0];
+
+  /* ====================================================================
+     GROUND THAT ACTUALLY SLOPES
+
+     The floor was a block per square with a bevel cut into the high
+     side of every step. That is a staircase with the corners knocked
+     off, and it read as one: pull a tile up and you got a stack of
+     flat plateaus, not a hill. The physics has had real slopes for a
+     while - a block's grip against gravity, sliding, the extra cost of
+     pushing uphill - and none of it was visible.
+
+     So the surface is a proper height field now. Every corner of the
+     grid sits at the average of the squares touching it, which is what
+     makes it continuous: two neighbouring squares share those corner
+     heights exactly, so there is never a seam between them. Each
+     square is drawn as four triangles fanning out from its middle, and
+     the middle is pinned to that square's own logical height - so the
+     surface slopes without anything that stands on it floating or
+     sinking. groundAt stays exactly what it was.
+
+     The old bevels go: a slope does not need a bevel on it. */
+  var skinGeo = new THREE.BufferGeometry();
+  var CAP = COLS * ROWS * (12 + 4 * 6);      /* the fan, plus four skirts */
+  skinGeo.setAttribute("position", new THREE.BufferAttribute(new Float32Array(CAP * 3), 3));
+  skinGeo.setAttribute("normal", new THREE.BufferAttribute(new Float32Array(CAP * 3), 3));
+  skinGeo.setAttribute("uv", new THREE.BufferAttribute(new Float32Array(CAP * 2), 2));
+  skinGeo.setAttribute("color", new THREE.BufferAttribute(new Float32Array(CAP * 3), 3));
+  var skinMap = slabMaps(0);
+  floorSkin = new THREE.Mesh(skinGeo,
+    new THREE.MeshStandardMaterial({ map: skinMap.map, bumpMap: skinMap.bump,
+                                     bumpScale: 0.075, roughness: 0.96, metalness: 0.015,
+                                     vertexColors: true }));
+  floorSkin.receiveShadow = true;
+  floorSkin.castShadow = false;
+  floorSkin.frustumCulled = false;
+  scene.add(floorSkin);
 
   /* Where one square of floor stands higher than the next there used to
      be a sheer face between them, and a vertical face down here catches
@@ -6797,6 +6898,41 @@ var ai = { on: false, plan: [] };   /* declared here: enterLevel clears it */
 var plan = $("plan"), planCtx = plan.getContext("2d");
 
 var STEP = 0.55;                       /* world height of one step of floor */
+/* The height of one corner of the grid: the average of the squares
+   that touch it. Squares outside the level do not vote, so the ground
+   runs out to its own boundary at full height instead of sagging into
+   nothing. Returned in steps, not world units. */
+function cornerH(i, j) {
+  var sum = 0, n = 0;
+  for (var d = 0; d < 4; d++) {
+    var c = i - (d & 1), r = j - (d >> 1);
+    if (c < 0 || r < 0 || c >= COLS || r >= ROWS) continue;
+    if (game.shape && !game.shape[r * COLS + c]) continue;
+    sum += game.height[r * COLS + c]; n++;
+  }
+  return n ? sum / n : 0;
+}
+
+/* Which way the ground faces at a corner.
+
+   Taking a normal per triangle makes every one of them a flat little
+   plate, and a hill built out of flat plates looks like a hill built
+   out of flat plates - you can count the facets. The surface has a
+   slope at every point and it can be worked out rather than
+   approximated: how fast the corner heights change across the room in
+   each direction IS the gradient, and the normal is that gradient
+   turned on its side. Neighbouring squares ask the same question about
+   the same corner and get the same answer, so the shading runs on
+   across them without a seam.
+
+   j counts rows, and z runs the other way, which is why the two
+   differences are subtracted in opposite orders. */
+function cornerN(i, j, out) {
+  var gx = (cornerH(i + 1, j) - cornerH(i - 1, j)) * 0.5 * STEP;
+  var gz = (cornerH(i, j - 1) - cornerH(i, j + 1)) * 0.5 * STEP;
+  return out.set(-gx, 1, -gz).normalize();
+}
+
 function groundAt(c, r) {
   if (c < 0 || r < 0 || c >= COLS || r >= ROWS) return 0;
   return game.height[r * COLS + c] * STEP;
@@ -6857,36 +6993,22 @@ function syncEdges() {
 
 function syncTerrain() {
   var n = [0, 0, 0], col = new THREE.Color();
+
+  /* the body of the ground, sunk far enough that the sloped skin above
+     always covers it - a square's own top is at its logical height, and
+     the skin can dip up to three quarters of a step below that where
+     the ground falls away on every side */
   for (var r = 0; r < ROWS; r++) for (var c = 0; c < COLS; c++) {
-    /* a square that has been cut out of the level has no floor at all,
-       which is how a builder sees the shape they are making */
     if (game.shape && !game.shape[r * COLS + c]) continue;
     var lvl = game.height[r * COLS + c];
     var h = lvl * STEP, thick = 1 + h;
     var a = hash2(c, r), b = hash2(r + 91, c + 17);
-
-    /* damp stone gathers in the low ground, worn stone anywhere */
     var cut = (lvl === 0 && a < 0.26) ? 2 : (a < 0.62 ? 0 : 1);
     var mesh = terrains[cut];
-    placeAt(mesh, n[cut], c, r, h - thick / 2, 1, thick, 1, (Math.floor(b * 4) * Math.PI) / 2);
-
-    /* value carries the shape of the floor: low ground darker and
-       cooler where the damp sits, high ground lighter and warmer for
-       being nearer the torches. Plus a little per-stone variation so no
-       two neighbours match. */
-    var v = 0.56 + 0.17 * lvl + (b - 0.5) * 0.1;
-    var warm = 0.9 + 0.07 * lvl;
-    var painted = game.tint && game.tint[r * COLS + c];
-    if (painted && game.floors && game.floors[painted - 1]) {
-      /* a square the builder painted. Its own colour, but still lit by
-         the same value, so a painted floor rises and falls with the
-         ground like everything else rather than sitting on top of it
-         as a flat sticker. */
-      col.set(game.floors[painted - 1]);
-      col.multiplyScalar(0.62 + v * 0.62);
-    } else {
-      col.setRGB(v * (0.94 + 0.09 * lvl), v * 0.95, v * warm * 0.92);
-    }
+    placeAt(mesh, n[cut], c, r, h - STEP - thick / 2, 1, thick, 1,
+            (Math.floor(b * 4) * Math.PI) / 2);
+    var v0 = 0.5 + 0.15 * lvl;
+    col.setRGB(v0 * 0.8, v0 * 0.78, v0 * 0.74);
     mesh.setColorAt(n[cut], col);
     n[cut]++;
   }
@@ -6895,51 +7017,146 @@ function syncTerrain() {
     terrains[k].instanceMatrix.needsUpdate = true;
     if (terrains[k].instanceColor) terrains[k].instanceColor.needsUpdate = true;
   }
+  rampMesh.count = 0;                    /* the skin is the slope now */
+  rampMesh.instanceMatrix.needsUpdate = true;
 
-  /* and a ramp down every edge where the floor drops */
-  /* how far into the low square the slope reaches. A tall step wants a
-     longer run or it is a cliff with a bevel on it rather than a slope */
-  /* [dc, dr, which way the slope faces]. The slope is cut out of the
-     HIGH square's own edge and stops dead at the boundary, so it never
-     reaches into the low square. That matters: a square is either flat
-     or it is the edge, and everything the game puts down - bricks,
-     rocks, trees, the man - rests on a flat square. A block sitting on
-     a slope would have to lie at the same angle, and two of them side
-     by side would then be inside each other. So nothing ever does. */
-  var SIDES = [
-    [ 1,  0,  Math.PI / 2],
-    [-1,  0, -Math.PI / 2],
-    [ 0,  1,  Math.PI],
-    [ 0, -1,  0]
-  ];
-  var nr2 = 0, rc = new THREE.Color();
-  for (var r2 = 0; r2 < ROWS; r2++) for (var c2 = 0; c2 < COLS; c2++) {
-    var hi = game.height[r2 * COLS + c2];
-    for (var sd = 0; sd < SIDES.length; sd++) {
-      var S = SIDES[sd], nc2 = c2 + S[0], nr3 = r2 + S[1];
-      /* off the edge of the cellar is somebody else's problem */
-      if (nc2 < 0 || nr3 < 0 || nc2 >= COLS || nr3 >= ROWS) continue;
-      var lo = game.height[nr3 * COLS + nc2];
-      if (lo >= hi) continue;
-      var dh = (hi - lo) * STEP;
-      /* it has to fit inside the square it belongs to, so a tall step is
-         steeper rather than longer - there is nowhere else for it to go */
-      var run = Math.min(0.5, 0.24 + dh * 0.3);
-      placeAt(rampMesh, nr2,
-              c2 + S[0] * (0.5 - run), r2 + S[1] * (0.5 - run),
-              hi * STEP, 1, dh, run, S[2]);
-      /* the ramp belongs to the high ground, so it takes its colour */
-      var bb = hash2(r2 + 91, c2 + 17);
-      var vv = 0.56 + 0.17 * hi + (bb - 0.5) * 0.1;
-      rc.setRGB(vv * (0.94 + 0.09 * hi), vv * 0.95, vv * (0.9 + 0.07 * hi) * 0.92);
-      rampMesh.setColorAt(nr2, rc);
-      nr2++;
+  /* ---- the sloped surface ---------------------------------------- */
+  var g = floorSkin.geometry;
+  var P = g.attributes.position.array, N = g.attributes.normal.array;
+  var U = g.attributes.uv.array, C = g.attributes.color.array;
+  var v = 0;
+  var e1 = new THREE.Vector3(), e2 = new THREE.Vector3(), nn = new THREE.Vector3();
+  var A = new THREE.Vector3(), B = new THREE.Vector3(), Cv = new THREE.Vector3();
+  var _keepB = B, _keepC = Cv;
+
+  /* `face` is the way this triangle is meant to look. The winding
+     decides which side three.js draws and which way the normal comes
+     out, and getting it backwards does not throw - the surface is just
+     quietly culled and you go on looking at whatever is underneath it,
+     which is exactly what happened here: every one of the floor's ten
+     thousand normals came out pointing at the ground. So the winding is
+     not trusted, it is checked against the direction the face is
+     supposed to look and turned round if it disagrees. */
+  var face = new THREE.Vector3();
+  var nA = new THREE.Vector3(), nB = new THREE.Vector3(), nCv = new THREE.Vector3();
+  var smooth = null;
+  function tri(ax, ay, az, bx, by, bz, cx, cy, cz, cr, cg, cb) {
+    B = _keepB; Cv = _keepC;
+    A.set(ax, ay, az); B.set(bx, by, bz); Cv.set(cx, cy, cz);
+    e1.subVectors(B, A); e2.subVectors(Cv, A);
+    nn.crossVectors(e1, e2).normalize();
+    var na = nA, nb = nB, nc = nCv;
+    if (nn.dot(face) < 0) {
+      var sw = B; B = Cv; Cv = sw;
+      var sn = nb; nb = nc; nc = sn;
+      nn.negate();
+    }
+    var pts = [A, B, Cv];
+    var nml = smooth ? [na, nb, nc] : [nn, nn, nn];
+    for (var q = 0; q < 3; q++) {
+      P[v * 3] = pts[q].x; P[v * 3 + 1] = pts[q].y; P[v * 3 + 2] = pts[q].z;
+      N[v * 3] = nml[q].x; N[v * 3 + 1] = nml[q].y; N[v * 3 + 2] = nml[q].z;
+      U[v * 2] = pts[q].x; U[v * 2 + 1] = pts[q].z;      /* stone runs across the room */
+      C[v * 3] = cr; C[v * 3 + 1] = cg; C[v * 3 + 2] = cb;
+      v++;
     }
   }
-  rampMesh.count = nr2;
-  rampMesh.instanceMatrix.needsUpdate = true;
-  if (rampMesh.instanceColor) rampMesh.instanceColor.needsUpdate = true;
+
+  for (var r2 = 0; r2 < ROWS; r2++) for (var c2 = 0; c2 < COLS; c2++) {
+    var i2 = r2 * COLS + c2;
+    if (game.shape && !game.shape[i2]) continue;
+    var lv = game.height[i2];
+    var bb = hash2(r2 + 91, c2 + 17);
+
+    /* the same reading of the floor as before: low ground darker and
+       cooler where the damp sits, high ground lighter and warmer for
+       being nearer the torches, and a little per-stone variation */
+    var vv = 0.56 + 0.17 * lv + (bb - 0.5) * 0.1;
+    var warm = 0.9 + 0.07 * lv;
+    var painted = game.tint && game.tint[i2];
+    if (painted && game.floors && game.floors[painted - 1]) {
+      col.set(game.floors[painted - 1]);
+      col.multiplyScalar(0.62 + vv * 0.62);
+    } else {
+      col.setRGB(vv * (0.94 + 0.09 * lv), vv * 0.95, vv * warm * 0.92);
+    }
+    var cr = col.r, cg = col.g, cb = col.b;
+
+    /* the square's four corners, in world space. z runs backwards. */
+    var x0 = c2, x1 = c2 + 1;
+    var z0 = ROWS - 1 - r2, z1 = z0 + 1;
+    var hNW = cornerH(c2, r2) * STEP;          /* r2 side is the far edge */
+    var hNE = cornerH(c2 + 1, r2) * STEP;
+    var hSW = cornerH(c2, r2 + 1) * STEP;
+    var hSE = cornerH(c2 + 1, r2 + 1) * STEP;
+    var mx = c2 + 0.5, mz = z0 + 0.5, my = lv * STEP;   /* pinned to groundAt */
+
+    /* four triangles fanning out from the middle, each corner carrying
+       the way the ground actually faces there */
+    face.set(0, 1, 0);
+    smooth = 1;
+    var nSW = cornerN(c2, r2 + 1, new THREE.Vector3());
+    var nSE = cornerN(c2 + 1, r2 + 1, new THREE.Vector3());
+    var nNW = cornerN(c2, r2, new THREE.Vector3());
+    var nNE = cornerN(c2 + 1, r2, new THREE.Vector3());
+    /* the middle looks the way the square as a whole is leaning */
+    var mid = new THREE.Vector3(
+      -((hSE + hNE) - (hSW + hNW)) * 0.5,
+      1,
+      -((hNW + hNE) - (hSW + hSE)) * 0.5).normalize();
+
+    nA.copy(nSW); nB.copy(nSE); nCv.copy(mid);
+    tri(x0, hSW, z0, x1, hSE, z0, mx, my, mz, cr, cg, cb);
+    nA.copy(nSE); nB.copy(nNE); nCv.copy(mid);
+    tri(x1, hSE, z0, x1, hNE, z1, mx, my, mz, cr, cg, cb);
+    nA.copy(nNE); nB.copy(nNW); nCv.copy(mid);
+    tri(x1, hNE, z1, x0, hNW, z1, mx, my, mz, cr, cg, cb);
+    nA.copy(nNW); nB.copy(nSW); nCv.copy(mid);
+    tri(x0, hNW, z1, x0, hSW, z0, mx, my, mz, cr, cg, cb);
+    smooth = null;
+
+    /* where the level stops, the ground has a side to it */
+    var SK = [
+      [ 0,  1, x0, hSW, z0, x1, hSE, z0],     /* toward the camera */
+      [ 0, -1, x1, hNE, z1, x0, hNW, z1],
+      [-1,  0, x0, hNW, z1, x0, hSW, z0],
+      [ 1,  0, x1, hSE, z0, x1, hNE, z1]
+    ];
+    for (var sd = 0; sd < 4; sd++) {
+      var S = SK[sd], nc = c2 + S[0], nr = r2 + S[1];
+      /* Only where a cut-out has made a new boundary. The four walls of
+         the room have had their own stonework since long before this -
+         edgeWall and edgeLip, dealt in syncEdges - and putting a skirt
+         there as well drew a second, taller, brighter face just under
+         the first, which came out as a stack of pale stripes along the
+         near edge once the camera pulled back far enough to see under
+         the floor. */
+      if (nc < 0 || nr < 0 || nc >= COLS || nr >= ROWS) continue;
+      if (!game.shape || game.shape[nr * COLS + nc]) continue;
+      var ax = S[2], ay = S[3], az = S[4], bx = S[5], by = S[6], bz = S[7];
+      /* z runs backwards, so a neighbour one row on is one unit nearer */
+      face.set(S[0], 0, -S[1]);
+      /* Far enough down to be a drop rather than a kerb. It reached
+         about a step and a bit below the floor, which from the room
+         view left the underside of everything - the sunk slabs, the
+         bottom of the skirt itself, the dark beyond - showing as a
+         stack of pale stripes along the near edge. A drop should read
+         as the floor ending and the dark going on. */
+      var foot = Math.min(ay, by) - 7;
+      var dk = 0.30;                            /* a side face catches little */
+      tri(ax, ay, az, bx, by, bz, bx, foot, bz, cr * dk, cg * dk, cb * dk);
+      tri(ax, ay, az, bx, foot, bz, ax, foot, az, cr * dk, cg * dk, cb * dk);
+    }
+  }
+
+  g.setDrawRange(0, v);
+  g.attributes.position.needsUpdate = true;
+  g.attributes.normal.needsUpdate = true;
+  g.attributes.uv.needsUpdate = true;
+  g.attributes.color.needsUpdate = true;
+  g.computeBoundingSphere();
 }
+
 
 /* everything that can change from one turn to the next */
 function syncWorld() {
@@ -7574,7 +7791,7 @@ var ed = {
      is the cursor, so without this the starting square was wherever the
      builder happened to leave him when they stopped building - which
      was almost never where they meant the player to begin. */
-  startC: 4, startR: 4,
+  startC: 4, startR: 4, brush: 2,
   /* The single most important thing an editor has, and the first
      version did not have it: somewhere to put the last forty things you
      did so you can take one of them back. Whole cellars, because a
@@ -7585,7 +7802,7 @@ var ed = {
      reset the moment the key comes up or the cursor moves. */
   liftN: 0, liftAt: "",
   /* the editor starts looking at the whole room */
-  wide: true
+  view: "room"
 };
 var UNDO_DEEP = 40;
 
@@ -7642,31 +7859,125 @@ function edButtons() {
 var ED_GROUPS = ["Ground", "Liquid", "Kit", "Monsters", "Shape"];
 
 var ED_TOOLS = [
-  { name: "Erase",     group: 0, swatch: "#2a231c", act: "cell", v: 0 },
-  { name: "Brick",     group: 0, swatch: "#b8462e", act: "cell", v: 1 },
-  { name: "Rock",      group: 0, swatch: "#8d8578", act: "cell", v: 8 },
-  { name: "Tree",      group: 0, swatch: "#2f4a24", act: "cell", v: 2 },
-  { name: "Marble",    group: 0, swatch: "#cfd6dd", act: "marble" },
-  { name: "Tar vat",   group: 1, swatch: "#4a2410", act: "cell", v: 4 },
-  { name: "Water vat", group: 1, swatch: "#2a5f7a", act: "cell", v: 5 },
-  { name: "Set tar",   group: 1, swatch: "#14100e", act: "cell", v: 6 },
-  { name: "Chopper",   group: 0, swatch: "#6b6b74", act: "cell", v: 7 },
-  { name: "Boots",     group: 2, swatch: "#a86b32", act: "item", v: 1 },
-  { name: "Frost",     group: 2, swatch: "#7fb6d8", act: "item", v: 2 },
-  { name: "Saw",       group: 2, swatch: "#c8c0a8", act: "item", v: 3 },
-  { name: "Jar",       group: 2, swatch: "#8a7fb0", act: "item", v: 4 },
-  { name: "Fly",       group: 3, swatch: "#3d63c4", act: "mob", v: "fly" },
-  { name: "Spider",    group: 3, swatch: "#6b4a2a", act: "mob", v: "spider" },
-  { name: "Beetle",    group: 3, swatch: "#2c6a3a", act: "mob", v: "beetle" },
-  { name: "Wasp",      group: 3, swatch: "#c8a017", act: "mob", v: "wasp" },
-  { name: "Snake",     group: 3, swatch: "#4c8a2e", act: "mob", v: "snake" },
-  { name: "Start",     group: 4, swatch: "#ffd27a", act: "man" },
-  { name: "Raise",     group: 4, swatch: "#7a6a52", act: "hi", v: 1 },
-  { name: "Lower",     group: 4, swatch: "#4a4034", act: "hi", v: -1 },
-  { name: "Wall/drop", group: 4, swatch: "#574c42", act: "edge" },
-  { name: "Cut out",   group: 4, swatch: "#0d0b09", act: "shape" },
-  { name: "Paint floor", group: 1, swatch: "#8a6a3a", act: "tint" }
+  { name: "Erase",     group: 0, swatch: "#2a231c", act: "cell", v: 0, how: "Click a square to clear whatever is on it." },
+  { name: "Brick",     group: 0, swatch: "#b8462e", act: "cell", v: 1, how: "Click a square to lay a brick. Drag to lay a row." },
+  { name: "Rock",      group: 0, swatch: "#8d8578", act: "cell", v: 8, how: "Click a square for a rock - four bricks of shove, and nothing down here can destroy it." },
+  { name: "Tree",      group: 0, swatch: "#2f4a24", act: "cell", v: 2, how: "Click a square to plant a tree. The chopper turns one into bricks." },
+  { name: "Marble",    group: 0, swatch: "#cfd6dd", act: "marble", how: "Click a square to drop a marble. It rolls when something shoves it." },
+  { name: "Tar vat",   group: 1, swatch: "#4a2410", act: "cell", v: 4, how: "Click a square for a vat of tar. Wall it in or it runs." },
+  { name: "Water vat", group: 1, swatch: "#2a5f7a", act: "cell", v: 5, how: "Click a square for a vat of water. Wall it in or it runs." },
+  { name: "Set tar",   group: 1, swatch: "#14100e", act: "cell", v: 6, how: "Click a square to lay tar that has already gone hard." },
+  { name: "Chopper",   group: 0, swatch: "#6b6b74", act: "cell", v: 7, how: "Click a square for a chopper - it turns trees into bricks." },
+  { name: "Boots",     group: 2, swatch: "#a86b32", act: "item", v: 1, how: "Click a square to leave boots there to be picked up." },
+  { name: "Frost",     group: 2, swatch: "#7fb6d8", act: "item", v: 2, how: "Click a square to leave frost there to be picked up." },
+  { name: "Saw",       group: 2, swatch: "#c8c0a8", act: "item", v: 3, how: "Click a square to leave a saw there to be picked up." },
+  { name: "Jar",       group: 2, swatch: "#8a7fb0", act: "item", v: 4, how: "Click a square to leave a jar there to be picked up." },
+  { name: "Fly",       group: 3, swatch: "#3d63c4", act: "mob", v: "fly", how: "Click a square to put a fly there. Click it again to take it away." },
+  { name: "Spider",    group: 3, swatch: "#6b4a2a", act: "mob", v: "spider", how: "Click a square to put a spider there. Click it again to take it away." },
+  { name: "Beetle",    group: 3, swatch: "#2c6a3a", act: "mob", v: "beetle", how: "Click a square to put a beetle there. Click it again to take it away." },
+  { name: "Wasp",      group: 3, swatch: "#c8a017", act: "mob", v: "wasp", how: "Click a square to put a wasp there. Click it again to take it away." },
+  { name: "Snake",     group: 3, swatch: "#4c8a2e", act: "mob", v: "snake", how: "Click a square to put a snake there. Click it again to take it away." },
+  { name: "Start",     group: 4, swatch: "#ffd27a", act: "man", how: "Click a square to say where the player begins." },
+  { name: "Raise",     group: 4, swatch: "#7a6a52", act: "hi", v: 1, how: "Click a square to lift it a step. Hold to keep lifting - the ground around it slopes up to meet it." },
+  { name: "Lower",     group: 4, swatch: "#4a4034", act: "hi", v: -1, how: "Click a square to drop it a step. Hold to keep going." },
+  { name: "Wall/drop", group: 4, swatch: "#574c42", act: "edge", how: "Click a square OUTSIDE the cellar to switch what lies beyond it between good stone and a drop." },
+  { name: "Cut out",   group: 4, swatch: "#0d0b09", act: "shape", how: "Click a square to take it out of the cellar - the floor stops there. Click it again to put it back." },
+  { name: "Paint floor", group: 1, swatch: "#8a6a3a", act: "tint", how: "Click a square to colour it with the swatch beside the name box." }
 ];
+
+/* What the tool in your hand actually does, in the header, all the
+   time. The one line explaining the editor used to be generic - "click
+   a square to put the tool down" - and it retired itself after six
+   clicks on the theory that the idea had landed. Both were wrong. It
+   went away while somebody was still asking how to lift a tile, and
+   even while it was up it never said the thing they needed, which is
+   what THIS tool does and that Raise repeats while you hold it. So
+   every tool carries its own sentence now, it appears the moment you
+   pick the tool, and it does not retire. */
+/* How wide the ground tool works. Raising one square at a time is a
+   chisel; what you want for a hill is a brush you can run over an area,
+   and how far the slope reaches out from where you press is the size of
+   that brush. It used to be decided for you by how long you held the
+   key down, which is unguessable and cannot be repeated deliberately -
+   so it is a number you set, it is on screen while you are holding a
+   ground tool, and the cursor grows to show you the footprint. */
+var BRUSH_MIN = 1, BRUSH_MAX = 6;
+
+/* ====================================================================
+   THREE WAYS TO LOOK AT IT
+
+   One camera cannot do all three jobs. Building the middle of a room
+   wants the three-quarter view, where you can read height and see what
+   a corner will actually look like. Drawing the outline of the floor
+   wants to be straight overhead, where a square is a square and the
+   shape you are cutting is the shape you see. Judging whether a
+   corridor feels tight wants to be down in it at head height, which is
+   what the game itself looks like.
+   ==================================================================== */
+var ED_VIEWS = [
+  { key: "room",  name: "Room",  how: "Three quarters, the whole floor. Best for building." },
+  { key: "plan",  name: "Plan",  how: "Straight down. Best for cutting the shape of the floor." },
+  { key: "close", name: "Close", how: "Down in it, the way the game looks." }
+];
+
+function edViewBar() {
+  var el = $("edViews");
+  if (!el) return;
+  el.innerHTML = '<span class="edViewName">view</span>';
+  ED_VIEWS.forEach(function (v) {
+    var b = document.createElement("button");
+    b.className = "edTab edView";
+    b.type = "button";
+    b.setAttribute("aria-pressed", v.key === ed.view ? "true" : "false");
+    b.textContent = v.name;
+    b.title = v.how + "   (V)";
+    b.addEventListener("click", function () { edViewTo(v.key); });
+    el.appendChild(b);
+  });
+}
+
+function edViewTo(key) {
+  ed.view = key;
+  edViewBar();
+  var v = ED_VIEWS.filter(function (x) { return x.key === key; })[0];
+  if (v) edSay(v.how);
+}
+
+function edBrushBar() {
+  var el = $("edBrush");
+  if (!el) return;
+  var t = ED_TOOLS[ed.tool];
+  if (!t || t.act !== "hi") { el.hidden = true; return; }
+  el.hidden = false;
+  el.innerHTML = '<span class="edBrushName">brush</span>';
+  for (var w = BRUSH_MIN; w <= BRUSH_MAX; w++) {
+    (function (n) {
+      var b = document.createElement("button");
+      b.className = "edBrushDot";
+      b.type = "button";
+      b.setAttribute("aria-pressed", n === ed.brush ? "true" : "false");
+      b.textContent = n;
+      b.title = n === 1 ? "one square - a step straight up"
+                        : n + " squares - a step every " + n +
+                          ", about " + (Math.atan(0.55 / n) * 180 / Math.PI).toFixed(0) + " degrees";
+      b.addEventListener("click", function () { edBrushTo(n); });
+      el.appendChild(b);
+    })(w);
+  }
+}
+
+function edBrushTo(n) {
+  ed.brush = Math.max(BRUSH_MIN, Math.min(BRUSH_MAX, n));
+  edBrushBar();
+  edSay("brush " + ed.brush + " square" + (ed.brush === 1 ? "" : "s") +
+        " - a step every " + ed.brush + ", about " +
+        (Math.atan(0.55 / ed.brush) * 180 / Math.PI).toFixed(0) + " degrees");
+}
+
+function edHow() {
+  var t = ED_TOOLS[ed.tool];
+  edSay(t && t.how ? t.how : "");
+}
 
 function edSay(text, cls) {
   $("edSay").innerHTML = cls ? '<span class="' + cls + '">' + text + "</span>" : text;
@@ -7680,36 +7991,65 @@ function edGroupTools(g) {
 }
 
 function edPaint() {
-  var box = $("edTools");
+  /* ------------------------------------------------------------------
+     One group at a time.
+
+     Every one of the twenty-four tools used to be on screen at once,
+     in six wrapping rows, and with the name box and three rows of
+     buttons under them the chrome came to about half the window. You
+     were building a 34 by 26 room through a letterbox - which is a
+     strange thing to do to an editor, whose entire job is to let you
+     see what you are making.
+
+     So the groups are tabs and only the one you are in shows its
+     tools. Six rows become two, the number keys finally mean what the
+     screen shows (they always picked within the current group), and
+     the room gets the space back.
+     ------------------------------------------------------------------ */
   var group = ED_TOOLS[ed.tool] ? ED_TOOLS[ed.tool].group : 0;
-  box.innerHTML = "";
 
+  edViewBar();
+
+  var tabs = $("edTabs");
+  /* the view switch lives in this row and is not a tool, so it is kept
+     and put back rather than rebuilt with them */
+  var views = $("edViews");
+  tabs.innerHTML = "";
+  tabs.appendChild(views);
   ED_GROUPS.forEach(function (title, g) {
-    var wrap = document.createElement("div");
-    wrap.className = "edGroup" + (g === group ? " here" : "");
-    var head = document.createElement("span");
-    head.className = "edGroupName";
-    head.textContent = title;
-    wrap.appendChild(head);
-
-    edGroupTools(g).forEach(function (i, n) {
-      var t = ED_TOOLS[i];
-      var b = document.createElement("button");
-      b.className = "edTool";
-      b.type = "button";
-      b.setAttribute("aria-pressed", i === ed.tool ? "true" : "false");
-      /* a monster gets its portrait; everything else the colour it is */
-      var pic = (t.act === "mob") ? monsterPortrait(t.v, 64) : null;
-      b.innerHTML = (pic ? '<img class="edToolPic" alt="" src="' + pic + '">'
-                         : '<i class="edSwatch" style="background:' + t.swatch + '"></i>') +
-                    "<span>" + t.name + "</span>" +
-                    (g === group ? ' <i class="edKey">' + (n + 1) + "</i>" : "");
-      b.title = t.name + (g === group ? "  (" + (n + 1) + ")" : "  (" + title + ")");
-      b.addEventListener("click", function () { ed.tool = i; edPaint(); });
-      wrap.appendChild(b);
+    var b = document.createElement("button");
+    b.className = "edTab";
+    b.type = "button";
+    b.setAttribute("aria-pressed", g === group ? "true" : "false");
+    b.textContent = title;
+    b.title = title + "  (" + (g === group ? "here" : "[ and ] walk the groups") + ")";
+    b.addEventListener("click", function () {
+      if (g === group) return;
+      ed.tool = edGroupTools(g)[0];
+      edPaint(); edHow();
     });
-    box.appendChild(wrap);
+    tabs.appendChild(b);
   });
+
+  var box = $("edTools");
+  box.innerHTML = "";
+  edGroupTools(group).forEach(function (i, n) {
+    var t = ED_TOOLS[i];
+    var b = document.createElement("button");
+    b.className = "edTool";
+    b.type = "button";
+    b.setAttribute("aria-pressed", i === ed.tool ? "true" : "false");
+    var pic = (t.act === "mob") ? monsterPortrait(t.v, 64) : null;
+    b.innerHTML = (pic ? '<img class="edToolPic" alt="" src="' + pic + '">'
+                       : '<i class="edSwatch" style="background:' + t.swatch + '"></i>') +
+                  "<span>" + t.name + "</span>" +
+                  ' <i class="edKey">' + (n + 1) + "</i>";
+    b.title = t.name + "  (" + (n + 1) + ")";
+    b.addEventListener("click", function () { ed.tool = i; edPaint(); edHow(); });
+    box.appendChild(b);
+  });
+
+  edBrushBar();
 }
 
 /* --- what goes down when you press space -------------------------- */
@@ -7761,19 +8101,19 @@ function edStamp(quiet) {
     /* ------------------------------------------------------------
        Pulling the ground up.
 
-       One gesture, not a tool and a separate setting. Tap it and you
-       get a sharp little mound; hold it and the ground keeps coming up
-       and the hill keeps spreading out, which is what "pulling a tile
-       up" ought to feel like when the input you have is a key rather
-       than a mouse. The slope length is not something to know about
-       and set - it is how long you held on.
+       A brush. Pick how wide it is, then run it over the ground -
+       press, hold, drag - and the floor comes up under it, sloping
+       away to meet whatever it was before. A brush of one is a chisel
+       and gives you a step; a brush of six lays a gradient so gentle
+       you can push a rock up it.
 
-       Once the middle is as high as the floor goes, holding on stops
-       raising and starts widening, so a long pull gives a broad hill
+       The width used to be decided by how long you held the key, which
+       nobody can guess and nobody can repeat on purpose. Once the
+       middle is as high as the floor goes, holding on stops raising
+       and starts widening, so a long pull still gives a broad hill
        rather than doing nothing.
        ------------------------------------------------------------ */
-    ed.liftN = (ed.liftN || 0) + 1;
-    var run = Math.min(5, 1 + ((ed.liftN - 1) >> 1));
+    var run = ed.brush;
     var moved = game.terrace(c, r, t.v, run);
     if (!moved) moved = game.relax(t.v > 0, run);   /* at the top: spread it */
     var grade = (Math.atan(0.55 / run) * 180 / Math.PI).toFixed(0);
@@ -7946,21 +8286,17 @@ function edShowMark() {
   if (mode !== "edit") return;
   worldOf(game.manC, game.manR, tmp);
   edCursor.position.set(tmp.x, tmp.y + 0.15, tmp.z);
+  /* a ground tool works over an area, so the cursor is that area */
+  var tl = ED_TOOLS[ed.tool];
+  var wide = (tl && tl.act === "hi") ? 1 + ed.brush * 2 : 1;
+  edCursor.scale.set(wide, 1, wide);
   /* amber on the floor, grey off it, so it is plain before you click
      that there is nothing there to build on */
   edCursor.material.color.setHex(game.inField(game.manC, game.manR) ? 0xffd27a : 0x7a7168);
 }
 
-function edGotIt() {
-  var save = MF.save.read() || {};
-  save.edClicks = (save.edClicks || 0) + 1;
-  if (save.edClicks <= 6) MF.save.write(save);   /* stop writing after that */
-  if (save.edClicks >= 6) $("edTop").classList.add("gotIt");
-}
-
 function edPointTo(x, y, andStamp) {
   if (mode !== "edit") return;
-  if (andStamp) edGotIt();
   var at = cellUnder(x, y);
   if (!at) return;
   edHover = at;
@@ -7976,23 +8312,58 @@ function edPointTo(x, y, andStamp) {
 (function () {
   var el = document.getElementById("gl");
   if (!el) return;
-  var down = false;
+  var down = false, lastX = 0, lastY = 0;
   el.addEventListener("pointermove", function (e) {
     if (mode !== "edit") return;
+    lastX = e.clientX; lastY = e.clientY;
     /* dragging with the button held paints, which is what anybody who
        has used any editor will try first */
     edPointTo(e.clientX, e.clientY, down);
   });
+  /* Held down, it keeps going.
+
+     The Put down BUTTON has always repeated while held, which is how
+     you grow a hill more than one step high. Clicking the square did
+     not - so "hold on Raise to grow a hill" was true of the button and
+     false of the thing it was telling you to click, which is worse
+     than saying nothing. It repeats on the square now, on the square
+     the pointer is actually over, so dragging while held walks the
+     hill along with you. */
+  var again = null;
+  function stop() {
+    down = false; edPainted = false;
+    if (again) { clearInterval(again); again = null; }
+  }
   el.addEventListener("pointerdown", function (e) {
     if (mode !== "edit") return;
     e.preventDefault();
+    if (el.setPointerCapture) { try { el.setPointerCapture(e.pointerId); } catch (err) {} }
     down = true;
     edPainted = false;
+    lastX = e.clientX; lastY = e.clientY;
     edPointTo(e.clientX, e.clientY, true);
+    if (again) clearInterval(again);
+    /* Only the tools where repeating means something. Raise and Lower
+       grow and shrink, so holding builds. Everything else either lays
+       one thing down or TOGGLES - and a toggle repeating seven times a
+       second just flaps the square on and off under your finger. */
+    if (ED_TOOLS[ed.tool] && ED_TOOLS[ed.tool].act === "hi") {
+      again = setInterval(function () {
+        if (!down || mode !== "edit") return stop();
+        edPointTo(lastX, lastY, true);
+      }, 140);
+    }
   });
   ["pointerup", "pointerleave", "pointercancel"].forEach(function (n) {
-    el.addEventListener(n, function () { down = false; edPainted = false; });
+    el.addEventListener(n, function () { stop(); });
   });
+  el.addEventListener("wheel", function (e) {
+    if (mode !== "edit") return;
+    var t = ED_TOOLS[ed.tool];
+    if (!t || t.act !== "hi") return;     /* only the tools it means anything for */
+    e.preventDefault();
+    edBrushTo(ed.brush + (e.deltaY < 0 ? 1 : -1));
+  }, { passive: false });
 })();
 
 /* --- opening and leaving ------------------------------------------ */
@@ -8004,7 +8375,8 @@ function edEnter(rec, back) {
   $("briefSheet").hidden = true; $("pauseSheet").hidden = true;
   $("edBar").hidden = false;
   $("edTop").hidden = false;
-  if (((MF.save.read() || {}).edClicks || 0) >= 6) $("edTop").classList.add("gotIt");
+  edHow();
+  resize();
   /* the game's HUD is about a run, and there is no run here */
   $("hud").hidden = true; plan.hidden = false; $("hint").hidden = true;
 
@@ -8075,6 +8447,7 @@ function edTestPlay() {
   var bad = MutantLevelFormat.faults(rec);
   if (bad.length) return edSay(bad.join(" &middot; "), "bad");
   ed.rec = rec;
+  setTimeout(resize, 0);
   $("edBar").hidden = true;
   $("edTop").hidden = true;
   $("hud").hidden = false;
@@ -8339,12 +8712,26 @@ addEventListener("keydown", function (e) {
       var here = ED_TOOLS[ed.tool] ? ED_TOOLS[ed.tool].group : 0;
       var inGroup = edGroupTools(here);
       var want = inGroup[parseInt(k, 10) - 1];
-      if (want !== undefined) { e.preventDefault(); ed.tool = want; edPaint(); }
+      if (want !== undefined) { e.preventDefault(); ed.tool = want; edPaint(); edHow(); }
       return;
     }
     if (k === "z" && (e.ctrlKey || e.metaKey)) {
       e.preventDefault();
       if (e.shiftKey) edStepBack(ed.redo, ed.undo); else edStepBack(ed.undo, ed.redo);
+      return;
+    }
+    /* the brush, on the two keys next to each other that nothing else
+       wanted, and on the wheel over the floor */
+    if (k === "v") {
+      e.preventDefault();
+      var at = 0;
+      ED_VIEWS.forEach(function (x, n) { if (x.key === ed.view) at = n; });
+      edViewTo(ED_VIEWS[(at + 1) % ED_VIEWS.length].key);
+      return;
+    }
+    if (k === "-" || k === "_" || k === "=" || k === "+") {
+      e.preventDefault();
+      edBrushTo(ed.brush + (k === "=" || k === "+" ? 1 : -1));
       return;
     }
     if (k === "[" || k === "]") {
@@ -8353,6 +8740,7 @@ addEventListener("keydown", function (e) {
       var to = (was + (k === "]" ? 1 : ED_GROUPS.length - 1)) % ED_GROUPS.length;
       ed.tool = edGroupTools(to)[0];
       edPaint();
+      edHow();
       edSay(ED_GROUPS[to]);
       return;
     }
@@ -8383,6 +8771,11 @@ addEventListener("blur", function () { held = {}; tapped = {}; if (mode === "pla
 
   /* the editor's buttons */
   if ($("build")) $("build").addEventListener("click", function () { edEnter(null); });
+  if ($("edMore")) $("edMore").addEventListener("click", function () {
+    var rest = $("edRest"), open = rest.hidden;
+    rest.hidden = !open;
+    $("edMore").setAttribute("aria-pressed", open ? "true" : "false");
+  });
   if ($("edName")) $("edName").addEventListener("input", function () {
     ed.dirty = true; edCount();
   });
@@ -8677,7 +9070,7 @@ function frame() {
   edShowMark();
 
   /* fade between playing light and building light (see edSun) */
-  var wantLit = (mode === "edit" && ed.wide) ? 1 : 0;
+  var wantLit = (mode === "edit" && ed.view !== "close") ? 1 : 0;
   if (edLit !== wantLit) {
     edLit += (wantLit - edLit) * (1 - Math.pow(0.002, dt));
     if (Math.abs(wantLit - edLit) < 0.004) edLit = wantLit;
@@ -8854,7 +9247,29 @@ function frame() {
     camPos.set(TITLE_AIM.x + Math.sin(a) * 12, 15.5, TITLE_AIM.z + 15.5 + Math.cos(a) * 3.5);
     camera.position.lerp(camPos, 1 - Math.pow(0.05, dt));
     camera.lookAt(TITLE_AIM);
-  } else if (mode === "edit" && ed.wide) {
+  } else if (mode === "edit" && ed.view === "plan") {
+    /* ------------------------------------------------------------
+       STRAIGHT DOWN
+
+       Drawing the outline of a room is a plan job. From three quarters
+       the far wall hides the back rows, a square you are cutting is
+       foreshortened to a sliver, and you cannot see the shape you are
+       actually making - which is the whole point of the exercise. From
+       directly overhead every square is the same size and square-on,
+       the outline reads as an outline, and clicking is exact.
+
+       Framed the same way as the room view - solved from the window
+       that is there - but with no lean, so nothing is hidden behind
+       anything and the whole floor is reachable.
+       ------------------------------------------------------------ */
+    camAim.set(COLS / 2, 0, ROWS / 2);
+    var halfP = Math.tan(camera.fov * Math.PI / 360);
+    var upFor = Math.max((COLS / 2 + 1) / (halfP * Math.max(0.25, camera.aspect)),
+                         (ROWS / 2 + 1) / halfP);
+    camPos.set(COLS / 2, upFor, ROWS / 2 + 0.01);   /* a hair off true vertical */
+    camera.position.lerp(camPos, 1 - Math.pow(0.004, dt));
+    camera.lookAt(camAim);
+  } else if (mode === "edit" && ed.view === "room") {
     /* ------------------------------------------------------------
        The editor looks at the ROOM, not over the man's shoulder.
 
