@@ -514,11 +514,12 @@
    result wiped it - and then nothing anywhere said the little figure
    was the pointer. */
 
-/* A whole line, and it wraps. It was one line with an ellipsis, which
-   is fine for a label and wrong for the only thing the editor has to
-   talk with: it cut its own sentences off mid-word - "about 6 degrees
-   (nothi..." - and the clipped half is always the half that says what
-   actually happened. */
+/* One line, and it clips - the header is a single row and stays one.
+   That puts the onus on what is said rather than on the room to say it
+   in: anything long enough to be cut off mid-word belongs where there
+   is space for it, which is why the automatic save says nothing at all
+   and the faults it used to recite are said by Test play and Publish
+   instead. */
 #edSay { color: #b3a691; flex: 1 1 0; min-width: 0;
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 #edSay .bad { color: #e0785c; }
@@ -538,6 +539,38 @@
 /* the picture of the cellar, drawn as squares rather than smeared */
 .edPic { width: 96px; height: 60px; object-fit: cover; border-radius: 3px;
   border: 1px solid #33291f; flex: 0 0 auto; background: #14110c; }
+#edPad { position: fixed; right: 12px; z-index: 41;
+  display: grid; grid-template-columns: repeat(3, 30px); grid-template-rows: repeat(3, 30px);
+  gap: 2px; padding: 4px; border-radius: 10px; border: 1px solid #3a2e22;
+  background: rgba(12,9,7,.80); backdrop-filter: blur(3px); }
+.edPadKey { padding: 0; border-radius: 6px; border: 1px solid transparent;
+  background: transparent; color: #b8ab99; display: inline-grid; place-items: center;
+  cursor: pointer; -webkit-tap-highlight-color: transparent; }
+.edPadKey svg { width: 16px; height: 16px; display: block; fill: none;
+  stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+.edPadKey:hover { background: #2a2016; border-color: #6b5640; color: #ffe6b8; }
+.edPadKey:active { background: #503c25; border-color: #b98c3e; color: #ffe6b8; }
+.edPadKey.up { grid-area: 1 / 2; }
+.edPadKey.left { grid-area: 2 / 1; }
+.edPadKey.mid { grid-area: 2 / 2; color: #7d7365; }
+.edPadKey.right { grid-area: 2 / 3; }
+.edPadKey.down { grid-area: 3 / 2; }
+
+#edOops { position: fixed; inset: 0; z-index: 60; display: grid; place-items: center;
+  padding: 20px; background: rgba(6,4,3,.62); backdrop-filter: blur(2px);
+  font-family: "IBM Plex Mono", ui-monospace, monospace; }
+.edOopsCard { position: relative; width: min(520px, 100%); max-height: 76vh;
+  overflow: auto; padding: 14px 16px 16px; border-radius: 10px;
+  background: #17120e; border: 1px solid #6b4636;
+  box-shadow: 0 18px 44px rgba(0,0,0,.66); }
+.edOopsActs { position: absolute; top: 8px; right: 9px; display: flex; gap: 2px; }
+.edOopsWhat { margin: 0 92px 8px 0; color: #e0785c; font-size: 11px;
+  letter-spacing: .14em; text-transform: uppercase; }
+/* the whole sentence, wrapped - which is the entire point of the window */
+#edOopsText { margin: 0; color: #efe4d2; font-size: 13px; line-height: 1.55;
+  white-space: pre-wrap; overflow-wrap: anywhere; }
+.edOopsSaid { margin: 10px 0 0; color: #8e8172; font-size: 11px; min-height: 1.2em; }
+
 #edCode { width: 100%; height: 110px; background: #14100c; color: #c9bba8;
   border: 1px solid #3a2e22; border-radius: 6px; padding: 8px; font-family: inherit;
   font-size: 11px; resize: vertical; }
@@ -684,6 +717,8 @@
             title="Redo" aria-label="Redo"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M12.9 7.4H6.8a3.6 3.6 0 0 0 0 7.2h2.8"/><path d="M10.1 4.3l3.2 3.1-3.2 3.1"/></svg></button>
     <button class="edIcon" id="edMore" type="button" aria-pressed="false"
             title="Zoom" aria-label="Zoom"><svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="7" cy="7" r="4.5"/><path d="M10.4 10.4 13.9 13.9M5.1 7h3.8"/></svg></button>
+    <button class="edIcon" id="edPublish" type="button"
+            title="Make it public" aria-label="Make it public"><svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6.3"/><path d="M1.8 8h12.4"/><path d="M8 1.7a10 10 0 0 1 0 12.6 10 10 0 0 1 0-12.6z"/></svg></button>
     <button class="edIcon" id="edBurger" type="button" aria-pressed="false"
             title="Everything else" aria-label="Everything else"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2.6 4.4h10.8M2.6 8h10.8M2.6 11.6h10.8"/></svg></button>
     <div id="edBurgerList" hidden>
@@ -709,11 +744,38 @@
      magnifier in the header now and drops down under it when asked -
      together with the handful of things you reach for once a session,
      which is what was behind that icon before. -->
+<!-- ====================================================================
+     SOMETHING TO PRESS
+
+     Panning had three gestures and every one of them was a secret: hold
+     a key nothing tells you about, drag with a button nothing tells you
+     about, or put two fingers on a screen you might not have. A cellar
+     four times the size of the window is most of the reason the editor
+     exists, and there was nothing on screen anywhere that said it could
+     be moved at all.
+
+     Four arrows and a middle, bottom right, over the corner of the room
+     furthest from the palette. The gestures all still work; this is the
+     one you find without being told. The middle puts the room back where
+     it started, which is the way out of being lost.
+     ==================================================================== -->
+<div id="edPad" hidden>
+  <button class="edPadKey up" id="edPadU" type="button"
+          title="Move up" aria-label="Move up"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3.6 10 8 5.6 12.4 10"/></svg></button>
+  <button class="edPadKey left" id="edPadL" type="button"
+          title="Move left" aria-label="Move left"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M10 3.6 5.6 8 10 12.4"/></svg></button>
+  <button class="edPadKey mid" id="edPadC" type="button"
+          title="Back to the middle" aria-label="Back to the middle"><svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="2.3"/><path d="M8 1.6v2.2M8 12.2v2.2M1.6 8h2.2M12.2 8h2.2"/></svg></button>
+  <button class="edPadKey right" id="edPadR" type="button"
+          title="Move right" aria-label="Move right"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M6 3.6 10.4 8 6 12.4"/></svg></button>
+  <button class="edPadKey down" id="edPadD" type="button"
+          title="Move down" aria-label="Move down"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3.6 6 8 10.4 12.4 6"/></svg></button>
+</div>
+
 <div id="edMenu" hidden>
   <div id="edZoom"></div>
   <div class="edRow" id="edRest">
-        <button class="edBtn" id="edShare" type="button">Code</button>
-        <button class="edBtn" id="edPublish" type="button">Publish</button>
+        <button class="edBtn" id="edShare" type="button">Share as text</button>
       </div>
 </div>
 
@@ -748,6 +810,36 @@
         <span id="edTints" hidden></span>
       </div>
     </div>
+  </div>
+</div>
+
+<!-- ====================================================================
+     WHERE SOMETHING GOING WRONG IS ALLOWED TO TAKE UP ROOM
+
+     Faults were reported in the status line, which is one row of a
+     header that must stay one row - so "there is nothing to pick up and
+     nowhere to put it" arrived as "there is nothi...", and the half it
+     showed was the half that said nothing. A window has room for the
+     whole sentence and can wait to be read.
+
+     Three things to do with it. Copy, because the text is worth more in
+     a message to somebody than on a screen you are about to close. Send,
+     which puts it in the log on the server where it can be looked at
+     alongside everybody else's. And close.
+     ==================================================================== -->
+<div id="edOops" hidden>
+  <div class="edOopsCard" role="alertdialog" aria-labelledby="edOopsText">
+    <div class="edOopsActs">
+      <button class="edIcon" id="edOopsCopy" type="button"
+              title="Copy it" aria-label="Copy it"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M5.6 5.6h7.2v7.8H5.6z"/><path d="M10.4 5.6V2.6H3.2v7.8h2.4"/></svg></button>
+      <button class="edIcon" id="edOopsSend" type="button"
+              title="Send it up" aria-label="Send it up"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M14 2 1.8 6.9l4.6 1.8L14 2z"/><path d="m14 2-6.2 12-1.4-5.3L14 2z"/></svg></button>
+      <button class="edIcon" id="edOopsShut" type="button"
+              title="Close" aria-label="Close"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8"/></svg></button>
+    </div>
+    <p class="edOopsWhat">That did not work</p>
+    <p id="edOopsText"></p>
+    <p class="edOopsSaid" id="edOopsSaid"></p>
   </div>
 </div>
 
@@ -6650,6 +6742,8 @@ function resize() {
   var box = viewBox();
   var zb = $("edMenu");
   if (zb) zb.style.top = (box.top + 6) + "px";
+  var pad = $("edPad");
+  if (pad) pad.style.bottom = (innerHeight - box.top - box.h + 12) + "px";
   /* How many tabs fit depends on the width, so it is worked out again
      when the width changes - but laying them out changes the height of
      the bar, which the observer notices, which calls this again. The
@@ -8635,7 +8729,7 @@ function edStepBack(stack, other) {
     edRigs(); syncTerrain(); syncEdges(); syncWorld(); drawPlan(); edCount(); edButtons();
     worldOf(game.manC, game.manR, manWant); manPos.copy(manWant);
     edSay("");
-  } catch (e) { edSay("could not go back: " + e.message, "bad"); }
+  } catch (e) { edOops("Could not go back a step.\n\n" + (e && e.stack || e)); }
 }
 
 function edButtons() {
@@ -10780,6 +10874,7 @@ function edEnter(rec, back) {
   $("edBar").hidden = false;
   $("edTop").hidden = false;
   $("edMenu").hidden = true;
+  $("edPad").hidden = false;
   /* through edViewTo, so the tool in your hand belongs to the view you
      are looking at. Opening straight onto ED_TOOLS[0] meant the editor
      started with Erase selected while the Blocks view was showing, and
@@ -10856,6 +10951,8 @@ function edSureToLose(what) {
 function edLeave() {
   if (!edSureToLose("Leave")) return;
   $("edBar").hidden = true;
+  $("edPad").hidden = true;
+  $("edMenu").hidden = true;
   $("edTop").hidden = true;
   $("edListSheet").hidden = true;
   $("edCodeSheet").hidden = true;
@@ -10904,7 +11001,8 @@ function edAsLevel(about) {
 function edTestPlay() {
   var rec = edAsLevel({ name: $("edName").value });
   var bad = MutantLevelFormat.faults(rec);
-  if (bad.length) return edSay(bad.join(" &middot; "), "bad");
+  if (bad.length) return edOops("This cellar cannot be played yet.\n\n" +
+                                bad.join("\n"));
   /* ==================================================================
      A TEST PLAY IS NOT A RUN
 
@@ -10931,6 +11029,8 @@ function edTestPlay() {
   ed.view = "things"; edDress();    /* a test play looks like the game */
   setTimeout(resize, 0);
   $("edBar").hidden = true;
+  $("edPad").hidden = true;
+  $("edMenu").hidden = true;
   $("edTop").hidden = true;
   $("hud").hidden = false;
   MutantLevelFormat.apply(game, rec);
@@ -11089,11 +11189,12 @@ function edSave(quiet) {
     created: ed.created || Date.now(), edited: Date.now()
   };
   vaultPut("levels", id, row).then(function (r) {
-    if (!r || !r.ok) return edSay("this browser would not keep it" + (r && r.full ? " - it is out of room" : ""), "bad");
+    if (!r || !r.ok) return edOops("This browser would not keep the cellar" +
+      (r && r.full ? " - it has run out of room for stored data." : ".") +
+      "\n\nUse the Code button to take a copy of it somewhere safe.");
     ed.id = id; ed.dirty = false;
     edCount();
-    if (quiet) return edSay(bad.length ? "saved - but " + bad.join("; ") : "saved",
-                            bad.length ? "bad" : "");
+    if (quiet) return;
     var g = MutantCatalogue.gate({ id: "local", reached: 99, paid: false, played: {} }, Date.now());
     edSay("saved" + (bad.length ? " - but " + bad.join("; ") : "") +
           (g.beta ? " &middot; beta cellars may not survive to release - use Code to keep one" : ""),
@@ -11167,15 +11268,19 @@ function edLoadCode() {
 /* --- publishing --------------------------------------------------- */
 function edPublish() {
   if (!ed.id) return edSay("save it first", "bad");
+  var faults = MutantLevelFormat.faults(edAsLevel({ name: $("edName").value }));
+  if (faults.length) return edOops("This cellar cannot be published yet.\n\n" +
+                                   faults.join("\n"));
   var save = MF.save.read() || {};
   var g = MutantCatalogue.gate({ id: "local", reached: save.deepest || 1,
                                  paid: false, played: {} }, Date.now());
   /* the editor opens early in the beta; the door out of it does not */
-  if (!g.canPublish) return edSay(g.publishNeeds + " - it is saved here, and the Code button will send it to anybody", "bad");
+  if (!g.canPublish) return edOops(g.publishNeeds +
+    "\n\nIt is saved here either way, and the Code button will send it to anybody.");
   edSay("sending it up...");
   catalogueSend(ed).then(function (r) {
     if (r.ok) { ed.state = "public"; ed.everPublic = true; edSay("published - other people can find it now", "good"); }
-    else edSay(r.why, "bad");
+    else edOops(r.why);
   });
 }
 
@@ -11186,6 +11291,99 @@ function catalogueSend() {
   return Promise.resolve({ ok: false, why: navigator.onLine
     ? "the catalogue is not switched on yet - your cellar is saved here, and the Code button will send it to anybody"
     : "no connection - your cellar is saved here, and the Code button will send it to anybody" });
+}
+
+/* ====================================================================
+   SAYING SO PROPERLY
+
+   edSay is for the running commentary - what you just put down, which
+   side you just picked. It is one line and it clips, and that is right
+   for a line nobody has to read. edOops is for the other kind: the ones
+   worth stopping over, which are always the long ones, and which used
+   to be the ones that got cut in half.
+   ==================================================================== */
+var edOopsText = "";
+
+function edOops(text) {
+  var el = $("edOops");
+  /* the entities and tags edSay is written in are for a line of HTML,
+     and this is a paragraph of plain words */
+  var flat = String(text == null ? "" : text)
+    .replace(/&middot;/g, "\u00b7").replace(/&mdash;/g, "\u2014")
+    .replace(/&amp;/g, "&").replace(/<[^>]*>/g, "").trim();
+  if (!el) return edSay(flat, "bad");
+  edOopsText = flat;
+  edOopsId = "";
+  $("edOopsText").textContent = flat;
+  $("edOopsSaid").textContent = "";
+  el.hidden = false;
+  var shut = $("edOopsShut");
+  if (shut && shut.focus) try { shut.focus(); } catch (e) {}
+  return flat;
+}
+
+function edOopsShut() { if ($("edOops")) $("edOops").hidden = true; }
+
+/* ====================================================================
+   SENDING IT UP
+
+   The same text, in the log on the server, where one person's fault can
+   be read next to everybody else's - which is the only way to tell a
+   thing that happened once from a thing that happens to everyone.
+
+   The id is made here rather than there, so pressing Send twice on the
+   same window puts one row in the log and not two: the server keeps the
+   first and ignores the rest, the way it does with plays. Sent with no
+   signature and no name attached; what goes up is the sentence, the
+   page it happened on and which cellar was open, and nothing else.
+   ==================================================================== */
+var edOopsId = "";
+function edOopsSend() {
+  var said = $("edOopsSaid");
+  if (!edOopsText) return;
+  if (said) said.textContent = "sending...";
+  if (!edOopsId) edOopsId = newId();
+  var body = {
+    id: edOopsId,
+    text: edOopsText,
+    page: location.pathname + " " + navigator.userAgent,
+    level: ed.id || ""
+  };
+  fetch("/api/report", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(body)
+  }).then(function (r) {
+    return r.json().catch(function () { return { ok: r.ok }; });
+  }).then(function (r) {
+    if (said) said.textContent = (r && r.ok)
+      ? "sent - thank you"
+      : "could not send it" + (r && r.why ? ": " + r.why : "") +
+        " - Copy takes it instead";
+  }).catch(function () {
+    if (said) said.textContent =
+      "could not send it - no connection. Copy takes it instead";
+  });
+}
+
+function edOopsCopy() {
+  var said = $("edOopsSaid");
+  function ok() { if (said) said.textContent = "copied"; }
+  function no() { if (said) said.textContent = "this browser would not let go of it"; }
+  if (navigator.clipboard && navigator.clipboard.writeText)
+    return navigator.clipboard.writeText(edOopsText).then(ok, no);
+  /* the old way, for a browser without the clipboard API or a page that
+     is not allowed to use it */
+  try {
+    var ta = document.createElement("textarea");
+    ta.value = edOopsText;
+    ta.style.position = "fixed"; ta.style.opacity = "0";
+    document.body.appendChild(ta);
+    ta.select();
+    var went = document.execCommand("copy");
+    document.body.removeChild(ta);
+    went ? ok() : no();
+  } catch (e) { no(); }
 }
 
 /* --- the vault, wrapped so the editor need not care --------------- */
@@ -11348,6 +11546,54 @@ addEventListener("blur", function () { held = {}; tapped = {}; if (mode === "pla
 
   /* the editor's buttons */
   if ($("build")) $("build").addEventListener("click", function () { edList(); });
+  /* the whole overlay is a way out, the way every dialog is */
+  if ($("edOops")) $("edOops").addEventListener("click", function (e) {
+    if (e.target === $("edOops")) edOopsShut();
+  });
+  /* ==================================================================
+     AND THE ONES NOBODY MEANT
+
+     A fault the editor knows about it can describe. One it does not know
+     about used to go to the console, where it is seen by nobody at all -
+     the screen simply stopped responding and there was nothing anywhere
+     to say why. Caught here, it goes in the same window as the rest,
+     with the stack, which is the part worth sending up.
+     ================================================================== */
+  addEventListener("error", function (e) {
+    if (mode !== "edit") return;
+    edOops("Something went wrong that the editor was not expecting.\n\n" +
+           ((e.error && e.error.stack) || e.message || "no message") +
+           (e.filename ? "\n" + e.filename + ":" + e.lineno : ""));
+  });
+  addEventListener("unhandledrejection", function (e) {
+    if (mode !== "edit") return;
+    var r = e.reason;
+    edOops("Something went wrong that the editor was not expecting.\n\n" +
+           ((r && r.stack) || (r && r.message) || String(r)));
+  });
+
+  /* held down, it keeps going - a room four sheets wide is a lot of
+     separate presses otherwise */
+  [["edPadU", 0, 1], ["edPadD", 0, -1], ["edPadL", -1, 0], ["edPadR", 1, 0]]
+    .forEach(function (k) {
+      var b = $(k[0]);
+      if (!b) return;
+      var timer = null, step = 4;
+      var go = function () { edPanBy(k[1] * step, k[2] * step); };
+      b.addEventListener("pointerdown", function (e) {
+        e.preventDefault();
+        go();
+        timer = setInterval(go, 110);
+      });
+      ["pointerup", "pointerleave", "pointercancel"].forEach(function (n) {
+        b.addEventListener(n, function () { clearInterval(timer); timer = null; });
+      });
+    });
+  if ($("edPadC")) $("edPadC").addEventListener("click", function () {
+    ed.panX = null; ed.panZ = null;
+    edSay("back to the middle of the room");
+  });
+
   if ($("edUp")) $("edUp").addEventListener("click", function () { edRowStep(-1); });
   if ($("edDown")) $("edDown").addEventListener("click", function () { edRowStep(1); });
   if ($("edFold")) $("edFold").addEventListener("click", function () {
@@ -11418,7 +11664,8 @@ addEventListener("blur", function () { held = {}; tapped = {}; if (mode === "pla
       if (mode !== "edit") $("titleSheet").hidden = false;
     },
     edCodeClose: function () { $("edCodeSheet").hidden = true; },
-    edPaste: edLoadCode
+    edPaste: edLoadCode,
+    edOopsCopy: edOopsCopy, edOopsSend: edOopsSend, edOopsShut: edOopsShut
   };
   for (var wk in edWire) (function (id, fn) {
     var el = $(id); if (el) el.addEventListener("click", fn);
