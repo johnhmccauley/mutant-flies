@@ -282,8 +282,9 @@
 .edNothing { color: #6f6456; font-size: 11px; padding: 4px 2px; }
 
 /* how wide the ground tools work */
-#edBrush { display: flex; gap: 3px; align-items: center; margin-left: 4px;
+#edBrush, #edZoom { display: flex; gap: 3px; align-items: center; margin-left: 4px;
   padding-left: 9px; border-left: 1px solid #372c21; }
+.edZoomDot { width: auto; min-width: 22px; padding: 0 4px; }
 #edBrush .edBrushName { color: #7d7365; font-size: 10px; letter-spacing: .1em;
   text-transform: uppercase; margin-right: 2px; }
 .edBrushDot { background: #1d1712; border: 1px solid #372c21; color: #b8ab99;
@@ -498,6 +499,7 @@
   <div class="edRow">
     <div id="edTools"></div>
     <span id="edBrush" hidden></span>
+    <span id="edZoom"></span>
   </div>
   <div class="edRow">
     <input type="text" id="edName" maxlength="48" placeholder="Name this cellar" spellcheck="false">
@@ -7834,7 +7836,7 @@ var ed = {
      is the cursor, so without this the starting square was wherever the
      builder happened to leave him when they stopped building - which
      was almost never where they meant the player to begin. */
-  startC: 4, startR: 4, brush: 2, poly: [], polyWall: [], polyShut: false, dragNode: -1, picked: [], band: null, testing: false,
+  startC: 4, startR: 4, brush: 2, poly: [], polyWall: [], polyShut: false, dragNode: -1, picked: [], band: null, zoom: 1, testing: false,
   /* The single most important thing an editor has, and the first
      version did not have it: somewhere to put the last forty things you
      did so you can take one of them back. Whole cellars, because a
@@ -8312,6 +8314,58 @@ function edPolyDraw() {
 var BRUSH_MIN = 1, BRUSH_MAX = 6;
 
 /* ====================================================================
+   ZOOM
+
+   The editor's views frame the whole room, which is right when you are
+   deciding where things go and wrong when you are placing one brick
+   against another - at that distance a square is a few pixels and the
+   difference between the square you meant and the one next to it is a
+   flick of the wrist. And the bigger a room gets the worse that is.
+
+   So the framing is solved as before and then divided by this. Below
+   one, the camera stands off and the room sits smaller in the frame
+   with air round it - useful for seeing a big level whole. Above one it
+   moves in, and because it can then no longer see everything it follows
+   the cursor, so walking or pointing pans the view and there is no
+   separate thing to learn about panning.
+   ==================================================================== */
+var ZOOMS = [0.5, 0.7, 1, 1.5, 2, 3];
+
+function edZoomBar() {
+  var el = $("edZoom");
+  if (!el) return;
+  el.innerHTML = '<span class="edBrushName">zoom</span>';
+  ZOOMS.forEach(function (z) {
+    var b = document.createElement("button");
+    b.className = "edBrushDot edZoomDot";
+    b.type = "button";
+    b.setAttribute("aria-pressed", z === ed.zoom ? "true" : "false");
+    b.textContent = (z === 1) ? "1" : (z < 1 ? z.toFixed(1).replace("0.", ".") : z + "\u00d7");
+    b.title = z < 1 ? "stand back - see a big level whole"
+                    : z > 1 ? "move in - the view follows the cursor"
+                            : "the whole room";
+    b.addEventListener("click", function () { edZoomTo(z); });
+    el.appendChild(b);
+  });
+}
+
+function edZoomTo(z) {
+  var near = ZOOMS[0];
+  ZOOMS.forEach(function (x) { if (Math.abs(x - z) < Math.abs(near - z)) near = x; });
+  ed.zoom = near;
+  edZoomBar();
+  edSay(near === 1 ? "the whole room"
+                   : near < 1 ? "standing back"
+                              : "moved in \u2014 the view follows the cursor");
+}
+
+function edZoomStep(by) {
+  var at = ZOOMS.indexOf(ed.zoom);
+  if (at < 0) at = 2;
+  edZoomTo(ZOOMS[Math.max(0, Math.min(ZOOMS.length - 1, at + by))]);
+}
+
+/* ====================================================================
    THREE WAYS TO LOOK AT IT
 
    One camera cannot do all three jobs. Building the middle of a room
@@ -8512,6 +8566,7 @@ function edPaint() {
   });
 
   edBrushBar();
+  edZoomBar();
 }
 
 /* --- what goes down when you press space -------------------------- */
@@ -8749,6 +8804,12 @@ function edCount() {
    height, because a raised square is nearer the camera and the first
    answer is wrong by however high it stands.
    ==================================================================== */
+/* Its own vector. The room camera builds its lean out of the shared
+   `tmp`, so following the cursor through `tmp` overwrote the lean with
+   the aim point and then normalised THAT - the camera folded to the
+   floor and nothing could be clicked. A borrowed scratch vector is
+   fine until two things borrow it in the same breath. */
+var _aimAt = new THREE.Vector3();
 var _ray = new THREE.Raycaster();
 var _ndc = new THREE.Vector2();
 var _hit = new THREE.Vector3();
@@ -8940,10 +9001,10 @@ function edPointTo(x, y, andStamp) {
   });
   el.addEventListener("wheel", function (e) {
     if (mode !== "edit") return;
-    var t = ED_TOOLS[ed.tool];
-    if (!t || t.act !== "hi") return;     /* only the tools it means anything for */
     e.preventDefault();
-    edBrushTo(ed.brush + (e.deltaY < 0 ? 1 : -1));
+    var t = ED_TOOLS[ed.tool];
+    if (t && t.act === "hi") edBrushTo(ed.brush + (e.deltaY < 0 ? 1 : -1));
+    else edZoomStep(e.deltaY < 0 ? 1 : -1);
   }, { passive: false });
 })();
 
@@ -9383,9 +9444,15 @@ addEventListener("keydown", function (e) {
     if (k === "escape" && ed.poly.length && !ed.polyShut) { e.preventDefault(); edPolyDrop(); return; }
     if (k === "-" || k === "_" || k === "=" || k === "+") {
       e.preventDefault();
-      edBrushTo(ed.brush + (k === "=" || k === "+" ? 1 : -1));
+      /* the ground tools own these keys while one is in your hand,
+         because the brush is what you are adjusting then */
+      var gt = ED_TOOLS[ed.tool];
+      var up = (k === "=" || k === "+");
+      if (gt && gt.act === "hi") edBrushTo(ed.brush + (up ? 1 : -1));
+      else edZoomStep(up ? 1 : -1);
       return;
     }
+    if (k === "0") { e.preventDefault(); edZoomTo(1); return; }
     if (k === "[" || k === "]") {
       e.preventDefault();
       var was = 0;
@@ -9917,8 +9984,10 @@ function frame() {
     camAim.set(COLS / 2, 0, ROWS / 2);
     var halfP = Math.tan(camera.fov * Math.PI / 360);
     var upFor = Math.max((COLS / 2 + 1) / (halfP * Math.max(0.25, camera.aspect)),
-                         (ROWS / 2 + 1) / halfP);
-    camPos.set(COLS / 2, upFor, ROWS / 2 + 0.01);   /* a hair off true vertical */
+                         (ROWS / 2 + 1) / halfP) / ed.zoom;
+    if (ed.zoom > 1)
+      camAim.lerp(_aimAt.set(game.manC + 0.5, 0, ROWS - 1 - game.manR + 0.5), 0.85);
+    camPos.set(camAim.x, upFor, camAim.z + 0.01);   /* a hair off true vertical */
     camera.position.lerp(camPos, 1 - Math.pow(0.004, dt));
     camera.lookAt(camAim);
   } else if (mode === "edit" && edViewNow().cam === "room") {
@@ -9953,7 +10022,10 @@ function frame() {
     var tilt = Math.atan2(lean.y, lean.z);
     var forWide = (COLS / 2 + 1.5) / (half * Math.max(0.25, camera.aspect));
     var forDeep = (ROWS * Math.sin(tilt) / 2 + 1.5) / half;
-    camPos.copy(camAim).add(lean.normalize().multiplyScalar(Math.max(forWide, forDeep)));
+    /* moved in, it cannot see the whole room, so it follows the cursor */
+    if (ed.zoom > 1)
+      camAim.lerp(_aimAt.set(game.manC + 0.5, 0, ROWS - 1 - game.manR + 0.5), 0.85);
+    camPos.copy(camAim).add(lean.normalize().multiplyScalar(Math.max(forWide, forDeep) / ed.zoom));
     camera.position.lerp(camPos, 1 - Math.pow(0.004, dt));
     camera.lookAt(camAim);
   } else {
