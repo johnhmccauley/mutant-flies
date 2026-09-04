@@ -33,6 +33,30 @@ const MAX_BODY = 8000;                  /* a level packs to ~1.9k; this is slack
 const MAX_NAME = 48;
 const MAX_THUMB = 60000;                /* a 384x240 jpeg of a dark room, with room to spare */
 const PAGE = 50;
+
+/* ------------------------------------------------------------------
+   WHEN THE BETA ENDS
+
+   The first of January 2027, midnight Central Time - which is six in
+   the morning UTC, because Central is six hours behind in January and
+   is not on daylight saving then. Written out as UTC rather than as a
+   zone name so it means one instant and not an argument.
+
+   A date rather than a switch, because a switch has to be remembered
+   and a date does not, and because a date can be SAID: the game shows
+   it, so nobody is charged for something they did not see coming. Set
+   BETA_UNTIL to move it without shipping any code.
+   ------------------------------------------------------------------ */
+const BETA_ENDS = Date.UTC(2027, 0, 1, 6, 0, 0);
+
+function betaEnds(env) {
+  if (env && env.BETA_UNTIL) {
+    const t = Date.parse(env.BETA_UNTIL);
+    if (isFinite(t)) return t;
+  }
+  return BETA_ENDS;
+}
+function inBeta(env, now) { return now < betaEnds(env); }
 const ROYALTY = 2;                      /* must match src/credits.js */
 const PODIUM = [
   { place: "gold", award: 1000 },
@@ -275,11 +299,11 @@ export async function whoIsThis(db, req, path, rawBody, now) {
 /* ------------------------------------------------------------------
    THE BETA
 
-   While OPEN_BETA is on, everything is free - and everybody who turns
-   up while it is on is quietly given a permanent entitlement, keyed on
-   their own player id. So the day it is switched off, every player who
-   was there beforehand keeps everything they had, without being asked
-   for anything and without anybody having to remember to do it.
+   Until the date above, everything is free - and everybody who turns up
+   before it is quietly given a permanent entitlement, keyed on their
+   own player id. So on the morning the beta ends, every player who was
+   there beforehand keeps everything they had, without being asked for
+   anything and without anybody having to remember to do it.
 
    That is the whole reason it is done this way round rather than as a
    flag that simply opens the gates. A flag opens the gates and then
@@ -296,7 +320,7 @@ async function hasPaid(db, playerId, env, now) {
   const row = await db.prepare("SELECT 1 AS ok FROM claims WHERE player_id = ?")
     .bind(playerId).first();
   if (row) return true;
-  if (!env || String(env.OPEN_BETA || "") !== "1") return false;
+  if (!inBeta(env, now || 0)) return false;
 
   /* here during the beta: let them in, and give them the key */
   const key = "beta:" + playerId;
@@ -541,6 +565,8 @@ export async function handle(req, env, ctx) {
       .bind(who.id).all()).results || [];
     return json({ id: who.id, paid, name: called ? called.name : null,
                   authorId: called ? called.uuid : null,
+                  /* said out loud, so the game can say it too */
+                  beta: inBeta(env, now), betaUntil: betaEnds(env),
                   levels: mine.map(publicShape) });
   }
 
@@ -870,4 +896,4 @@ export async function storeHook(req, env, provider) {
 /* kept under its old name because that is what the route is called */
 export function stripeHook(req, env) { return storeHook(req, env, "stripe"); }
 
-export const _test = { appKeyOk };
+export const _test = { appKeyOk, betaEnds, inBeta, BETA_ENDS };

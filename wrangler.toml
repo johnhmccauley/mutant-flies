@@ -33,11 +33,13 @@ simple = { limit = 120, period = 60 }
 # SECRETS, none of which belong in this file. Set each with
 #   wrangler secret put NAME
 #
-#   OPEN_BETA              "1" while the game is free to everybody. Every
-#                          player who turns up while it is on is given a
-#                          permanent entitlement as they go, so switching
-#                          it off never takes anything away from anybody
-#                          who was already here.
+#   BETA_UNTIL             optional. The beta ends on 1 January 2027 at
+#                          midnight Central without setting anything;
+#                          this moves that date without shipping code.
+#                          Every player who turns up before it is given a
+#                          permanent entitlement as they go, so the end
+#                          of the beta never takes anything away from
+#                          anybody who was already here.
 #   APP_KEYS               comma separated, so one can be rotated while
 #                          browsers still hold the old page. Leave it
 #                          unset and the check is off, which is what a

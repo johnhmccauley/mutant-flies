@@ -41,6 +41,12 @@ function lvl(id, opts) {
 }
 const order = (list, by) => C.sortLevels(list, by).map((r) => r.id);
 
+/* The beta is free to everybody until the first of January 2027, so
+   every test about who may do what has to say WHEN it is asking. These
+   two are either side of that morning. */
+const IN_BETA = Date.UTC(2026, 5, 1);
+const AFTER = Date.UTC(2027, 0, 2);
+
 console.log("\nThe order things come in\n");
 {
   const a = lvl("a", { avg: 5 }), b = lvl("b", { avg: 3 }), c = lvl("c", { avg: 4 });
@@ -175,17 +181,17 @@ const cid = { id: "cid", reached: 9, paid: false, played: {} };
 {
   const r = lvl("r", { state: C.PUBLIC, owner: "amy" });
   ok("other people's levels are for paying players",
-     [C.canPlay(r, bob), C.canPlay(r, cid)], [true, false]);
+     [C.canPlay(r, bob, AFTER), C.canPlay(r, cid, AFTER)], [true, false]);
   /* and so are your own. The dollar is what buys the editor, so an
      author who has not paid is one who has lost their key and started
      again on a new machine - and they are back to the five free cellars
      like anybody else until they paste their recovery code in. */
   ok("including the author's own, if the money is not there",
-     C.canPlay(r, { id: "amy", reached: 9, paid: false, played: {} }), false);
+     C.canPlay(r, { id: "amy", reached: 9, paid: false, played: {} }, AFTER), false);
 }
 {
   const r = lvl("r", { state: C.PUBLIC, owner: "amy" });
-  ok("only the author may edit", [C.canEdit(r, amy), C.canEdit(r, bob)], [true, false]);
+  ok("only the author may edit", [C.canEdit(r, amy, AFTER), C.canEdit(r, bob, AFTER)], [true, false]);
 }
 
 console.log("\nStars\n");
@@ -211,29 +217,29 @@ console.log("\nStars\n");
 
 console.log("\nWhat a dollar buys\n");
 {
-  const early = C.gate({ id: "a", reached: 4, paid: false });
+  const early = C.gate({ id: "a", reached: 4, paid: false }, AFTER);
   ok("cellars one to four say nothing about any of it",
      [early.editorShown, early.catalogueShown], [false, false]);
 }
 {
-  const early = C.gate({ id: "a", reached: 4, paid: true });
+  const early = C.gate({ id: "a", reached: 4, paid: true }, AFTER);
   ok("and not even if you have paid - it is the fifth that opens it",
      [early.editorShown, early.catalogueShown], [false, false]);
 }
 {
-  const free = C.gate({ id: "a", reached: 5, paid: false });
+  const free = C.gate({ id: "a", reached: 5, paid: false }, AFTER);
   ok("at the fifth both appear, and neither works",
      [free.editorShown, free.editorEnabled, free.catalogueShown, free.cataloguePlayable],
      [true, false, true, false]);
-  ok("and the descent stops there", [C.canDescend({ paid: false }, 5), C.canDescend({ paid: false }, 6)],
+  ok("and the descent stops there", [C.canDescend({ paid: false }, 5, AFTER), C.canDescend({ paid: false }, 6, AFTER)],
      [true, false]);
 }
 {
-  const paid = C.gate({ id: "a", reached: 5, paid: true });
+  const paid = C.gate({ id: "a", reached: 5, paid: true }, AFTER);
   ok("a dollar turns all four on",
      [paid.editorShown, paid.editorEnabled, paid.catalogueShown, paid.cataloguePlayable],
      [true, true, true, true]);
-  ok("and lets the descent carry on", C.canDescend({ paid: true }, 400), true);
+  ok("and lets the descent carry on", C.canDescend({ paid: true }, 400, AFTER), true);
 }
 {
   /* a free player browses the whole catalogue and opens none of it -
@@ -241,19 +247,52 @@ console.log("\nWhat a dollar buys\n");
   const r = lvl("r", { state: C.PUBLIC, owner: "amy" });
   const looker = { id: "zoe", reached: 9, paid: false, played: {} };
   ok("a free player can see a level but not play it",
-     [C.visibleTo(r, looker), C.canPlay(r, looker)], [true, false]);
+     [C.visibleTo(r, looker), C.canPlay(r, looker, AFTER)], [true, false]);
   const owner = { id: "amy", reached: 9, paid: false, played: {} };
   ok("and cannot play their own either once the money has lapsed",
-     C.canPlay(r, owner), false);
-  ok("nor edit it", C.canEdit(r, owner), false);
-  ok("nor make a new one", C.canCreate(owner), false);
+     C.canPlay(r, owner, AFTER), false);
+  ok("nor edit it", C.canEdit(r, owner, AFTER), false);
+  ok("nor make a new one", C.canCreate(owner, AFTER), false);
 }
 {
   const owner = { id: "amy", reached: 9, paid: true, played: {} };
   const r = lvl("r", { state: C.PRIVATE, owner: "amy", everPublic: false });
-  ok("a paid author may make and edit", [C.canCreate(owner), C.canEdit(r, owner)], [true, true]);
+  ok("a paid author may make and edit", [C.canCreate(owner, AFTER), C.canEdit(r, owner, AFTER)], [true, true]);
   const tooEarly = { id: "amy", reached: 3, paid: true, played: {} };
-  ok("but not before the fifth cellar", C.canCreate(tooEarly), false);
+  ok("but not before the fifth cellar", C.canCreate(tooEarly, AFTER), false);
+}
+
+console.log("\nThe beta\n");
+{
+  /* until the first of January 2027 everything is open, whoever you are */
+  const nobody = { id: "zoe", reached: 9, paid: false, played: {} };
+  const g = C.gate(nobody, IN_BETA);
+  ok("during the beta the whole game is open to everybody",
+     [g.editorEnabled, g.cataloguePlayable, g.canDescendTo, g.beta],
+     [true, true, null, true]);
+}
+{
+  const nobody = { id: "zoe", reached: 9, paid: false, played: {} };
+  const g = C.gate(nobody, AFTER);
+  ok("and after it, it is not",
+     [g.editorEnabled, g.cataloguePlayable, g.canDescendTo, g.beta],
+     [false, false, 5, false]);
+}
+{
+  /* somebody who played in the beta was given a key on the way past,
+     so they are simply paid afterwards */
+  const was = { id: "amy", reached: 9, paid: true, played: {} };
+  ok("but somebody who was there keeps it", C.gate(was, AFTER).editorEnabled, true);
+}
+{
+  ok("and the date is the same one the catalogue server uses",
+     new Date(C.BETA_ENDS).toISOString(), "2027-01-01T06:00:00.000Z");
+}
+{
+  /* a caller who forgets to say when gets the strict answer */
+  const nobody = { id: "zoe", reached: 9, paid: false, played: {} };
+  ok("asking without saying when does not quietly open the gates",
+     typeof C.gate(nobody).editorEnabled, "boolean");
 }
 
 console.log("\n" + pass + " passed, " + fail + " failed");

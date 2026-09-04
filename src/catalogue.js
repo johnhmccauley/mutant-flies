@@ -43,9 +43,24 @@
      ------------------------------------------------------------------ */
   var FREE_CELLARS = 5, EDITOR_AT = 5;
 
-  function gate(who) {
+  /* The first of January 2027, midnight Central - six in the morning
+     UTC, Central being six hours behind in January. The same instant
+     the server uses, said in the same way, so the game and the
+     catalogue never disagree about whether the beta is over. */
+  var BETA_ENDS = Date.UTC(2027, 0, 1, 6, 0, 0);
+  function inBeta(now) {
+    /* A caller who forgets to say when gets the real clock, not nought.
+       Defaulting to nought would have meant "before 2027, so free", and
+       every gate in the game would have quietly stood open for anybody
+       who called it the short way. */
+    return (now === undefined ? Date.now() : now) < BETA_ENDS;
+  }
+
+  function gate(who, now) {
     var reached = who.reached || 1;
-    var paid = !!who.paid;
+    /* everything is open until the beta ends, and everybody who played
+       in it keeps what they had - the server hands out the key */
+    var paid = !!who.paid || inBeta(now);
     return {
       freeCellars: FREE_CELLARS,
       /* the editor is in the menu from here, working or not */
@@ -56,11 +71,13 @@
       cataloguePlayable: paid,
       /* and the descent itself stops at the fifth cellar */
       canDescendTo: paid ? Infinity : FREE_CELLARS,
-      paid: paid
+      paid: paid,
+      beta: inBeta(now),
+      betaEnds: BETA_ENDS
     };
   }
 
-  function canDescend(who, cellar) { return cellar <= gate(who).canDescendTo; }
+  function canDescend(who, cellar, now) { return cellar <= gate(who, now).canDescendTo; }
 
   /* ------------------------------------------------------------------
      Stars, and what to sort on.
@@ -147,9 +164,9 @@
   /* Seeing a level in the list is not the same as being able to open
      it. A free player browses the whole catalogue and plays none of it,
      including - since making one needs the editor - their own. */
-  function canPlay(rec, who) {
+  function canPlay(rec, who, now) {
     if (!visibleTo(rec, who)) return false;
-    return !!who.paid;
+    return !!who.paid || inBeta(now);
   }
 
   /* --------------------------------------------------------------
@@ -160,11 +177,11 @@
      some of them still have it. Hiding is the way back, not deleting.
      -------------------------------------------------------------- */
   function canDelete(rec) { return rec.state === PRIVATE && !rec.everPublic; }
-  function canEdit(rec, who) {
+  function canEdit(rec, who, now) {
     if (!rec.owner || rec.owner !== who.id) return false;
-    return gate(who).editorEnabled;
+    return gate(who, now).editorEnabled;
   }
-  function canCreate(who) { return gate(who).editorEnabled; }
+  function canCreate(who, now) { return gate(who, now).editorEnabled; }
 
   var MOVES = {};
   MOVES[PRIVATE] = [PUBLIC];
@@ -209,6 +226,7 @@
   root.MutantCatalogue = {
     PRIVATE: PRIVATE, PUBLIC: PUBLIC, HIDDEN: HIDDEN,
     FREE_CELLARS: FREE_CELLARS, EDITOR_AT: EDITOR_AT,
+    BETA_ENDS: BETA_ENDS, inBeta: inBeta,
     gate: gate, canDescend: canDescend, canCreate: canCreate,
     stars: stars, rank: rank, plays: plays, sortLevels: sortLevels, SORTS: SORTS,
     PRIOR: PRIOR, PRIOR_WEIGHT: PRIOR_WEIGHT,

@@ -68,8 +68,12 @@ function freshDb() {
     return who;
   }
 
+  /* Most of these tests are about who has PAID, so they run after the
+     beta is over - otherwise everybody is entitled and there is nothing
+     to test. The beta gets its own section, which sets its own date. */
   function makeEnv(db, now) {
-    return { DB: db.DB, NOW: () => now, EMAIL_SALT: "pepper" };
+    return { DB: db.DB, NOW: () => now, EMAIL_SALT: "pepper",
+             BETA_UNTIL: "2020-01-01T00:00:00Z" };
   }
 
   /* a level now carries a uuid made where the level was made, so the
@@ -847,8 +851,9 @@ function freshDb() {
   {
     const d = freshDb();
     const amy = await player();
-    const beta = { DB: d.DB, NOW: () => 1700000000000, EMAIL_SALT: "pepper", OPEN_BETA: "1" };
-    const paid = { DB: d.DB, NOW: () => 1700000000000, EMAIL_SALT: "pepper" };
+    /* the same clock either side of the morning the beta ends */
+    const beta = { DB: d.DB, NOW: () => Date.UTC(2026, 5, 1), EMAIL_SALT: "pepper" };
+    const paid = { DB: d.DB, NOW: () => Date.UTC(2027, 0, 2), EMAIL_SALT: "pepper" };
     const callIn = async (env, method, p2, body) => {
       const n = await api.handle(new Request(ORIGIN + "/api/nonce"), env, null);
       const { nonce } = await n.json();
@@ -861,11 +866,14 @@ function freshDb() {
       return { status: res.status, body: await res.json() };
     };
 
-    ok("before the beta, a player who has bought nothing has nothing",
+    ok("after the beta, a player who has bought nothing has nothing",
        (await callIn(paid, "POST", "/api/me")).body.paid, false);
 
     const during = await callIn(beta, "POST", "/api/me");
-    ok("during the beta, everything is open", during.body.paid, true);
+    ok("during the beta, everything is open",
+       [during.body.paid, during.body.beta], [true, true]);
+    ok("and the game is told when it ends, so it can say so",
+       new Date(during.body.betaUntil).toISOString(), "2027-01-01T06:00:00.000Z");
 
     /* and the point of it: the beta is over, and they keep it */
     ok("and when the beta ends they keep what they had",
@@ -880,7 +888,7 @@ function freshDb() {
     /* somebody who never turned up during the beta gets nothing from it */
     const d = freshDb();
     const latecomer = await player();
-    const paid = { DB: d.DB, NOW: () => 1700000000000, EMAIL_SALT: "pepper" };
+    const paid = { DB: d.DB, NOW: () => Date.UTC(2027, 0, 2), EMAIL_SALT: "pepper" };
     const n = await api.handle(new Request(ORIGIN + "/api/nonce"), paid, null);
     const { nonce } = await n.json();
     const sig = await latecomer.sign(api.claimText("POST", "/api/me", nonce, ""));
