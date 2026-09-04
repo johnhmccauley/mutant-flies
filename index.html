@@ -750,8 +750,6 @@
             title="Redo" aria-label="Redo"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M12.9 7.4H6.8a3.6 3.6 0 0 0 0 7.2h2.8"/><path d="M10.1 4.3l3.2 3.1-3.2 3.1"/></svg></button>
     <button class="edIcon" id="edMore" type="button" aria-pressed="false"
             title="Zoom" aria-label="Zoom"><svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="7" cy="7" r="4.5"/><path d="M10.4 10.4 13.9 13.9M5.1 7h3.8"/></svg></button>
-    <button class="edIcon" id="edPublish" type="button"
-            title="Make it public" aria-label="Make it public"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 10.6V1.9"/><path d="M4.7 5.2 8 1.9l3.3 3.3"/><path d="M2.4 9.4v4.2h11.2V9.4"/></svg><span>Publish</span></button>
     <button class="edIcon" id="edBurger" type="button" aria-pressed="false"
             title="Everything else" aria-label="Everything else"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2.6 4.4h10.8M2.6 8h10.8M2.6 11.6h10.8"/></svg></button>
     <div id="edBurgerList" hidden>
@@ -10603,13 +10601,7 @@ var PLAY_ICON = '<path class="fill" d="M4.6 3.2 12.6 8l-8 4.8z"/>';
 var STOP_ICON = '<rect class="fill" x="4.2" y="4.2" width="7.6" height="7.6" rx="1.2"/>';
 
 function edReady() {
-  var play = $("edTest"), pub = $("edPublish");
-  var bad;
-  try {
-    bad = MutantLevelFormat.faults(edAsLevel({ name: $("edName").value }));
-  } catch (e) { bad = []; }        /* half-built is not a reason to lock it */
-  var why = bad.length ? "Not yet - " + bad.join("; ") : "";
-
+  var play = $("edTest");
   if (play) {
     var svg = play.querySelector("svg");
     if (svg) svg.innerHTML = ed.testing ? STOP_ICON : PLAY_ICON;
@@ -10620,7 +10612,7 @@ function edReady() {
 
   /* the rest of the header is for building, and nothing is being built
      while somebody is walking about in it */
-  ["edInfoBtn", "edUndo", "edRedo", "edMore", "edPublish", "edBurger"]
+  ["edInfoBtn", "edUndo", "edRedo", "edMore", "edBurger"]
     .forEach(function (id) {
       var b = $(id);
       if (b) b.hidden = !!ed.testing;
@@ -10630,11 +10622,6 @@ function edReady() {
     var v = $(id);
     if (v && v.parentNode) v.parentNode.hidden = !!ed.testing;
   });
-
-  if (pub) {
-    pub.disabled = !!bad.length;
-    pub.title = why || "Make it public";
-  }
 }
 
 /* ====================================================================
@@ -11457,6 +11444,32 @@ function edSave(quiet) {
   });
 }
 
+/* what a saved cellar is still missing, read out of the record on the
+   shelf rather than out of whatever is open in the editor */
+function edRowFaults(row) {
+  try {
+    return MutantLevelFormat.faults(MutantLevelFormat.fromCode(row.body)) || [];
+  } catch (e) { return ["it will not read back - " + e.message]; }
+}
+
+function edPublishRow(row) {
+  var bad = edRowFaults(row);
+  if (bad.length) return edOops("This cellar cannot be published yet.\n\n" +
+                                bad.join("\n"));
+  var save = MF.save.read() || {};
+  var g = MutantCatalogue.gate({ id: "local", reached: save.deepest || 1,
+                                 paid: false, played: {} }, Date.now());
+  /* the editor opens early in the beta; the door out of it does not */
+  if (!g.canPublish) return edOops(g.publishNeeds +
+    "\n\nIt is saved here either way, and Share as text will send it to anybody.");
+  catalogueSend(row).then(function (r) {
+    if (!r.ok) return edOops(r.why);
+    row.state = "public"; row.everPublic = true;
+    vaultPut("levels", row.id, row).then(edList);
+    if (ed.id === row.id) { ed.state = "public"; ed.everPublic = true; }
+  });
+}
+
 function edList() {
   if (mode !== "edit") $("titleSheet").hidden = true;
   vaultAll("levels").then(function (rows) {
@@ -11478,10 +11491,29 @@ function edList() {
         $("edListSheet").hidden = true; edEnter(row);
       });
       el.appendChild(open);
+      var pub = document.createElement("button");
+      pub.className = "edBtn"; pub.type = "button";
+      /* what is stopping it, said on the button rather than after it */
+      var bad = edRowFaults(row);
+      if (row.state === "public") {
+        pub.textContent = "Public"; pub.disabled = true;
+        pub.title = "other people can already find this one";
+      } else {
+        pub.textContent = "Publish";
+        pub.disabled = !!bad.length;
+        pub.title = bad.length ? "Not yet - " + bad.join("; ")
+                               : "put it in front of other people";
+        pub.addEventListener("click", function () { edPublishRow(row); });
+      }
+      el.appendChild(pub);
+
       var del = document.createElement("button");
       del.className = "edBtn"; del.type = "button";
-      del.textContent = row.everPublic ? "Published" : "Delete";
+      del.textContent = "Delete";
       del.disabled = !!row.everPublic;
+      del.title = row.everPublic
+        ? "a cellar that has been public cannot be deleted - other people have played it"
+        : "";
       if (!row.everPublic) del.addEventListener("click", function () {
         vaultDel("levels", row.id).then(edList);
       });
@@ -11521,23 +11553,6 @@ function edLoadCode() {
 }
 
 /* --- publishing --------------------------------------------------- */
-function edPublish() {
-  if (!ed.id) return edSay("save it first", "bad");
-  var faults = MutantLevelFormat.faults(edAsLevel({ name: $("edName").value }));
-  if (faults.length) return edOops("This cellar cannot be published yet.\n\n" +
-                                   faults.join("\n"));
-  var save = MF.save.read() || {};
-  var g = MutantCatalogue.gate({ id: "local", reached: save.deepest || 1,
-                                 paid: false, played: {} }, Date.now());
-  /* the editor opens early in the beta; the door out of it does not */
-  if (!g.canPublish) return edOops(g.publishNeeds +
-    "\n\nIt is saved here either way, and the Code button will send it to anybody.");
-  edSay("sending it up...");
-  catalogueSend(ed).then(function (r) {
-    if (r.ok) { ed.state = "public"; ed.everPublic = true; edSay("published - other people can find it now", "good"); }
-    else edOops(r.why);
-  });
-}
 
 /* The catalogue is the one part that needs a network, and it does not
    pretend otherwise: with no connection the level is still saved here
@@ -11938,7 +11953,7 @@ addEventListener("blur", function () { held = {}; tapped = {}; if (mode === "pla
     edUndo: function () { edStepBack(ed.undo, ed.redo); },
     edRedo: function () { edStepBack(ed.redo, ed.undo); },
     edTest: edTestPlay, edShare: edShare,
-    edPublish: edPublish, edQuit: edLeave,
+    edQuit: edLeave,
     edListNew: function () {
       if (!edSureToLose("Start a new one")) return;
       $("edListSheet").hidden = true;
