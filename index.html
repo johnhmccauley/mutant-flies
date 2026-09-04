@@ -894,7 +894,7 @@
     <!-- one set of verbs, about whichever cellar is picked below -->
     <div class="row" id="edShelfActs">
       <button class="edBtn" id="edShelfOpen" type="button">Open</button>
-      <button class="edBtn warm" id="edListNew" type="button">New cellar</button>
+      <button class="edBtn" id="edListNew" type="button">New</button>
       <button class="edBtn" id="edShelfPub" type="button">Publish</button>
       <button class="edBtn" id="edShelfDel" type="button">Delete</button>
       <button class="edBtn" id="edListClose" type="button">Back</button>
@@ -11535,10 +11535,14 @@ function edShelfDraw() {
 function edShelfActs() {
   var row = edPicked();
   var open = $("edShelfOpen"), pub = $("edShelfPub"), del = $("edShelfDel");
+  var fresh = $("edListNew");
+  var bare = !edShelf.length;
   if (open) {
     open.disabled = !row;
     open.title = row ? "open it on the bench" : "pick a cellar first";
+    open.className = bare ? "edBtn" : "edBtn warm";
   }
+  if (fresh) fresh.className = bare ? "edBtn warm" : "edBtn";
   if (pub) {
     var bad = row ? edRowFaults(row) : [];
     var done = row && row.state === "public";
@@ -11743,6 +11747,13 @@ var KEYMAP = { "z": "left", "arrowleft": "left", "x": "right", "arrowright": "ri
                ":": "up", ";": "up", "arrowup": "up", "/": "down", "arrowdown": "down" };
 addEventListener("keydown", function (e) {
   var k = e.key.toLowerCase(), a = KEYMAP[k];
+
+  if (k === "enter" && $("edListSheet") && !$("edListSheet").hidden) {
+    e.preventDefault();
+    var lit = edShelf.length ? $("edShelfOpen") : $("edListNew");
+    if (lit && !lit.disabled) lit.click();
+    return;
+  }
 
   /* ------------------------------------------------------------------
      Typing beats everything.
