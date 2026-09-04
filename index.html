@@ -7215,8 +7215,7 @@ function buildProps() {
   props.water = inst(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshStandardMaterial({
     color: 0x1d5a72, transparent: true, opacity: 0.66, roughness: 0.05, metalness: 0.2 }), 500, false);
   props.tar = inst(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshStandardMaterial({
-    color: 0x090604, roughness: 0.22, metalness: 0.0,
-    emissive: 0xc4380a, emissiveIntensity: 0.09 }), 500, false);
+    color: 0x070505, roughness: 0.95, metalness: 0.0 }), 500, false);
 
   /* marbles: few enough to be real objects, and the only thing down
      here polished enough to show you the room in it */
@@ -8292,8 +8291,6 @@ function syncWorld() {
     props[k].count = counts[k];
     props[k].instanceMatrix.needsUpdate = true;
   }
-  /* it breathes, but faintly - the flames standing in it are the fire */
-  if (props.tar) props.tar.material.emissiveIntensity = 0.09 + Math.sin(bobT * 5.1) * 0.04;
 
   /* marbles */
   /* the same answer edDress gave, since it is the same question */
