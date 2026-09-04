@@ -31,7 +31,19 @@
      Y%>128 / Y%<928 (250,260): a playfield 34 cells across and 26 down.
      Bricks came from the PA%() table built at line 100, which holds
      160,192,...1088 - so they land in the inner 30x23.               */
-  var COLS = 34, ROWS = 26;
+  /* The 1985 playfield, which is still the size of every cellar the
+     game generates - the whole of the original game happens in here and
+     nothing about how a cellar is dealt has changed. */
+  var FIELD_C = 34, FIELD_R = 26;
+
+  /* The canvas a level is allowed to occupy: four times the area, which
+     is two of the old playfield each way. Only levels somebody builds
+     can use more than the field - a generated cellar is given a shape
+     the size of the old one and is dealt inside it exactly as before.
+     Everything is indexed against COLS, so this is the only place the
+     difference between "the room" and "the paper it is drawn on" is
+     decided. */
+  var COLS = 68, ROWS = 52;
   var BRICK_C0 = 2, BRICK_C1 = 31;
   var BRICK_R0 = 1, BRICK_R1 = 23;
 
@@ -711,7 +723,13 @@
      altogether, without a single array changing length. */
   Game.prototype.inField = function (c, r) {
     if (c < 0 || r < 0 || c >= COLS || r >= ROWS) return false;
-    return this.shape ? this.shape[r * COLS + c] === 1 : true;
+    if (this.shape) return this.shape[r * COLS + c] === 1;
+    /* No shape means the room the game has always dealt: the 1985
+       field, in the corner of the larger sheet a built level may use.
+       Saying it this way rather than filling a shape plane into every
+       generated cellar keeps those cellars exactly as small on disk and
+       in a level code as they have always been. */
+    return c < FIELD_C && r < FIELD_R;
   };
   Game.prototype.at = function (c, r) { return this.inField(c, r) ? this.grid[this.idx(c, r)] : -1; };
   Game.prototype.h = function (c, r) { return this.inField(c, r) ? this.height[this.idx(c, r)] : 0; };
@@ -1090,14 +1108,32 @@
   /* what is just outside the field at (c,r) - only ever asked of a
      square one step off the edge, so a corner never comes up */
   Game.prototype.edgeAt = function (c, r) {
-    /* A level with a shape has a boundary that is not four straight
-       sides, so what lies beyond a square is recorded per square. */
-    if (this.bound && c >= 0 && r >= 0 && c < COLS && r < ROWS)
-      return this.bound[r * COLS + c] === WALL ? WALL : DROP;
-    if (c < 0) return this.edge.W[clamp(r, 0, ROWS - 1)];
-    if (c >= COLS) return this.edge.E[clamp(r, 0, ROWS - 1)];
-    if (r < 0) return this.edge.S[clamp(c, 0, COLS - 1)];
-    if (r >= ROWS) return this.edge.N[clamp(c, 0, COLS - 1)];
+    /* ------------------------------------------------------------------
+       What lies just beyond a square.
+
+       A level with a `bound` plane has a boundary that is not four
+       straight sides - it is whatever outline somebody drew - so the
+       answer is kept per square there and that is the whole story.
+
+       A cellar the game DEALT has the four sides it always had. Those
+       used to be found by asking whether the square was off the grid,
+       which worked while the grid and the room were the same thing. They
+       are not any more: the room is 34 by 26 on paper that is 68 by 52,
+       so a brick shoved east leaves the room at column 34 and does not
+       leave the paper until 68. Every stone wall in the game stopped
+       working the moment the paper got bigger, silently, because falling
+       off the end of those tests returns DROP. The sides are found
+       against the room's own box now.
+       ------------------------------------------------------------------ */
+    if (this.bound)
+      return (c >= 0 && r >= 0 && c < COLS && r < ROWS &&
+              this.bound[r * COLS + c] === WALL) ? WALL : DROP;
+
+    var b = this.box || this.reBox();
+    if (c < b.c0) return this.edge.W[clamp(r, 0, ROWS - 1)];
+    if (c > b.c1) return this.edge.E[clamp(r, 0, ROWS - 1)];
+    if (r < b.r0) return this.edge.S[clamp(c, 0, COLS - 1)];
+    if (r > b.r1) return this.edge.N[clamp(c, 0, COLS - 1)];
     return DROP;
   };
 
@@ -1142,6 +1178,23 @@
     this.stress.fill(0);
     this.marbles.length = 0;
     this.sources.length = 0;
+
+    /* ----------------------------------------------------------------
+       A generated cellar is the size the game has always been.
+
+       shape and bound were never cleared here, so after playing a level
+       somebody had cut a hole in, the next cellar was dealt into that
+       hole - bricks and monsters generated outside their own floor,
+       standing on paper. Now the cellar states its own shape every
+       time: the old 34 by 26 field, and nothing beyond it. Only a level
+       somebody builds replaces that with something else.
+       ---------------------------------------------------------------- */
+    this.shape = null;              /* the field, as always */
+    this.bound = null;
+    this.blocks = null;
+    this.floors = null;
+    this.deal = null;
+    this.reBox();
 
     /* the man's state resets with the cellar */
     this.steps = 0;
@@ -1240,11 +1293,39 @@
 
   /* somewhere clear to put somebody - level ground for choice, and not
      on top of anything already there */
+  /* The smallest box that holds the level - the old field for anything
+     generated, whatever somebody drew for anything built. Everything
+     that puts something down at random works inside it, so a coin or a
+     robot never turns up in the blank paper round a small room. */
+  Game.prototype.reBox = function () {
+    var c0 = COLS, c1 = -1, r0 = ROWS, r1 = -1;
+    for (var r = 0; r < ROWS; r++) for (var c = 0; c < COLS; c++) {
+      if (!this.inField(c, r)) continue;
+      if (c < c0) c0 = c;
+      if (c > c1) c1 = c;
+      if (r < r0) r0 = r;
+      if (r > r1) r1 = r;
+    }
+    if (c1 < 0) { c0 = 0; c1 = COLS - 1; r0 = 0; r1 = ROWS - 1; }
+    this.box = { c0: c0, c1: c1, r0: r0, r1: r1, w: c1 - c0 + 1, h: r1 - r0 + 1 };
+    return this.box;
+  };
+
+  /* somewhere inside the level, inset from its own edges */
+  Game.prototype.someWhere = function (inset, pick) {
+    var b = this.box || this.reBox();
+    var w = Math.max(1, b.w - inset * 2), h = Math.max(1, b.h - inset * 2);
+    return [b.c0 + inset + pick(w), b.r0 + inset + pick(h)];
+  };
+
   Game.prototype.openSpot = function (away, minDist) {
     var best = null, bestScore = -1;
     for (var t = 0; t < 500; t++) {
-      var c = 2 + rnd(COLS - 4), r = 2 + rnd(ROWS - 4);
+      var at = this.someWhere(2, rnd), c = at[0], r = at[1];
+      /* never on paper the level does not cover, and never in a pool */
+      if (!this.inField(c, r)) continue;
       if (this.grid[this.idx(c, r)] !== EMPTY) continue;
+      if (this.fluid[this.idx(c, r)] !== DRY) continue;
       if (this.monsterAt(c, r)) continue;
       var ok = true;
       for (var i = 0; away && i < away.length; i++)
@@ -1253,7 +1334,13 @@
       var score = 10 - this.height[this.idx(c, r)] * 3 + rnd(3);
       if (score > bestScore) { bestScore = score; best = [c, r]; if (score >= 12) break; }
     }
-    return best || [MAN_C0, MAN_R0];
+    if (best) return best;
+    /* nothing was free: the first empty square in the level, and only
+       the man's old corner if the level has none at all */
+    for (var fr = 0; fr < ROWS; fr++) for (var fc = 0; fc < COLS; fc++)
+      if (this.inField(fc, fr) && this.grid[this.idx(fc, fr)] === EMPTY &&
+          this.fluid[this.idx(fc, fr)] === DRY) return [fc, fr];
+    return [MAN_C0, MAN_R0];
   };
 
   Game.prototype.newMonster = function (kind, c, r) {
@@ -1320,7 +1407,8 @@
        the whole floor ended up flat. */
     var mounds = 3 + this.grnd(4);
     for (var k = 0; k < mounds; k++) {
-      var cx = 4 + this.grnd(COLS - 8), cy = 3 + this.grnd(ROWS - 6);
+      var hp = this.someWhere(4, this.grnd.bind(this));
+      var cx = hp[0], cy = hp[1];
       var amp = 1 + this.grnd(MAX_H), rad = 3 + amp * 3 + this.grnd(6);
       for (var r = 0; r < ROWS; r++) for (var c = 0; c < COLS; c++) {
         var d = Math.sqrt((c - cx) * (c - cx) + (r - cy) * (r - cy));
@@ -1445,7 +1533,9 @@
     var f = this.feat, self = this;
     function scatter(n, put) {
       for (var i = 0, guard = 0; i < n && guard < 4000; guard++) {
-        var c = 2 + self.grnd(COLS - 4), r = 2 + self.grnd(ROWS - 4);
+        var sp = self.someWhere(2, function (n) { return self.grnd(n); });
+        var c = sp[0], r = sp[1];
+        if (!self.inField(c, r)) continue;
         if (self.grid[self.idx(c, r)] !== EMPTY) continue;
         if (self.item[self.idx(c, r)] !== NOTHING) continue;
         put(c, r); i++;
@@ -1490,7 +1580,8 @@
   Game.prototype.makePools = function (kind, howMany) {
     for (var n = 0; n < howMany; n++) {
       for (var tries = 0; tries < 60; tries++) {
-        var cx = 4 + this.grnd(COLS - 8), cy = 4 + this.grnd(ROWS - 8);
+        var pp = this.someWhere(4, this.grnd.bind(this));
+        var cx = pp[0], cy = pp[1];
         var rad = 1;
         var clear = true;
         for (var r = cy - rad - 1; r <= cy + rad + 1 && clear; r++)
@@ -2102,7 +2193,8 @@
   Game.prototype.farSpot = function () {
     var best = [1, 1], far = -1;
     for (var k = 0; k < 60; k++) {
-      var c = 2 + rnd(COLS - 4), r = 2 + rnd(ROWS - 4);
+      var sw = this.someWhere(2, rnd), c = sw[0], r = sw[1];
+      if (!this.inField(c, r)) continue;
       if (this.grid[this.idx(c, r)] !== EMPTY || this.monsterAt(c, r)) continue;
       var d = Math.abs(c - this.manC) + Math.abs(r - this.manR);
       if (d > far) { far = d; best = [c, r]; }
@@ -2494,7 +2586,8 @@
 
   root.MutantFly = {
     Game: Game,
-    COLS: COLS, ROWS: ROWS, TICK_HZ: TICK_HZ, MAX_H: MAX_H,
+    COLS: COLS, ROWS: ROWS, FIELD_C: FIELD_C, FIELD_R: FIELD_R,
+    TICK_HZ: TICK_HZ, MAX_H: MAX_H,
     EMPTY: EMPTY, BRICK: BRICK, TREE: TREE, MARBLE: MARBLE,
     VAT_TAR: VAT_TAR, VAT_WATER: VAT_WATER, COOLED: COOLED, CHOPPER: CHOPPER,
     ROCK: ROCK, ROCK_WEIGHT: ROCK_WEIGHT, PUSH_POWER: PUSH_POWER,

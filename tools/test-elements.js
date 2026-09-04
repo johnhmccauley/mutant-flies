@@ -305,6 +305,14 @@ function settle(g, turns) {
   ok("tar runs downhill", [touched > 0, farthest > 2, sumH / touched < 3], [true, true, true]);
 }
 {
+  /* Pinned right here. How long tar takes to burn through a brick is a
+     count of turns, but WHERE the tar goes on the way is the luck of the
+     draw - and the draw is one stream shared by every test in this file,
+     so this one's answer depended on how many numbers everything above
+     it happened to use. Changing anything about how a cellar is dealt
+     moved it. In isolation the brick gives way on turn nine either way;
+     the test was reading the stream, not the rule. */
+  MF.luck(MF.mulberry32(LUCK));
   const g = bare();
   put(g, 13, 10); put(g, 14, 10, MF.TREE);
   g.grid[I(12, 10)] = MF.VAT_TAR;
@@ -513,33 +521,33 @@ function settle(g, turns) {
   /* good stone holds the line instead of eating it */
   const g = bare();
   g.edge.E.fill(MF.WALL);
-  g.manC = MF.COLS - 3;
-  put(g, MF.COLS - 2, 10); put(g, MF.COLS - 1, 10);
+  g.manC = MF.FIELD_C - 3;
+  put(g, MF.FIELD_C - 2, 10); put(g, MF.FIELD_C - 1, 10);
   const before = g.bricks;
   g.steps = 3;
   const ev = g.step("right");
   ok("a stone wall stops a shove without taking a brick",
-     [ev.blocked, ev.lostOverEdge, g.bricks, g.manC], [true, 0, before, MF.COLS - 3]);
+     [ev.blocked, ev.lostOverEdge, g.bricks, g.manC], [true, 0, before, MF.FIELD_C - 3]);
 }
 {
   /* but where the floor just stops, it goes over and is gone */
   const g = bare();
   g.edge.E.fill(MF.DROP);
-  g.manC = MF.COLS - 3;
-  put(g, MF.COLS - 2, 10); put(g, MF.COLS - 1, 10);
+  g.manC = MF.FIELD_C - 3;
+  put(g, MF.FIELD_C - 2, 10); put(g, MF.FIELD_C - 1, 10);
   const before = g.bricks;
   g.steps = 3;
   const ev = g.step("right");
   ok("a brick shoved over a drop is lost",
-     [ev.lostOverEdge, g.bricks, g.manC], [1, before - 1, MF.COLS - 2]);
+     [ev.lostOverEdge, g.bricks, g.manC], [1, before - 1, MF.FIELD_C - 2]);
 }
 {
   /* stone counts as a side, so a corner is worth two bricks */
   const g = bare();
   g.edge.E.fill(MF.WALL); g.edge.N.fill(MF.WALL);
-  const m = monster(g, "spider", MF.COLS - 1, MF.ROWS - 1);
+  const m = monster(g, "spider", MF.FIELD_C - 1, MF.FIELD_R - 1);
   const cornered = g.isBoxed(m);
-  put(g, MF.COLS - 2, MF.ROWS - 1); put(g, MF.COLS - 1, MF.ROWS - 2);
+  put(g, MF.FIELD_C - 2, MF.FIELD_R - 1); put(g, MF.FIELD_C - 1, MF.FIELD_R - 2);
   ok("two bricks wall a monster into a stone corner",
      [cornered, g.isBoxed(m)], [false, true]);
 }
@@ -547,15 +555,15 @@ function settle(g, turns) {
   /* the same corner made of nothing holds nothing */
   const g = bare();
   g.edge.E.fill(MF.DROP); g.edge.N.fill(MF.DROP);
-  const m = monster(g, "spider", MF.COLS - 1, MF.ROWS - 1);
-  put(g, MF.COLS - 2, MF.ROWS - 1); put(g, MF.COLS - 1, MF.ROWS - 2);
+  const m = monster(g, "spider", MF.FIELD_C - 1, MF.FIELD_R - 1);
+  put(g, MF.FIELD_C - 2, MF.FIELD_R - 1); put(g, MF.FIELD_C - 1, MF.FIELD_R - 2);
   ok("a corner of two drops holds nothing in", g.isBoxed(m), false);
 }
 {
   /* and you can walk off one */
   const g = bare();
   g.edge.E.fill(MF.DROP);
-  g.manC = MF.COLS - 1; g.manR = 10;
+  g.manC = MF.FIELD_C - 1; g.manR = 10;
   g.steps = 3;
   const ev = g.step("right");
   ok("walking off a drop kills you", [ev.fell, ev.lost], [true, true]);
@@ -563,7 +571,7 @@ function settle(g, turns) {
 {
   const g = bare();
   g.edge.E.fill(MF.WALL);
-  g.manC = MF.COLS - 1; g.manR = 10;
+  g.manC = MF.FIELD_C - 1; g.manR = 10;
   g.steps = 3;
   const ev = g.step("right");
   ok("walking into stone does not", [!!ev.fell, !!ev.lost], [false, false]);
@@ -584,12 +592,12 @@ function settle(g, turns) {
   /* but 1985 still loses it over the edge, which is the whole point */
   const g = new MF.Game({ classic: true, seed: SEED });
   g.sheet(); g.grid.fill(MF.EMPTY); g.bricks = 0;
-  g.manC = MF.COLS - 2; g.manR = 10;
+  g.manC = MF.FIELD_C - 2; g.manR = 10;
   g.monsters[0].c = 2; g.monsters[0].r = 2;
-  put(g, MF.COLS - 1, 10);
+  put(g, MF.FIELD_C - 1, 10);
   const ev = g.step("right");
   ok("the 1985 cellar still loses bricks over its edge",
-     [ev.lostOverEdge, g.bricks, g.manC], [1, 0, MF.COLS - 1]);
+     [ev.lostOverEdge, g.bricks, g.manC], [1, 0, MF.FIELD_C - 1]);
 }
 {
   /* the chopper is the one thing left that takes bricks off you */
@@ -641,7 +649,11 @@ function settle(g, turns) {
   let raised = 0, total = 0;
   for (let F = 4; F <= 20; F++) {
     g.F = F; g.sheet();
-    for (let i = 0; i < g.height.length; i++) { total++; if (g.height[i] > 0) raised++; }
+    /* only inside the cellar - the height plane covers the whole sheet
+       a built level may use, and the dealt room is a quarter of it */
+    for (let r = 0; r < MF.FIELD_R; r++) for (let c = 0; c < MF.FIELD_C; c++) {
+      total++; if (g.height[r * MF.COLS + c] > 0) raised++;
+    }
   }
   ok("a good part of the cellar is not level", raised / total > 0.25, true);
 }
@@ -1051,7 +1063,7 @@ function placeOf(g) {
     const h = bare();
     h.edge.E.fill(MF.DROP);
     h.marbles.push(mar);
-    mar.c = MF.COLS - 2; mar.r = 10;
+    mar.c = MF.FIELD_C - 2; mar.r = 10;
     h.grid[I(mar.c, mar.r)] = MF.MARBLE;
     h.step(null);
     return !!mar.gone;
@@ -1261,22 +1273,22 @@ function deep(level) {
   /* nothing shoves one over the edge */
   const g = deep();
   g.edge.E.fill(MF.DROP);
-  const b = { c: MF.COLS - 1, r: 10, size: 1, running: true, power: 12, life: 40, wait: 20, gone: false };
+  const b = { c: MF.FIELD_C - 1, r: 10, size: 1, running: true, power: 12, life: 40, wait: 20, gone: false };
   g.robots.push(b);
   const moved = g.robotMove(b, [1, 0], { pushed: 0 });
-  ok("a robot will not walk off a drop", [moved, b.gone, b.c], [false, false, MF.COLS - 1]);
+  ok("a robot will not walk off a drop", [moved, b.gone, b.c], [false, false, MF.FIELD_C - 1]);
 }
 {
   const g = deep();
   g.edge.E.fill(MF.DROP);
-  const b = { c: MF.COLS - 1, r: 10, size: 1, running: true, power: 12, life: 40, wait: 20, gone: false };
+  const b = { c: MF.FIELD_C - 1, r: 10, size: 1, running: true, power: 12, life: 40, wait: 20, gone: false };
   g.robots.push(b);
-  g.manC = MF.COLS - 3; g.manR = 10;
-  put(g, MF.COLS - 2, 10);
+  g.manC = MF.FIELD_C - 3; g.manR = 10;
+  put(g, MF.FIELD_C - 2, 10);
   g.steps = 3;
   const ev = g.step("right");
   ok("and a brick line will not push one over either",
-     [ev.blocked, b.gone, g.manC], [true, false, MF.COLS - 3]);
+     [ev.blocked, b.gone, g.manC], [true, false, MF.FIELD_C - 3]);
 }
 {
   /* a monster takes one apart */

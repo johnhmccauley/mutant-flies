@@ -591,7 +591,19 @@
      Y%>128 / Y%<928 (250,260): a playfield 34 cells across and 26 down.
      Bricks came from the PA%() table built at line 100, which holds
      160,192,...1088 - so they land in the inner 30x23.               */
-  var COLS = 34, ROWS = 26;
+  /* The 1985 playfield, which is still the size of every cellar the
+     game generates - the whole of the original game happens in here and
+     nothing about how a cellar is dealt has changed. */
+  var FIELD_C = 34, FIELD_R = 26;
+
+  /* The canvas a level is allowed to occupy: four times the area, which
+     is two of the old playfield each way. Only levels somebody builds
+     can use more than the field - a generated cellar is given a shape
+     the size of the old one and is dealt inside it exactly as before.
+     Everything is indexed against COLS, so this is the only place the
+     difference between "the room" and "the paper it is drawn on" is
+     decided. */
+  var COLS = 68, ROWS = 52;
   var BRICK_C0 = 2, BRICK_C1 = 31;
   var BRICK_R0 = 1, BRICK_R1 = 23;
 
@@ -1271,7 +1283,13 @@
      altogether, without a single array changing length. */
   Game.prototype.inField = function (c, r) {
     if (c < 0 || r < 0 || c >= COLS || r >= ROWS) return false;
-    return this.shape ? this.shape[r * COLS + c] === 1 : true;
+    if (this.shape) return this.shape[r * COLS + c] === 1;
+    /* No shape means the room the game has always dealt: the 1985
+       field, in the corner of the larger sheet a built level may use.
+       Saying it this way rather than filling a shape plane into every
+       generated cellar keeps those cellars exactly as small on disk and
+       in a level code as they have always been. */
+    return c < FIELD_C && r < FIELD_R;
   };
   Game.prototype.at = function (c, r) { return this.inField(c, r) ? this.grid[this.idx(c, r)] : -1; };
   Game.prototype.h = function (c, r) { return this.inField(c, r) ? this.height[this.idx(c, r)] : 0; };
@@ -1650,14 +1668,32 @@
   /* what is just outside the field at (c,r) - only ever asked of a
      square one step off the edge, so a corner never comes up */
   Game.prototype.edgeAt = function (c, r) {
-    /* A level with a shape has a boundary that is not four straight
-       sides, so what lies beyond a square is recorded per square. */
-    if (this.bound && c >= 0 && r >= 0 && c < COLS && r < ROWS)
-      return this.bound[r * COLS + c] === WALL ? WALL : DROP;
-    if (c < 0) return this.edge.W[clamp(r, 0, ROWS - 1)];
-    if (c >= COLS) return this.edge.E[clamp(r, 0, ROWS - 1)];
-    if (r < 0) return this.edge.S[clamp(c, 0, COLS - 1)];
-    if (r >= ROWS) return this.edge.N[clamp(c, 0, COLS - 1)];
+    /* ------------------------------------------------------------------
+       What lies just beyond a square.
+
+       A level with a `bound` plane has a boundary that is not four
+       straight sides - it is whatever outline somebody drew - so the
+       answer is kept per square there and that is the whole story.
+
+       A cellar the game DEALT has the four sides it always had. Those
+       used to be found by asking whether the square was off the grid,
+       which worked while the grid and the room were the same thing. They
+       are not any more: the room is 34 by 26 on paper that is 68 by 52,
+       so a brick shoved east leaves the room at column 34 and does not
+       leave the paper until 68. Every stone wall in the game stopped
+       working the moment the paper got bigger, silently, because falling
+       off the end of those tests returns DROP. The sides are found
+       against the room's own box now.
+       ------------------------------------------------------------------ */
+    if (this.bound)
+      return (c >= 0 && r >= 0 && c < COLS && r < ROWS &&
+              this.bound[r * COLS + c] === WALL) ? WALL : DROP;
+
+    var b = this.box || this.reBox();
+    if (c < b.c0) return this.edge.W[clamp(r, 0, ROWS - 1)];
+    if (c > b.c1) return this.edge.E[clamp(r, 0, ROWS - 1)];
+    if (r < b.r0) return this.edge.S[clamp(c, 0, COLS - 1)];
+    if (r > b.r1) return this.edge.N[clamp(c, 0, COLS - 1)];
     return DROP;
   };
 
@@ -1702,6 +1738,23 @@
     this.stress.fill(0);
     this.marbles.length = 0;
     this.sources.length = 0;
+
+    /* ----------------------------------------------------------------
+       A generated cellar is the size the game has always been.
+
+       shape and bound were never cleared here, so after playing a level
+       somebody had cut a hole in, the next cellar was dealt into that
+       hole - bricks and monsters generated outside their own floor,
+       standing on paper. Now the cellar states its own shape every
+       time: the old 34 by 26 field, and nothing beyond it. Only a level
+       somebody builds replaces that with something else.
+       ---------------------------------------------------------------- */
+    this.shape = null;              /* the field, as always */
+    this.bound = null;
+    this.blocks = null;
+    this.floors = null;
+    this.deal = null;
+    this.reBox();
 
     /* the man's state resets with the cellar */
     this.steps = 0;
@@ -1800,11 +1853,39 @@
 
   /* somewhere clear to put somebody - level ground for choice, and not
      on top of anything already there */
+  /* The smallest box that holds the level - the old field for anything
+     generated, whatever somebody drew for anything built. Everything
+     that puts something down at random works inside it, so a coin or a
+     robot never turns up in the blank paper round a small room. */
+  Game.prototype.reBox = function () {
+    var c0 = COLS, c1 = -1, r0 = ROWS, r1 = -1;
+    for (var r = 0; r < ROWS; r++) for (var c = 0; c < COLS; c++) {
+      if (!this.inField(c, r)) continue;
+      if (c < c0) c0 = c;
+      if (c > c1) c1 = c;
+      if (r < r0) r0 = r;
+      if (r > r1) r1 = r;
+    }
+    if (c1 < 0) { c0 = 0; c1 = COLS - 1; r0 = 0; r1 = ROWS - 1; }
+    this.box = { c0: c0, c1: c1, r0: r0, r1: r1, w: c1 - c0 + 1, h: r1 - r0 + 1 };
+    return this.box;
+  };
+
+  /* somewhere inside the level, inset from its own edges */
+  Game.prototype.someWhere = function (inset, pick) {
+    var b = this.box || this.reBox();
+    var w = Math.max(1, b.w - inset * 2), h = Math.max(1, b.h - inset * 2);
+    return [b.c0 + inset + pick(w), b.r0 + inset + pick(h)];
+  };
+
   Game.prototype.openSpot = function (away, minDist) {
     var best = null, bestScore = -1;
     for (var t = 0; t < 500; t++) {
-      var c = 2 + rnd(COLS - 4), r = 2 + rnd(ROWS - 4);
+      var at = this.someWhere(2, rnd), c = at[0], r = at[1];
+      /* never on paper the level does not cover, and never in a pool */
+      if (!this.inField(c, r)) continue;
       if (this.grid[this.idx(c, r)] !== EMPTY) continue;
+      if (this.fluid[this.idx(c, r)] !== DRY) continue;
       if (this.monsterAt(c, r)) continue;
       var ok = true;
       for (var i = 0; away && i < away.length; i++)
@@ -1813,7 +1894,13 @@
       var score = 10 - this.height[this.idx(c, r)] * 3 + rnd(3);
       if (score > bestScore) { bestScore = score; best = [c, r]; if (score >= 12) break; }
     }
-    return best || [MAN_C0, MAN_R0];
+    if (best) return best;
+    /* nothing was free: the first empty square in the level, and only
+       the man's old corner if the level has none at all */
+    for (var fr = 0; fr < ROWS; fr++) for (var fc = 0; fc < COLS; fc++)
+      if (this.inField(fc, fr) && this.grid[this.idx(fc, fr)] === EMPTY &&
+          this.fluid[this.idx(fc, fr)] === DRY) return [fc, fr];
+    return [MAN_C0, MAN_R0];
   };
 
   Game.prototype.newMonster = function (kind, c, r) {
@@ -1880,7 +1967,8 @@
        the whole floor ended up flat. */
     var mounds = 3 + this.grnd(4);
     for (var k = 0; k < mounds; k++) {
-      var cx = 4 + this.grnd(COLS - 8), cy = 3 + this.grnd(ROWS - 6);
+      var hp = this.someWhere(4, this.grnd.bind(this));
+      var cx = hp[0], cy = hp[1];
       var amp = 1 + this.grnd(MAX_H), rad = 3 + amp * 3 + this.grnd(6);
       for (var r = 0; r < ROWS; r++) for (var c = 0; c < COLS; c++) {
         var d = Math.sqrt((c - cx) * (c - cx) + (r - cy) * (r - cy));
@@ -2005,7 +2093,9 @@
     var f = this.feat, self = this;
     function scatter(n, put) {
       for (var i = 0, guard = 0; i < n && guard < 4000; guard++) {
-        var c = 2 + self.grnd(COLS - 4), r = 2 + self.grnd(ROWS - 4);
+        var sp = self.someWhere(2, function (n) { return self.grnd(n); });
+        var c = sp[0], r = sp[1];
+        if (!self.inField(c, r)) continue;
         if (self.grid[self.idx(c, r)] !== EMPTY) continue;
         if (self.item[self.idx(c, r)] !== NOTHING) continue;
         put(c, r); i++;
@@ -2050,7 +2140,8 @@
   Game.prototype.makePools = function (kind, howMany) {
     for (var n = 0; n < howMany; n++) {
       for (var tries = 0; tries < 60; tries++) {
-        var cx = 4 + this.grnd(COLS - 8), cy = 4 + this.grnd(ROWS - 8);
+        var pp = this.someWhere(4, this.grnd.bind(this));
+        var cx = pp[0], cy = pp[1];
         var rad = 1;
         var clear = true;
         for (var r = cy - rad - 1; r <= cy + rad + 1 && clear; r++)
@@ -2662,7 +2753,8 @@
   Game.prototype.farSpot = function () {
     var best = [1, 1], far = -1;
     for (var k = 0; k < 60; k++) {
-      var c = 2 + rnd(COLS - 4), r = 2 + rnd(ROWS - 4);
+      var sw = this.someWhere(2, rnd), c = sw[0], r = sw[1];
+      if (!this.inField(c, r)) continue;
       if (this.grid[this.idx(c, r)] !== EMPTY || this.monsterAt(c, r)) continue;
       var d = Math.abs(c - this.manC) + Math.abs(r - this.manR);
       if (d > far) { far = d; best = [c, r]; }
@@ -3054,7 +3146,8 @@
 
   root.MutantFly = {
     Game: Game,
-    COLS: COLS, ROWS: ROWS, TICK_HZ: TICK_HZ, MAX_H: MAX_H,
+    COLS: COLS, ROWS: ROWS, FIELD_C: FIELD_C, FIELD_R: FIELD_R,
+    TICK_HZ: TICK_HZ, MAX_H: MAX_H,
     EMPTY: EMPTY, BRICK: BRICK, TREE: TREE, MARBLE: MARBLE,
     VAT_TAR: VAT_TAR, VAT_WATER: VAT_WATER, COOLED: COOLED, CHOPPER: CHOPPER,
     ROCK: ROCK, ROCK_WEIGHT: ROCK_WEIGHT, PUSH_POWER: PUSH_POWER,
@@ -4265,8 +4358,25 @@
   function apply(g, rec) {
     if (!rec || typeof rec !== "object") throw new Error("that is not a level");
     rec = upgrade(rec);
-    if (rec.cols !== MF.COLS || rec.rows !== MF.ROWS)
-      throw new Error("that level is a different shape from this cellar");
+    /* ------------------------------------------------------------------
+       A level written for a smaller sheet.
+
+       Every cellar used to be 34 by 26 and so was every level ever saved
+       or shared as a code. The sheet is four times that now, and a
+       straight refusal here would have thrown away every level anybody
+       had already built - including any built during the beta, which
+       were promised to at least be readable. So a smaller record is not
+       rejected, it is laid into the corner of the larger sheet, which is
+       exactly where the old room still is.
+
+       Bigger than this build understands is still refused: guessing at
+       what a future version meant would quietly corrupt it. */
+    var wasC = rec.cols | 0, wasR = rec.rows | 0;
+    if (wasC > MF.COLS || wasR > MF.ROWS)
+      throw new Error("that level was built for a bigger cellar than this game has");
+    if (wasC < 1 || wasR < 1)
+      throw new Error("that level does not say how big it is");
+    var older = (wasC !== MF.COLS || wasR !== MF.ROWS);
 
     /* hold on to anything a newer game wrote that this one has no idea
        about, so saving it again does not throw it away */
@@ -4291,9 +4401,14 @@
          is what every one of them means when it is absent - so a level
          written before a plane existed still loads */
       if (packed === undefined || packed === null) { g[PLANES[i]].fill(0); continue; }
-      var got = IO.unpackArray(packed, N);
+      var got = IO.unpackArray(packed, older ? wasC * wasR : N);
       if (!got) throw new Error("the " + PLANES[i] + " of that level is damaged");
-      g[PLANES[i]].set(got);
+      if (!older) { g[PLANES[i]].set(got); continue; }
+      /* row by row into the corner - the rows are a different length */
+      g[PLANES[i]].fill(0);
+      for (var yr = 0; yr < wasR; yr++)
+        for (var xc = 0; xc < wasC; xc++)
+          g[PLANES[i]][yr * MF.COLS + xc] = got[yr * wasC + xc];
     }
     for (var s = 0; s < SIDES.length; s++) {
       var side = SIDES[s][0];
@@ -4307,8 +4422,22 @@
     if (!g.blocks.length) g.blocks = null;
     g.floors = (rec.floors || []).slice(0, 16).map(cleanColour);
     if (!g.floors.length) g.floors = null;
-    g.shape = rec.shape ? IO.unpackArray(rec.shape, N) : null;
-    g.bound = rec.bound ? IO.unpackArray(rec.bound, N) : null;
+    g.shape = rec.shape ? IO.unpackArray(rec.shape, older ? wasC * wasR : N) : null;
+    g.bound = rec.bound ? IO.unpackArray(rec.bound, older ? wasC * wasR : N) : null;
+    if (older) {
+      /* the old room, wherever it fell in the old sheet, and nothing
+         beyond it - so a level that used every square of a 34 by 26
+         cellar does not silently gain the blank paper round it */
+      var wide = function (src) {
+        var out = new Uint8Array(N);
+        for (var yr2 = 0; yr2 < wasR; yr2++)
+          for (var xc2 = 0; xc2 < wasC; xc2++)
+            out[yr2 * MF.COLS + xc2] = src ? src[yr2 * wasC + xc2] : 1;
+        return out;
+      };
+      g.shape = wide(g.shape);
+      g.bound = g.bound ? wide(g.bound) : null;
+    }
     g.deal = rec.deal || null;
 
     g.manC = rec.man[0]; g.manR = rec.man[1];
@@ -4365,6 +4494,10 @@
        be one */
     g.settle({ trappedNow: [], freed: [] });
     return g;
+    /* everything that places something at random works inside the
+       level's own bounds, so they are worked out once it is loaded */
+    if (g.reBox) g.reBox();
+
   }
 
   /* ------------------------------------------------------------------
@@ -6935,7 +7068,7 @@ function cornerH(i, j) {
   for (var d = 0; d < 4; d++) {
     var c = i - (d & 1), r = j - (d >> 1);
     if (c < 0 || r < 0 || c >= COLS || r >= ROWS) continue;
-    if (game.shape && !game.shape[r * COLS + c]) continue;
+    if (!game.inField(c, r)) continue;
     sum += game.height[r * COLS + c]; n++;
   }
   return n ? sum / n : 0;
@@ -6997,23 +7130,20 @@ function syncEdges() {
     if (wall) placeAt(props.edgeWall, nW++, c, r, 1.7);
     else placeAt(props.edgeLip, nL++, c, r, 0.13);
   }
-  if (game.shape) {
-    /* every square that is not in the level but touches one is a piece
-       of its boundary, wherever that boundary happens to run */
-    for (var r2 = 0; r2 < ROWS; r2++) for (var c2 = 0; c2 < COLS; c2++) {
-      if (game.shape[r2 * COLS + c2]) continue;
-      var touches = false;
-      for (var d = 0; d < 4; d++) {
-        var dd = [[1, 0], [-1, 0], [0, 1], [0, -1]][d];
-        var nc = c2 + dd[0], nr = r2 + dd[1];
-        if (nc < 0 || nr < 0 || nc >= COLS || nr >= ROWS) continue;
-        if (game.shape[nr * COLS + nc]) touches = true;
-      }
-      if (touches) put(c2, r2);
+  /* every square that is not in the level but touches one is a piece of
+     its boundary, wherever that boundary happens to run */
+  for (var r2 = 0; r2 < ROWS; r2++) for (var c2 = 0; c2 < COLS; c2++) {
+    if (game.inField(c2, r2)) continue;
+    var touches = false;
+    for (var d = 0; d < 4; d++) {
+      var dd = [[1, 0], [-1, 0], [0, 1], [0, -1]][d];
+      if (game.inField(c2 + dd[0], r2 + dd[1])) touches = true;
     }
+    if (touches) put(c2, r2);
   }
-  for (var r = 0; r < ROWS; r++) { put(-1, r); put(COLS, r); }
-  for (var c = 0; c < COLS; c++) { put(c, ROWS); }
+  var bx = game.box || game.reBox();
+  for (var r = bx.r0; r <= bx.r1; r++) { put(bx.c0 - 1, r); put(bx.c1 + 1, r); }
+  for (var c = bx.c0; c <= bx.c1; c++) { put(c, bx.r1 + 1); }
   /* the near edge is the kerb the camera looks over, drawn already */
   props.edgeWall.count = nW; props.edgeWall.instanceMatrix.needsUpdate = true;
   props.edgeLip.count = nL; props.edgeLip.instanceMatrix.needsUpdate = true;
@@ -7027,7 +7157,10 @@ function syncTerrain() {
      the skin can dip up to three quarters of a step below that where
      the ground falls away on every side */
   for (var r = 0; r < ROWS; r++) for (var c = 0; c < COLS; c++) {
-    if (game.shape && !game.shape[r * COLS + c]) continue;
+    /* through inField, not the shape plane: a cellar with no shape is
+       not "everywhere", it is the room the game has always dealt, in
+       the corner of a sheet four times the size */
+    if (!game.inField(c, r)) continue;
     var lvl = game.height[r * COLS + c];
     var h = lvl * STEP, thick = 1 + h;
     var a = hash2(c, r), b = hash2(r + 91, c + 17);
@@ -7092,7 +7225,7 @@ function syncTerrain() {
 
   for (var r2 = 0; r2 < ROWS; r2++) for (var c2 = 0; c2 < COLS; c2++) {
     var i2 = r2 * COLS + c2;
-    if (game.shape && !game.shape[i2]) continue;
+    if (!game.inField(c2, r2)) continue;
     var lv = game.height[i2];
     var bb = hash2(r2 + 91, c2 + 17);
 
@@ -7160,7 +7293,7 @@ function syncTerrain() {
          near edge once the camera pulled back far enough to see under
          the floor. */
       if (nc < 0 || nr < 0 || nc >= COLS || nr >= ROWS) continue;
-      if (!game.shape || game.shape[nr * COLS + nc]) continue;
+      if (game.inField(nc, nr)) continue;
       var ax = S[2], ay = S[3], az = S[4], bx = S[5], by = S[6], bz = S[7];
       /* z runs backwards, so a neighbour one row on is one unit nearer */
       face.set(S[0], 0, -S[1]);
@@ -8089,6 +8222,7 @@ function edPolyFill(loud) {
   game._extra = game._extra || {};
   game._extra.outline = ed.poly.map(function (v) { return [v[0], v[1]]; });
   game._extra.outlineWall = edSegs().slice();
+  game.reBox();
   edRigs(); syncTerrain(); syncEdges(); edDress(); edCount(); edPolyDraw();
   ed.dirty = true;
   if (!loud) return;
@@ -8329,7 +8463,31 @@ var BRUSH_MIN = 1, BRUSH_MAX = 6;
    the cursor, so walking or pointing pans the view and there is no
    separate thing to learn about panning.
    ==================================================================== */
-var ZOOMS = [0.5, 0.7, 1, 1.5, 2, 3];
+/* The widest step has a job: at it the whole sheet is on screen, so a
+   corner of the room can be dragged right out to the far paper. Framing
+   the room and halving it only reaches about as far again, which is not
+   enough to double the room in both directions. */
+var ZOOMS = [0.3, 0.5, 0.7, 1, 1.5, 2, 3];
+
+/* ------------------------------------------------------------------
+   The camera frames the ROOM, not the sheet.
+
+   The sheet is four times the area a cellar has ever used, so framing
+   that would put every ordinary room in the middle of three quarters of
+   nothing. It frames what the level actually occupies; zooming out from
+   there is what shows you the blank paper you can grow into, which is
+   exactly the moment you want to see it and no other.
+   ------------------------------------------------------------------ */
+function edBox() {
+  return (game.box || (game.reBox ? game.reBox() : null) ||
+          { c0: 0, c1: COLS - 1, r0: 0, r1: ROWS - 1, w: COLS, h: ROWS });
+}
+function edFrameW() { return Math.max(8, edBox().w); }
+function edFrameH() { return Math.max(8, edBox().h); }
+function edFrame(v) {
+  var b = edBox();
+  return v.set(b.c0 + b.w / 2, 0, ROWS - 1 - b.r1 + b.h / 2);
+}
 
 function edZoomBar() {
   var el = $("edZoom");
@@ -8379,7 +8537,7 @@ function edZoomStep(by) {
 var ED_VIEWS = [
   { key: "floor", name: "Floor", cam: "plan", show: "floor",
     tools: ["Outline", "Cut out"],
-    how: "The floor on its own. Click or drag over squares to cut them out of the cellar, or put them back." },
+    how: "The floor on its own, with a handle on every corner of it. Zoom out to see the paper it can grow into." },
   { key: "walls", name: "Walls", cam: "plan", show: "walls",
     tools: ["Wall/drop"],
     how: "Click a square OUTSIDE the floor to switch what lies beyond it between good stone and a drop. Stone counts as a side of a trap; a drop does not." },
@@ -8467,6 +8625,27 @@ function edDress() {
 }
 
 
+/* ====================================================================
+   THE OUTLINE YOU ALREADY HAVE
+
+   A room is never a blank sheet: it starts as the square the game has
+   always dealt, and what you want to do to it is pull a corner about,
+   not draw it again from nothing. So the Floor view hands you that
+   square, with a handle on each of its four corners, and everything
+   from there is moving corners, adding one on an edge, or losing one.
+
+   The sheet is four times the area of that square, so dragging a corner
+   out into the blank paper is how a room gets bigger - which is what
+   zooming out is for.
+   ==================================================================== */
+function edPolySquare() {
+  var b = game.reBox ? game.reBox() : { c0: 0, c1: MF.FIELD_C - 1, r0: 0, r1: MF.FIELD_R - 1 };
+  ed.poly = [[b.c0, b.r0], [b.c1, b.r0], [b.c1, b.r1], [b.c0, b.r1]];
+  ed.polyWall = [1, 1, 1, 1];
+  ed.polyShut = true;
+  ed.picked = [];
+}
+
 function edViewTo(key) {
   /* a half-drawn outline is abandoned on the way out of the view; a
      closed one is part of the level and stays */
@@ -8479,6 +8658,8 @@ function edViewTo(key) {
      riddle, not a choice */
   var mine = edViewTools(key);
   if (mine.length && mine.indexOf(ed.tool) < 0) ed.tool = mine[0];
+  /* the room as it stands, ready to be pulled about */
+  if (key === "floor" && ed.poly.length < 3) edPolySquare();
   edPaint();
   edHow();
   resize();
@@ -8667,17 +8848,10 @@ function edStamp(quiet) {
       }
       return edSay("that is not on the outline \u2014 drag a corner, or click an edge to add one");
     }
-    /* clicking the first corner again closes the loop */
-    if (ed.poly.length >= 3 && ed.poly[0][0] === c && ed.poly[0][1] === r)
-      return edPolyClose();
-    var last = ed.poly[ed.poly.length - 1];
-    if (last && last[0] === c && last[1] === r) return;   /* held on one square */
-    ed.poly.push([c, r]);
-    edPolyDraw();
-    edSay(ed.poly.length + " corner" + (ed.poly.length === 1 ? "" : "s") +
-          (ed.poly.length >= 3 ? " \u2014 click the first one again, or press Enter, to close it"
-                               : " \u2014 keep going"));
-    return;
+    /* no outline yet - hand over the room as it stands */
+    edPolySquare();
+    edPolyFill(true);
+    return edSay("here is the room \u2014 drag a corner to change it");
   } else if (t.act === "shape") {
     /* ------------------------------------------------------------
        The outline of the cellar.
@@ -8775,7 +8949,10 @@ function edCount() {
   $("edTitle").textContent = name || "untitled";
   $("edDirty").className = "edDot" + (ed.dirty ? " on" : "");
   $("edDirty").title = ed.dirty ? "unsaved changes" : "saved";
-  var bits = ["cellar " + game.F, bricks + " brick" + (bricks === 1 ? "" : "s")];
+  var bx = game.box || (game.reBox && game.reBox());
+  var bits = ["cellar " + game.F];
+  if (bx) bits.push(bx.w + "\u00d7" + bx.h);
+  bits.push(bricks + " brick" + (bricks === 1 ? "" : "s"));
   if (rocks) bits.push(rocks + " rock" + (rocks === 1 ? "" : "s"));
   var loose = game.monsters.filter(function (m) { return !m.gone; }).length;
   bits.push(loose + " monster" + (loose === 1 ? "" : "s"));
@@ -9981,10 +10158,10 @@ function frame() {
        that is there - but with no lean, so nothing is hidden behind
        anything and the whole floor is reachable.
        ------------------------------------------------------------ */
-    camAim.set(COLS / 2, 0, ROWS / 2);
+    edFrame(camAim);
     var halfP = Math.tan(camera.fov * Math.PI / 360);
-    var upFor = Math.max((COLS / 2 + 1) / (halfP * Math.max(0.25, camera.aspect)),
-                         (ROWS / 2 + 1) / halfP) / ed.zoom;
+    var upFor = Math.max((edFrameW() / 2 + 1) / (halfP * Math.max(0.25, camera.aspect)),
+                         (edFrameH() / 2 + 1) / halfP) / ed.zoom;
     if (ed.zoom > 1)
       camAim.lerp(_aimAt.set(game.manC + 0.5, 0, ROWS - 1 - game.manR + 0.5), 0.85);
     camPos.set(camAim.x, upFor, camAim.z + 0.01);   /* a hair off true vertical */
@@ -10004,7 +10181,7 @@ function frame() {
        Held on a key, so a builder can still drop in close to see what
        a corner actually looks like.
        ------------------------------------------------------------ */
-    camAim.set(COLS / 2, 0, ROWS / 2);
+    edFrame(camAim);
     /* Far enough back that the WHOLE room is on screen, worked out from
        the window that is actually there rather than a distance that
        happened to look right once. It matters more than it sounds:
@@ -10020,8 +10197,8 @@ function frame() {
     var lean = tmp.set(0, 30.5, 15.5);
     var half = Math.tan(camera.fov * Math.PI / 360);
     var tilt = Math.atan2(lean.y, lean.z);
-    var forWide = (COLS / 2 + 1.5) / (half * Math.max(0.25, camera.aspect));
-    var forDeep = (ROWS * Math.sin(tilt) / 2 + 1.5) / half;
+    var forWide = (edFrameW() / 2 + 1.5) / (half * Math.max(0.25, camera.aspect));
+    var forDeep = (edFrameH() * Math.sin(tilt) / 2 + 1.5) / half;
     /* moved in, it cannot see the whole room, so it follows the cursor */
     if (ed.zoom > 1)
       camAim.lerp(_aimAt.set(game.manC + 0.5, 0, ROWS - 1 - game.manR + 0.5), 0.85);
@@ -10037,6 +10214,22 @@ function frame() {
     camera.position.lerp(camPos, 1 - Math.pow(0.002, dt));
     camera.lookAt(camAim);
   }
+
+  /* ------------------------------------------------------------------
+     Far enough to see what is being looked at.
+
+     The far plane was fixed at 220, which was generous for a camera
+     that never got more than forty units from a 34 by 26 room. A level
+     can now be four times that area, and standing back from a full-size
+     one puts the camera 274 units out - past the far plane, so the
+     entire cellar was clipped away and the screen went black. Nothing
+     errors when that happens; it just renders nothing.
+
+     It follows the camera instead, and comes back down when it can, so
+     an ordinary room keeps the depth precision it always had.
+     ------------------------------------------------------------------ */
+  var far = Math.max(220, camera.position.distanceTo(camAim) + Math.max(COLS, ROWS) + 40);
+  if (Math.abs(camera.far - far) > 2) { camera.far = far; camera.updateProjectionMatrix(); }
 
   if (bannerT > 0) { bannerT -= dt * 1000; if (bannerT <= 0) $("banner").hidden = true; }
   renderer.render(scene, camera);

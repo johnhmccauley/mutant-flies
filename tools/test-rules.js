@@ -48,18 +48,18 @@ const isBrick = (g, c, r) => g.grid[r * MF.COLS + c] === MF.BRICK;
 }
 {
   /* the man always advances - the original updates X% before it looks */
-  const g = bare(); g.manC = MF.COLS - 2; put(g, MF.COLS - 1, 10);
+  const g = bare(); g.manC = MF.FIELD_C - 2; put(g, MF.FIELD_C - 1, 10);
   g.step("right");
   ok("brick pushed over the edge is gone for good (POINT reads -1 outside)",
-     [g.manC, g.bricks, isBrick(g, MF.COLS - 1, 10)], [MF.COLS - 1, 0, false]);
+     [g.manC, g.bricks, isBrick(g, MF.FIELD_C - 1, 10)], [MF.FIELD_C - 1, 0, false]);
 }
 {
   /* three bricks against the edge: only the leading one is lost */
-  const g = bare(); g.manC = MF.COLS - 4;
-  put(g, MF.COLS - 3, 10); put(g, MF.COLS - 2, 10); put(g, MF.COLS - 1, 10);
+  const g = bare(); g.manC = MF.FIELD_C - 4;
+  put(g, MF.FIELD_C - 3, 10); put(g, MF.FIELD_C - 2, 10); put(g, MF.FIELD_C - 1, 10);
   g.step("right");
   ok("only the leading brick of a run goes over the edge",
-     [g.bricks, isBrick(g, MF.COLS - 2, 10), isBrick(g, MF.COLS - 1, 10)], [2, true, true]);
+     [g.bricks, isBrick(g, MF.FIELD_C - 2, 10), isBrick(g, MF.FIELD_C - 1, 10)], [2, true, true]);
 }
 {
   /* driven straight at the fly: the head brick lands on its square and

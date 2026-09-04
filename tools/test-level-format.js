@@ -486,5 +486,53 @@ console.log("\nDrawn, dealt, or both\n");
   ok("something the game has never heard of is skipped, not fatal", rocks, 3);
 }
 
+
+/* ============ a level written for the smaller sheet ================ */
+/* Every cellar used to be 34 by 26, and so is every level anybody has
+   already saved or shared as a code. The sheet is four times that now.
+   Refusing those records would have thrown all of them away. */
+{
+  const IO = global.MutantLevelIO;
+  const g = new MF.Game({ seed: 4242 });
+  g.F = 7; g.sheet();
+  g.grid[g.idx(5, 5)] = MF.BRICK;
+  g.grid[g.idx(33, 25)] = MF.BRICK;      /* the far corner of the OLD room */
+  g.manC = 6; g.manR = 6;
+
+  /* squeeze a current record down to how one looked before the sheet grew */
+  const rec = MutantLevelFormat.capture(g, { name: "From Before" });
+  const OC = MF.FIELD_C, OR = MF.FIELD_R;
+  const squeeze = (arr) => {
+    const out = new Uint8Array(OC * OR);
+    for (let r = 0; r < OR; r++) for (let c = 0; c < OC; c++)
+      out[r * OC + c] = arr[r * MF.COLS + c];
+    return out;
+  };
+  const old = JSON.parse(JSON.stringify(rec));
+  old.cols = OC; old.rows = OR;
+  MutantLevelFormat.PLANES.forEach((pl) => {
+    if (rec.cells[pl] == null) return;
+    old.cells[pl] = IO.packArray(squeeze(g[pl]));
+  });
+
+  const back = new MF.Game({ seed: 1 });
+  let threw = null;
+  try { MutantLevelFormat.apply(back, old); } catch (e) { threw = String(e); }
+  ok("a level from the smaller sheet still loads", threw, null);
+  ok("and everything in it is where it was",
+     [back.grid[back.idx(5, 5)], back.grid[back.idx(33, 25)], back.manC, back.manR],
+     [MF.BRICK, MF.BRICK, 6, 6]);
+  ok("it keeps the old room and does not gain the blank paper round it",
+     [back.inField(33, 25), back.inField(34, 25), back.inField(5, 26)],
+     [true, false, false]);
+
+  /* and a record from some future build is refused rather than guessed at */
+  let big = null;
+  try { MutantLevelFormat.apply(new MF.Game({ seed: 1 }),
+        Object.assign({}, old, { cols: MF.COLS + 2, rows: MF.ROWS })); }
+  catch (e) { big = String(e); }
+  ok("a level built for a bigger cellar is refused", /bigger cellar/.test(big || ""), true);
+}
+
 console.log("\n" + pass + " passed, " + fail + " failed");
 process.exit(fail ? 1 : 0);

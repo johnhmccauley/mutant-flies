@@ -215,8 +215,25 @@
   function apply(g, rec) {
     if (!rec || typeof rec !== "object") throw new Error("that is not a level");
     rec = upgrade(rec);
-    if (rec.cols !== MF.COLS || rec.rows !== MF.ROWS)
-      throw new Error("that level is a different shape from this cellar");
+    /* ------------------------------------------------------------------
+       A level written for a smaller sheet.
+
+       Every cellar used to be 34 by 26 and so was every level ever saved
+       or shared as a code. The sheet is four times that now, and a
+       straight refusal here would have thrown away every level anybody
+       had already built - including any built during the beta, which
+       were promised to at least be readable. So a smaller record is not
+       rejected, it is laid into the corner of the larger sheet, which is
+       exactly where the old room still is.
+
+       Bigger than this build understands is still refused: guessing at
+       what a future version meant would quietly corrupt it. */
+    var wasC = rec.cols | 0, wasR = rec.rows | 0;
+    if (wasC > MF.COLS || wasR > MF.ROWS)
+      throw new Error("that level was built for a bigger cellar than this game has");
+    if (wasC < 1 || wasR < 1)
+      throw new Error("that level does not say how big it is");
+    var older = (wasC !== MF.COLS || wasR !== MF.ROWS);
 
     /* hold on to anything a newer game wrote that this one has no idea
        about, so saving it again does not throw it away */
@@ -241,9 +258,14 @@
          is what every one of them means when it is absent - so a level
          written before a plane existed still loads */
       if (packed === undefined || packed === null) { g[PLANES[i]].fill(0); continue; }
-      var got = IO.unpackArray(packed, N);
+      var got = IO.unpackArray(packed, older ? wasC * wasR : N);
       if (!got) throw new Error("the " + PLANES[i] + " of that level is damaged");
-      g[PLANES[i]].set(got);
+      if (!older) { g[PLANES[i]].set(got); continue; }
+      /* row by row into the corner - the rows are a different length */
+      g[PLANES[i]].fill(0);
+      for (var yr = 0; yr < wasR; yr++)
+        for (var xc = 0; xc < wasC; xc++)
+          g[PLANES[i]][yr * MF.COLS + xc] = got[yr * wasC + xc];
     }
     for (var s = 0; s < SIDES.length; s++) {
       var side = SIDES[s][0];
@@ -257,8 +279,22 @@
     if (!g.blocks.length) g.blocks = null;
     g.floors = (rec.floors || []).slice(0, 16).map(cleanColour);
     if (!g.floors.length) g.floors = null;
-    g.shape = rec.shape ? IO.unpackArray(rec.shape, N) : null;
-    g.bound = rec.bound ? IO.unpackArray(rec.bound, N) : null;
+    g.shape = rec.shape ? IO.unpackArray(rec.shape, older ? wasC * wasR : N) : null;
+    g.bound = rec.bound ? IO.unpackArray(rec.bound, older ? wasC * wasR : N) : null;
+    if (older) {
+      /* the old room, wherever it fell in the old sheet, and nothing
+         beyond it - so a level that used every square of a 34 by 26
+         cellar does not silently gain the blank paper round it */
+      var wide = function (src) {
+        var out = new Uint8Array(N);
+        for (var yr2 = 0; yr2 < wasR; yr2++)
+          for (var xc2 = 0; xc2 < wasC; xc2++)
+            out[yr2 * MF.COLS + xc2] = src ? src[yr2 * wasC + xc2] : 1;
+        return out;
+      };
+      g.shape = wide(g.shape);
+      g.bound = g.bound ? wide(g.bound) : null;
+    }
     g.deal = rec.deal || null;
 
     g.manC = rec.man[0]; g.manR = rec.man[1];
@@ -315,6 +351,10 @@
        be one */
     g.settle({ trappedNow: [], freed: [] });
     return g;
+    /* everything that places something at random works inside the
+       level's own bounds, so they are worked out once it is loaded */
+    if (g.reBox) g.reBox();
+
   }
 
   /* ------------------------------------------------------------------
