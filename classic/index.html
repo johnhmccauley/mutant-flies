@@ -348,7 +348,8 @@
   /* line 130: X%=608 Y%=576, X1%=576 Y1%=512 */
   var MAN_C0 = 16, MAN_R0 = 14, MON_C0 = 15, MON_R0 = 12;
 
-  var MAX_H = 3;                      /* how high the floor ever gets */
+  var MAX_H = 3;                      /* how high the GENERATOR builds     */
+  var MAX_BUILD_H = 6;                /* how high a person may, by hand    */
   var TREE_STRENGTH = 10;             /* how much leaning a tree will take */
 
   /* Friction, by what the thing is rolling over. Gravity is the slope;
@@ -1391,7 +1392,7 @@
        so open a way out of whatever got boxed and settle again, because
        freeing a square lets the next brick move. */
     for (var round = 0; round < 8; round++) {
-      for (var settleN = 0; settleN < MAX_H * 8; settleN++) if (!this.slideBricks(null)) break;
+      for (var settleN = 0; settleN < MAX_BUILD_H * 8; settleN++) if (!this.slideBricks(null)) break;
       var opened = false;
       for (var mi = 0; mi < this.monsters.length; mi++)
         if (this.isBoxed(this.monsters[mi])) opened = this.openOut(this.monsters[mi]) || opened;
@@ -1587,10 +1588,10 @@
      is a slope you can read. */
   Game.prototype.smooth = function () {
     var D = [[1, 0], [-1, 0], [0, 1], [0, -1]];
-    for (var pass = 0; pass < MAX_H * 4; pass++) {
+    for (var pass = 0; pass < MAX_BUILD_H * 4; pass++) {
       var changed = false;
       for (var r = 0; r < ROWS; r++) for (var c = 0; c < COLS; c++) {
-        var i = this.idx(c, r), lowest = MAX_H;
+        var i = this.idx(c, r), lowest = MAX_BUILD_H;
         for (var d = 0; d < 4; d++) {
           var nc = c + D[d][0], nr = r + D[d][1];
           if (!this.inField(nc, nr)) { lowest = 0; break; }
@@ -1640,7 +1641,7 @@
     if (!this.inField(c, r)) return 0;
     run = Math.max(1, Math.min(6, run || 1));
     var i = this.idx(c, r);
-    var want = Math.max(0, Math.min(MAX_H, this.height[i] + delta));
+    var want = Math.max(0, Math.min(MAX_BUILD_H, this.height[i] + delta));
     if (want === this.height[i]) return 0;
     this.height[i] = want;
     return this.relax(delta > 0, run);
@@ -1656,7 +1657,7 @@
       var changed = false;
       for (var r = 0; r < ROWS; r++) for (var c = 0; c < COLS; c++) {
         if (!this.inField(c, r)) continue;
-        var i = this.idx(c, r), best = raising ? 0 : MAX_H;
+        var i = this.idx(c, r), best = raising ? 0 : MAX_BUILD_H;
         /* everything within `run` squares, because that is how far the
            ground is allowed to take to change by one */
         for (var dr = -run; dr <= run; dr++) for (var dc = -run; dc <= run; dc++) {
@@ -2741,7 +2742,7 @@
   root.MutantFly = {
     Game: Game,
     COLS: COLS, ROWS: ROWS, FIELD_C: FIELD_C, FIELD_R: FIELD_R, SHEER: SHEER,
-    TICK_HZ: TICK_HZ, MAX_H: MAX_H,
+    TICK_HZ: TICK_HZ, MAX_H: MAX_H, MAX_BUILD_H: MAX_BUILD_H,
     EMPTY: EMPTY, BRICK: BRICK, TREE: TREE, MARBLE: MARBLE,
     VAT_TAR: VAT_TAR, VAT_WATER: VAT_WATER, COOLED: COOLED, CHOPPER: CHOPPER,
     ROCK: ROCK, ROCK_WEIGHT: ROCK_WEIGHT, PUSH_POWER: PUSH_POWER,

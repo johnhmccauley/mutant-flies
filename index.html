@@ -1164,7 +1164,8 @@
   /* line 130: X%=608 Y%=576, X1%=576 Y1%=512 */
   var MAN_C0 = 16, MAN_R0 = 14, MON_C0 = 15, MON_R0 = 12;
 
-  var MAX_H = 3;                      /* how high the floor ever gets */
+  var MAX_H = 3;                      /* how high the GENERATOR builds     */
+  var MAX_BUILD_H = 6;                /* how high a person may, by hand    */
   var TREE_STRENGTH = 10;             /* how much leaning a tree will take */
 
   /* Friction, by what the thing is rolling over. Gravity is the slope;
@@ -2207,7 +2208,7 @@
        so open a way out of whatever got boxed and settle again, because
        freeing a square lets the next brick move. */
     for (var round = 0; round < 8; round++) {
-      for (var settleN = 0; settleN < MAX_H * 8; settleN++) if (!this.slideBricks(null)) break;
+      for (var settleN = 0; settleN < MAX_BUILD_H * 8; settleN++) if (!this.slideBricks(null)) break;
       var opened = false;
       for (var mi = 0; mi < this.monsters.length; mi++)
         if (this.isBoxed(this.monsters[mi])) opened = this.openOut(this.monsters[mi]) || opened;
@@ -2403,10 +2404,10 @@
      is a slope you can read. */
   Game.prototype.smooth = function () {
     var D = [[1, 0], [-1, 0], [0, 1], [0, -1]];
-    for (var pass = 0; pass < MAX_H * 4; pass++) {
+    for (var pass = 0; pass < MAX_BUILD_H * 4; pass++) {
       var changed = false;
       for (var r = 0; r < ROWS; r++) for (var c = 0; c < COLS; c++) {
-        var i = this.idx(c, r), lowest = MAX_H;
+        var i = this.idx(c, r), lowest = MAX_BUILD_H;
         for (var d = 0; d < 4; d++) {
           var nc = c + D[d][0], nr = r + D[d][1];
           if (!this.inField(nc, nr)) { lowest = 0; break; }
@@ -2456,7 +2457,7 @@
     if (!this.inField(c, r)) return 0;
     run = Math.max(1, Math.min(6, run || 1));
     var i = this.idx(c, r);
-    var want = Math.max(0, Math.min(MAX_H, this.height[i] + delta));
+    var want = Math.max(0, Math.min(MAX_BUILD_H, this.height[i] + delta));
     if (want === this.height[i]) return 0;
     this.height[i] = want;
     return this.relax(delta > 0, run);
@@ -2472,7 +2473,7 @@
       var changed = false;
       for (var r = 0; r < ROWS; r++) for (var c = 0; c < COLS; c++) {
         if (!this.inField(c, r)) continue;
-        var i = this.idx(c, r), best = raising ? 0 : MAX_H;
+        var i = this.idx(c, r), best = raising ? 0 : MAX_BUILD_H;
         /* everything within `run` squares, because that is how far the
            ground is allowed to take to change by one */
         for (var dr = -run; dr <= run; dr++) for (var dc = -run; dc <= run; dc++) {
@@ -3557,7 +3558,7 @@
   root.MutantFly = {
     Game: Game,
     COLS: COLS, ROWS: ROWS, FIELD_C: FIELD_C, FIELD_R: FIELD_R, SHEER: SHEER,
-    TICK_HZ: TICK_HZ, MAX_H: MAX_H,
+    TICK_HZ: TICK_HZ, MAX_H: MAX_H, MAX_BUILD_H: MAX_BUILD_H,
     EMPTY: EMPTY, BRICK: BRICK, TREE: TREE, MARBLE: MARBLE,
     VAT_TAR: VAT_TAR, VAT_WATER: VAT_WATER, COOLED: COOLED, CHOPPER: CHOPPER,
     ROCK: ROCK, ROCK_WEIGHT: ROCK_WEIGHT, PUSH_POWER: PUSH_POWER,
@@ -7204,11 +7205,18 @@ function buildProps() {
     new THREE.MeshStandardMaterial({ color: 0xf0d030, emissive: 0xf0d030,
                                      emissiveIntensity: 0.7, roughness: 0.2 }), 80, false);
 
+  /* what burning tar looks like from across the room */
+  props.flame = inst(new THREE.ConeGeometry(0.17, 0.46, 5), new THREE.MeshBasicMaterial({
+    color: 0xff8a2a, transparent: true, opacity: 0.9, depthWrite: false,
+    toneMapped: false }), 700, false);
+  props.smoke = inst(new THREE.SphereGeometry(0.2, 6, 5), new THREE.MeshBasicMaterial({
+    color: 0x241f1b, transparent: true, opacity: 0.34, depthWrite: false }), 700, false);
+
   props.water = inst(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshStandardMaterial({
     color: 0x1d5a72, transparent: true, opacity: 0.66, roughness: 0.05, metalness: 0.2 }), 500, false);
   props.tar = inst(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshStandardMaterial({
     color: 0x090604, roughness: 0.22, metalness: 0.0,
-    emissive: 0xc4380a, emissiveIntensity: 0.26 }), 500, false);
+    emissive: 0xc4380a, emissiveIntensity: 0.09 }), 500, false);
 
   /* marbles: few enough to be real objects, and the only thing down
      here polished enough to show you the room in it */
@@ -8147,7 +8155,7 @@ function syncWorld() {
                  snakeSeg: 0, snakeHead: 0, snakeEye: 0, rock: 0, coin: 0,
                  startPad: 0, cursorPad: 0,
                  robot: 0, robotOn: 0, robotTread: 0, robotEye: 0,
-                 chopBed: 0, chopBlade: 0, chopBlade2: 0,
+                 chopBed: 0, chopBlade: 0, chopBlade2: 0, flame: 0, smoke: 0,
                  item1: 0, item2: 0, item3: 0, item4: 0 };
   var spin = bobT * 7.4;
   var bricks = [];
@@ -8186,6 +8194,33 @@ function syncWorld() {
       var mesh = (f === MF.WATER) ? props.water : props.tar;
       var kk = (f === MF.WATER) ? "water" : "tar";
       placeAt(mesh, counts[kk]++, c, r, g0 + depth / 2, 0.99, depth, 0.99);
+
+      /* and tar is on fire the whole time it is loose */
+      if (f === MF.TAR) {
+        var seed = hash2(c, r);
+        for (var fl = 0; fl < 2; fl++) {
+          var ph = bobT * 3.1 + seed * 6.283 + fl * 2.1;
+          var lick = 0.72 + Math.abs(Math.sin(ph)) * 0.55;
+          placeAt(props.flame, counts.flame++,
+                  c + (fl ? 0.19 : -0.17) + Math.sin(ph * 0.7) * 0.05,
+                  r + (fl ? -0.15 : 0.16),
+                  g0 + depth + 0.2 * lick,
+                  0.85, lick, 0.85, ph);
+        }
+        for (var sm = 0; sm < 2; sm++) {
+          /* up, out and gone: the scale opens from nothing and closes
+             back to nothing, so a puff arrives and disperses instead of
+             blinking out at the top of its climb */
+          var t2 = ((bobT * 0.42 + seed + sm * 0.5) % 1);
+          var puff = Math.sin(Math.PI * t2);
+          if (puff < 0.03) continue;
+          placeAt(props.smoke, counts.smoke++,
+                  c + (sm ? 0.1 : -0.12) + t2 * 0.22,
+                  r + (sm ? -0.1 : 0.08),
+                  g0 + depth + 0.35 + t2 * 1.15,
+                  puff * 1.5, puff * 1.5, puff * 1.5, seed * 6.283);
+        }
+      }
     }
   }
   /* the two marks the editor needs and the game does not */
@@ -8257,8 +8292,8 @@ function syncWorld() {
     props[k].count = counts[k];
     props[k].instanceMatrix.needsUpdate = true;
   }
-  /* the fire breathes */
-  if (props.tar) props.tar.material.emissiveIntensity = 0.24 + Math.sin(bobT * 5.1) * 0.11;
+  /* it breathes, but faintly - the flames standing in it are the fire */
+  if (props.tar) props.tar.material.emissiveIntensity = 0.09 + Math.sin(bobT * 5.1) * 0.04;
 
   /* marbles */
   /* the same answer edDress gave, since it is the same question */
@@ -8909,8 +8944,8 @@ var ED_TOOLS = [
   { name: "Rock",      group: 0, swatch: "#8d8578", act: "cell", v: 8, how: "Click a square for a rock - four bricks of shove, and nothing down here can destroy it." },
   { name: "Tree",      group: 0, swatch: "#2f4a24", act: "cell", v: 2, how: "Click a square to plant a tree. The chopper turns one into bricks." },
   { name: "Marble",    group: 0, swatch: "#cfd6dd", act: "marble", how: "Click a square to drop a marble. It rolls when something shoves it." },
-  { name: "Tar vat",   group: 1, swatch: "#4a2410", act: "cell", v: 4, how: "Click a square for a vat of tar. Wall it in or it runs." },
-  { name: "Water vat", group: 1, swatch: "#2a5f7a", act: "cell", v: 5, how: "Click a square for a vat of water. Wall it in or it runs." },
+  { name: "Water",     group: 1, swatch: "#2a5f7a", act: "wet", v: MF.WATER, how: "Click a square to pour water on it. It runs downhill and finds its level, and it puts out burning tar." },
+  { name: "Tar",       group: 1, swatch: "#c4380a", act: "wet", v: MF.TAR, how: "Black, and hot enough to burn. It runs downhill and sets fire to what it touches - trees, bricks, monsters, you - and eventually goes hard." },
   { name: "Set tar",   group: 1, swatch: "#14100e", act: "cell", v: 6, how: "Click a square to lay tar that has already gone hard." },
   { name: "Chopper",   group: 0, swatch: "#6b6b74", act: "cell", v: 7, how: "Click a square for a chopper - it turns trees into bricks." },
   { name: "Boots",     group: 2, swatch: "#a86b32", act: "item", v: 1, how: "Click a square to leave boots there to be picked up." },
@@ -8925,12 +8960,12 @@ var ED_TOOLS = [
   { name: "Start",     group: 4, swatch: "#ffd27a", act: "man", how: "Click a square to say where the player begins." },
   { name: "Raise",     group: 4, swatch: "#7a6a52", act: "hi", v: 1, how: "Click a square to lift it a step. Hold to keep lifting - the ground around it slopes up to meet it." },
   { name: "Lower",     group: 4, swatch: "#4a4034", act: "hi", v: -1, how: "Click a square to drop it a step. Hold to keep going." },
-  { name: "Stone", group: 4, swatch: "#574c42", act: "edge", v: 1,
-    how: "Press a side of the room to build it in stone. A brick driven at it stops dead, and stone is the only side that counts as a side of a trap - two bricks hold something in a stone corner where four would be needed." },
+  { name: "Wall", group: 4, swatch: "#574c42", act: "edge", v: 1,
+    how: "Good stone, all the way up. A brick driven at it stops dead, and a wall is the only side that counts as a side of a trap - two bricks hold something in a walled corner where four would be needed." },
   { name: "A lip", group: 4, swatch: "#3b332c", act: "edge", v: MF.DROP,
-    how: "Press a side of the room to leave it a small kerb. Bricks go over it and so do you, but a marble rolling at it comes back slower - unless it is going fast enough to ride over." },
+    how: "The floor ends in a small kerb. Bricks go over it and so do you, but a marble rolling at it comes back slower - unless it is going fast enough to ride over." },
   { name: "A sheer drop", group: 4, swatch: "#0d0b09", act: "edge", v: MF.SHEER,
-    how: "Press a side of the room to take it away altogether. Everything that reaches it goes over, a marble at any speed included, and none of it comes back." },
+    how: "Nothing at all at the edge. Everything that reaches it goes over, a marble at any speed included, and none of it comes back." },
   { name: "Outline",   group: 4, swatch: "#ffd27a", act: "poly", how: "Drag a corner to move it. Click one to pick it out, or drag a box round several. Press anywhere along a side to add a corner there; Delete loses one." },
   { name: "Cut out",   group: 4, swatch: "#0d0b09", act: "shape", how: "Click a square to take it out of the cellar - the floor stops there. Click it again to put it back." },
   { name: "Paint floor", group: 1, swatch: "#8a6a3a", act: "tint", how: "Click a square to colour it with the swatch beside the name box." }
@@ -9931,12 +9966,12 @@ var ED_VIEWS = [
   { key: "walls", name: "Wall", cam: "low", show: "all", pics: true,
     /* a bond of bricks, not the rungs of a ladder */
     icon: '<path d="M1.6 3.4h12.8v9.2H1.6z"/><path d="M1.6 6.5h12.8M1.6 9.5h12.8"/><path d="M6 3.4v3.1M10.6 3.4v3.1M3.7 6.5v3M8.3 6.5v3M12.9 6.5v3M6 9.5v3.1M10.6 9.5v3.1"/>',
-    tools: ["Stone", "A lip", "A sheer drop"],
-    how: "Pick what a side of the room should be, then press the sides you want it on." },
+    tools: ["Wall", "A lip", "A sheer drop"],
+    how: "Press a side of the room to pick it out, then say what it should be." },
   { key: "things", name: "Elements", cam: "room", show: "all", pics: true,
     icon: '<path d="M8 1.9 14 5.2v5.6L8 14.1 2 10.8V5.2z"/><path d="M2 5.2 8 8.5l6-3.3M8 8.5v5.6"/>',
     tools: ["Erase", "Red brick", "Blue brick", "Rock", "Tree", "Marble", "Chopper",
-            "Tar vat", "Water vat", "Set tar",
+            "Water", "Tar", "Set tar",
             "Boots", "Frost", "Saw", "Jar"],
     /* Erase leads the list, because taking something off a square is
        the other half of putting one on it and you reach for it as
@@ -10280,9 +10315,29 @@ function edPaint() {
     var t = ED_TOOLS[i];
     var b = document.createElement("button");
     b.type = "button";
-    b.setAttribute("aria-pressed", i === ed.tool ? "true" : "false");
-    b.title = t.how + "   (" + (n + 1) + ")";
-    b.addEventListener("click", function () { ed.tool = i; edPaint(); edHow(); });
+    /* An edge card is not a thing to hold, it is a thing to say about
+       the side you have picked - so it is dim until there is one, and
+       the one that side already is reads as chosen. */
+    var edgy = (t.act === "edge");
+    var live = !edgy || ed.segPick >= 0;
+    var mine = edgy ? (live && (edSegs()[ed.segPick] | 0) === (t.v | 0))
+                    : (i === ed.tool);
+    b.setAttribute("aria-pressed", mine ? "true" : "false");
+    b.disabled = !live;
+    b.title = live ? t.how : "press a side of the room first";
+    b.addEventListener("click", function () {
+      if (!edgy) { ed.tool = i; edPaint(); edHow(); return; }
+      if (ed.segPick < 0) return;
+      var f = edSegs();
+      if ((f[ed.segPick] | 0) === (t.v | 0)) return;
+      edMark();
+      f[ed.segPick] = t.v | 0;
+      edPolyFill(false);
+      edPolyDraw();
+      edPaint();
+      /* the wall appears, or stops being there - which is the whole
+         message, and it is already on the screen */
+    });
 
     if (asCards) {
       /* a picture of the thing, not a square of its colour */
@@ -10416,6 +10471,19 @@ function edStamp(quiet) {
     game._extra = game._extra || {};
     if (t.hue) (game._extra.brickHue = game._extra.brickHue || {})[i] = t.hue;
     else if (game._extra.brickHue) delete game._extra.brickHue[i];
+  } else if (t.act === "wet") {
+    /* A fluid is not something standing on the square, it is the state
+       of the square - so it goes in the fluid layer, and the volume is
+       what the cellar reads to decide how deep it looks and how far it
+       will run. Enough to be a puddle rather than a stain. */
+    if (game.grid[i] !== MF.EMPTY)
+      return edSay("there is something on that square already", "bad");
+    if (game.fluid[i] === t.v) {
+      game.fluid[i] = MF.DRY; game.fvol[i] = 0;
+    } else {
+      game.fluid[i] = t.v; game.fvol[i] = 4;
+    }
+    game.sealed[i] = 0;
   } else if (t.act === "marble") {
     if (game.grid[i] === MF.MARBLE) return edSay("there is one there already");
     game.grid[i] = MF.MARBLE;
@@ -10533,21 +10601,20 @@ function edStamp(quiet) {
     /* With an outline, a wall is a side of the room rather than a
        square of it - so clicking anywhere along a stretch opens or
        closes the whole stretch. */
-    /* The kind is already in your hand - the card you picked - so
-       pressing a side is the whole gesture. It stays lit afterwards so
-       you can see which one you just did. */
+    /* Pressing picks the side out and says what it is. What it should
+       be is the next question, and the cards are the answer to it. */
     var seg = edEdgeNear(c, r);
     if (seg < 0) {
-      if (ed.segPick >= 0) { ed.segPick = -1; edPolyDraw(); }
-      return edSay("press along one of the room's sides", "bad");
+      if (ed.segPick >= 0) { ed.segPick = -1; edPolyDraw(); edPaint(); }
+      return edSay("press along one of the room's sides to pick it", "bad");
     }
-    var flags = edSegs();
     ed.segPick = seg;
-    if (flags[seg] === (t.v | 0)) { edPolyDraw(); return edSay("that side is already " + t.name.toLowerCase()); }
-    flags[seg] = t.v | 0;
-    edPolyFill(false);
     edPolyDraw();
-    return edSay("that side is now " + t.name.toLowerCase());
+    edPaint();
+    /* The cards below come alive and the one that side already is reads
+       as chosen, so a sentence saying the same thing is a third place to
+       look for one fact. */
+    return edSay("");
   } else if (t.act === "edge") {
     /* Only means anything OFF the floor - that is where an edge is. A
        shaped level has boundaries all over it, not just four sides, so
@@ -12333,11 +12400,24 @@ function thingPortrait(name, w, h, spin) {
 
     var put = [];
     var brickKind = (name === "Red brick") ? 1 : (name === "Blue brick") ? 2 : 0;
-    if (brickKind || name === "Rock" || name === "Marble" ||
-        name === "Set tar" || name === "Tar vat" || name === "Water vat") {
-      var of = { Rock: props.rock,
-                 "Set tar": props.cooled, "Tar vat": props.vatT,
-                 "Water vat": props.vatW }[name] || null;
+    /* ------------------------------------------------------------
+       A fluid has no shape of its own: what you are being shown is a
+       square of floor with something lying on it, which is exactly
+       what the cellar draws. The materials are the cellar's own, so
+       the tar in the picture glows the same orange the tar in the room
+       does - it is on fire, and that is the whole point of it.
+       ------------------------------------------------------------ */
+    if (name === "Water" || name === "Tar" || name === "Set tar") {
+      var pool = (name === "Water") ? props.water
+               : (name === "Tar") ? props.tar : props.cooled;
+      var mat = pool ? pool.material
+              : new THREE.MeshStandardMaterial({ color: 0x1d5a72 });
+      var deep = (name === "Set tar") ? 0.34 : 0.3;
+      var slab = new THREE.Mesh(new THREE.BoxGeometry(0.98, deep, 0.98), mat);
+      slab.position.y = deep / 2;
+      put.push(standOn(slab));
+    } else if (brickKind || name === "Rock" || name === "Marble") {
+      var of = { Rock: props.rock }[name] || null;
       if (brickKind) {
         /* the picture is the brick: the same box, the same material, and
            the texture that colour actually gets in the room */
@@ -12378,8 +12458,7 @@ function thingPortrait(name, w, h, spin) {
       } else {
         /* the cellar colours some of these per instance, so the bare
            material is white - which is not what a rock looks like */
-        var one2 = fromProp(of, name === "Rock" ? 0x574f45
-                              : name === "Set tar" ? 0x14100e : null);
+        var one2 = fromProp(of, name === "Rock" ? 0x574f45 : null);
         if (one2 && name === "Rock") {
           /* faceted and dull, which is what a rock is - the cellar's own
              material is smooth and pale because the light down there
