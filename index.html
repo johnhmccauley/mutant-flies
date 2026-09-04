@@ -273,13 +273,17 @@
   align-items: flex-start; align-content: flex-start;
   max-height: 40vh; overflow-y: auto; overflow-x: hidden;
   padding-bottom: 3px;
-  /* the browser's own is a white slab down the side of a dark room */
-  scrollbar-width: thin; scrollbar-color: #4a3c2c transparent; }
-#edTools::-webkit-scrollbar { width: 9px; }
-#edTools::-webkit-scrollbar-track { background: transparent; }
-#edTools::-webkit-scrollbar-thumb { background: #4a3c2c; border-radius: 5px;
+  padding-bottom: 3px; }
+
+/* the browser's own is a white slab down the side of a dark room, and
+   it is the same slab whichever list it is attached to */
+* { scrollbar-width: thin; scrollbar-color: #4a3c2c transparent; }
+*::-webkit-scrollbar { width: 9px; height: 9px; }
+*::-webkit-scrollbar-track { background: transparent; }
+*::-webkit-scrollbar-corner { background: transparent; }
+*::-webkit-scrollbar-thumb { background: #4a3c2c; border-radius: 5px;
   border: 2px solid transparent; background-clip: content-box; }
-#edTools::-webkit-scrollbar-thumb:hover { background: #6b5640; background-clip: content-box; }
+*::-webkit-scrollbar-thumb:hover { background: #6b5640; background-clip: content-box; }
 .edGroup { display: flex; gap: 3px; align-items: center; flex-wrap: wrap;
   padding: 2px 6px 2px 0; border-right: 1px solid #2b2219; }
 .edGroup:last-child { border-right: 0; }
@@ -553,7 +557,8 @@
 .edItem:hover { border-color: #6b5640; }
 .edItem.here { border-color: #b98c3e; background: #241b13; }
 .edItem.here b { color: #ffe6b8; }
-#edShelfActs { gap: 6px; justify-content: flex-start; margin-bottom: 4px; }
+#edShelfActs { gap: 6px; justify-content: flex-start; margin: 10px 0 0; flex-wrap: wrap; }
+#edShelfActs #edListNew { margin-left: auto; }
 .edItem b { color: #efe4d2; font-weight: 600; }
 .edItem span { color: #8e8172; font-size: 12px; }
 /* the picture of the cellar, drawn as squares rather than smeared */
@@ -886,17 +891,15 @@
   <div class="card">
     <p class="kicker">Your cellars</p>
     <h1>Build a cellar</h1>
-    <div id="edList"></div>
-    <!-- one set of verbs, about whichever cellar is picked above -->
+    <!-- one set of verbs, about whichever cellar is picked below -->
     <div class="row" id="edShelfActs">
       <button class="edBtn" id="edShelfOpen" type="button">Open</button>
       <button class="edBtn" id="edShelfPub" type="button">Publish</button>
       <button class="edBtn" id="edShelfDel" type="button">Delete</button>
+      <button class="edBtn warm" id="edListNew" type="button">New cellar</button>
+      <button class="edBtn" id="edListClose" type="button">Back</button>
     </div>
-    <div class="row">
-      <button class="go" id="edListNew" type="button">New cellar</button>
-      <button class="go quiet" id="edListClose" type="button">Back</button>
-    </div>
+    <div id="edList"></div>
     <p class="fine">Kept in this browser. A cellar that has been published cannot be deleted - other people have played it - but it can be hidden.</p>
   </div>
 </div>
