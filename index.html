@@ -913,7 +913,21 @@
      cellar. Come back to a saved game and it is where you left it. */
   function clamp(v, lo, hi) { return v < lo ? lo : (v > hi ? hi : v); }
 
-  var DROP = 0, WALL = 1;
+  /* ------------------------------------------------------------------
+     Three things a side of a room can be.
+
+     DROP is what the floor has always done here: it ends in a small lip.
+     A brick shoved over goes and does not come back, and so do you - but
+     a marble rolling at it clouts the lip and comes back slower unless
+     it is going fast enough to ride over. That lip has been in the game
+     since marbles were, quietly, as part of "drop".
+
+     SHEER is the new one: no lip at all, nothing to catch anything. A
+     marble reaches it and is gone whatever speed it was doing.
+
+     WALL is good stone, and it is the only one that holds anything in.
+     ------------------------------------------------------------------ */
+  var DROP = 0, WALL = 1, SHEER = 2;
 
   function mulberry32(a) {
     return function () {
@@ -1718,8 +1732,10 @@
       if (r < 0) return this.edge.S[clamp(c, 0, COLS - 1)];
       return this.edge.N[clamp(c, 0, COLS - 1)];
     }
-    if (this.bound)
-      return this.bound[r * COLS + c] === WALL ? WALL : DROP;
+    if (this.bound) {
+      var b = this.bound[r * COLS + c];
+      return (b === WALL || b === SHEER) ? b : DROP;
+    }
 
     var b = this.box || this.reBox();
     if (c < b.c0) return this.edge.W[clamp(r, 0, ROWS - 1)];
@@ -2667,7 +2683,7 @@
                   /* it goes over, and it is not coming back either */
                   ev.lostOverEdge = 1;
                   line.pop();
-                } else if (this.classic || this.edgeAt(cc, rr) === DROP) {
+                } else if (this.classic || this.edgeAt(cc, rr) !== WALL) {
                   /* 1985: the brick was drawn outside the graphics
                      viewport, clipped away, and never came back. Down
                      here the floor just stops, which comes to the same
@@ -2823,12 +2839,13 @@
         var dh = this.h(nc, nr) - this.h(m.c, m.r);
 
         if (!this.inField(nc, nr)) {
-          if (this.classic || this.edgeAt(nc, nr) === WALL) { this.bounce(m, 0.45); continue; }
-          /* No wall here, only the lip the floor ends in. Fast enough and
-             it rides over and is gone; short of that it clouts the lip
-             and comes back slower - and rougher ground robs it of more
-             on the way back. */
-          if (m.v >= lipSpeed(m)) {
+          var side = this.classic ? WALL : this.edgeAt(nc, nr);
+          if (side === WALL) { this.bounce(m, 0.45); continue; }
+          /* No wall here. A drop still ends in a lip: fast enough and it
+             rides over and is gone; short of that it clouts the lip and
+             comes back slower, and rougher ground robs it of more on the
+             way back. A sheer edge has no lip to clout. */
+          if (side === SHEER || m.v >= lipSpeed(m)) {
             this.grid[this.idx(m.c, m.r)] = EMPTY;
             m.gone = true; m.v = 0;
             ev.overTheEdge.push(m);
@@ -3192,7 +3209,7 @@
 
   root.MutantFly = {
     Game: Game,
-    COLS: COLS, ROWS: ROWS, FIELD_C: FIELD_C, FIELD_R: FIELD_R,
+    COLS: COLS, ROWS: ROWS, FIELD_C: FIELD_C, FIELD_R: FIELD_R, SHEER: SHEER,
     TICK_HZ: TICK_HZ, MAX_H: MAX_H,
     EMPTY: EMPTY, BRICK: BRICK, TREE: TREE, MARBLE: MARBLE,
     VAT_TAR: VAT_TAR, VAT_WATER: VAT_WATER, COOLED: COOLED, CHOPPER: CHOPPER,
@@ -6506,6 +6523,30 @@ function buildCellar() {
    a cellar with three hundred things in it costs the same as an empty
    one.
    ------------------------------------------------------------------ */
+/* n baulks stacked to `tall`, with a shadow gap between them, as one
+   geometry - so a wall of them is still one instance per square */
+function beamStack(n, tall, wide) {
+  var gap = 0.055, deep = wide;
+  var each = (tall - gap * (n - 1)) / n;
+  var parts = [];
+  for (var i = 0; i < n; i++) {
+    var g = new THREE.BoxGeometry(wide, each, deep).toNonIndexed();
+    g.translate(0, each / 2 + i * (each + gap) - tall / 2, 0);
+    parts.push(g);
+  }
+  var out = new THREE.BufferGeometry();
+  ["position", "normal", "uv"].forEach(function (name) {
+    var size = parts[0].attributes[name].itemSize;
+    var total = 0;
+    parts.forEach(function (g) { total += g.attributes[name].array.length; });
+    var all = new Float32Array(total), at = 0;
+    parts.forEach(function (g) { all.set(g.attributes[name].array, at); at += g.attributes[name].array.length; });
+    out.setAttribute(name, new THREE.BufferAttribute(all, size));
+  });
+  out.computeBoundingSphere();
+  return out;
+}
+
 function inst(geo, mat, n, shadow) {
   var m = new THREE.InstancedMesh(geo, mat, n);
   m.castShadow = !!shadow; m.receiveShadow = true; m.count = 0;
@@ -6562,8 +6603,26 @@ function buildProps() {
      and a room with any sort of bay or notch in it has more again. Over
      that, an InstancedMesh does not complain - it just stops drawing,
      so the far half of a wall you had built simply was not there. */
-  props.edgeWall = inst(new THREE.BoxGeometry(1.02, 3.4, 1.02),
-    new THREE.MeshStandardMaterial({ color: 0x574c42, roughness: 0.94, metalness: 0.03 }),
+  /* ------------------------------------------------------------------
+     The wall is stacked timber, not a slab.
+
+     One box per square, three and a half high, comes out as an unbroken
+     pale face - and lit by the editor's drafting light that face is
+     just white. Baulks of wood stacked up read as something built, take
+     the light in bands so you can see how tall it is, and match the
+     timber the top cellar is stacked with. Four beams with a shadow gap
+     between them, merged into one geometry so it still costs one
+     instance per square.
+     ------------------------------------------------------------------ */
+  props.edgeWall = inst(beamStack(4, 3.4, 1.02),
+    new THREE.MeshStandardMaterial({ map: BRICK_TEX.wood && BRICK_TEX.wood.map,
+                                     bumpMap: BRICK_TEX.wood && BRICK_TEX.wood.bump,
+                                     bumpScale: 0.05,
+                                     /* dark enough to stay timber under the
+                                        drafting light - a pale colour on a
+                                        big flat face goes to white and takes
+                                        the grain with it */
+                                     color: 0x5c4a2c, roughness: 0.93, metalness: 0.02 }),
     COLS * ROWS, true);
   /* the little lip the floor ends in where there is no wall */
   props.edgeLip = inst(new THREE.BoxGeometry(1.02, 0.26, 1.02),
@@ -7256,8 +7315,12 @@ function syncEdges() {
   var wallOf = props.edgeWall.userData.cells || (props.edgeWall.userData.cells = []);
   var lipOf = props.edgeLip.userData.cells || (props.edgeLip.userData.cells = []);
   function put(c, r) {
-    var wall = game.edgeAt(c, r) === MF.WALL;
-    if (wall) { wallOf[nW] = [c, r]; placeAt(props.edgeWall, nW++, c, r, 1.7); }
+    /* Three kinds, three things to draw - and for a sheer edge the
+       third thing is nothing at all. It was getting the same kerb as a
+       lip, which is the one detail that tells them apart. */
+    var side = game.edgeAt(c, r);
+    if (side === MF.WALL) { wallOf[nW] = [c, r]; placeAt(props.edgeWall, nW++, c, r, 1.7); }
+    else if (side === MF.SHEER) { /* the floor simply stops */ }
     else { lipOf[nL] = [c, r]; placeAt(props.edgeLip, nL++, c, r, 0.13); }
   }
   /* every square that is not in the level but touches one is a piece of
@@ -7294,7 +7357,8 @@ function syncEdges() {
     var a = game.edgeAt(k[0], k[3]), b2 = game.edgeAt(k[2], k[1]);
     if (a === MF.WALL || b2 === MF.WALL) {
       wallOf[nW] = [k[0], k[1]]; placeAt(props.edgeWall, nW++, k[0], k[1], 1.7);
-    } else { lipOf[nL] = [k[0], k[1]]; placeAt(props.edgeLip, nL++, k[0], k[1], 0.13); }
+    } else if (a === MF.SHEER && b2 === MF.SHEER) { /* nothing on either side */ }
+    else { lipOf[nL] = [k[0], k[1]]; placeAt(props.edgeLip, nL++, k[0], k[1], 0.13); }
   });
   props.edgeWall.count = nW; props.edgeWall.instanceMatrix.needsUpdate = true;
   props.edgeLip.count = nL; props.edgeLip.instanceMatrix.needsUpdate = true;
@@ -8120,7 +8184,7 @@ var ed = {
      is the cursor, so without this the starting square was wherever the
      builder happened to leave him when they stopped building - which
      was almost never where they meant the player to begin. */
-  startC: 4, startR: 4, brush: 2, poly: [], polyWall: [], polyShut: false, dragNode: -1, picked: [], band: null,
+  startC: 4, startR: 4, brush: 2, poly: [], polyWall: [], polyShut: false, dragNode: -1, picked: [], band: null, panX: null, panZ: null,
   dragFrom: null, zoom: 1, testing: false,
   /* The single most important thing an editor has, and the first
      version did not have it: somewhere to put the last forty things you
@@ -8346,19 +8410,20 @@ function edPolyFill(loud) {
 
   var segs = edSegs(), walled = 0;
   for (var v2 = 0; v2 < ed.poly.length; v2++) {
-    if (!segs[v2]) continue;                       /* this side is open */
+    var kindOf = segs[v2] | 0;
+    if (kindOf === MF.DROP) continue;              /* a plain lip needs nothing said */
     edWalkEdge(ed.poly[v2], ed.poly[(v2 + 1) % ed.poly.length], function (ec, er) {
       for (var d = 0; d < 4; d++) {
         var dd = [[1, 0], [-1, 0], [0, 1], [0, -1]][d];
         var nc = ec + dd[0], nr = er + dd[1];
-        if (nc < 0) { game.edge.W[er] = MF.WALL; walled++; continue; }
-        if (nc >= COLS) { game.edge.E[er] = MF.WALL; walled++; continue; }
-        if (nr < 0) { game.edge.S[ec] = MF.WALL; walled++; continue; }
-        if (nr >= ROWS) { game.edge.N[ec] = MF.WALL; walled++; continue; }
+        if (nc < 0) { game.edge.W[er] = kindOf; walled++; continue; }
+        if (nc >= COLS) { game.edge.E[er] = kindOf; walled++; continue; }
+        if (nr < 0) { game.edge.S[ec] = kindOf; walled++; continue; }
+        if (nr >= ROWS) { game.edge.N[ec] = kindOf; walled++; continue; }
         var ni = nr * COLS + nc;
         if (game.shape[ni]) continue;
-        if (game.bound[ni] !== MF.WALL) walled++;
-        game.bound[ni] = MF.WALL;
+        if (game.bound[ni] !== kindOf) walled++;
+        game.bound[ni] = kindOf;
       }
     });
   }
@@ -8874,13 +8939,14 @@ function edPolyDraw() {
     var onEdge = ED_TOOLS[ed.tool] && ED_TOOLS[ed.tool].act === "edge";
     for (var i = 0; i < n; i++) {
       if (onEdge) {
-        /* In the Walls view every side is blue, because every side is a
-           thing you can press - the white outline in the Floor view is
-           about corners, and using the same white here would say the
-           same thing about two different jobs. The one you have picked
-           is the bright one. */
+        /* White unless it is the one you picked. Drawing every side in
+           a dim blue was meant to say "all of these can be pressed" and
+           said "all of these are selected" instead - blue is doing one
+           job here and it should only ever do that one. What KIND each
+           side is needs no colour: from down here you can see the wall
+           standing up, or the kerb, or nothing at all. */
         if (i === ed.segPick) side(i, (i + 1) % n, 0.25, 0.69, 1.0);
-        else side(i, (i + 1) % n, 0.10, 0.28, 0.42);
+        else side(i, (i + 1) % n, 0.85, 0.85, 0.85);
       } else {
         var lit = segs[i] ? 1.0 : 0.30;
         side(i, (i + 1) % n, lit, lit, lit);
@@ -8893,6 +8959,7 @@ function edPolyDraw() {
   edPolyLine.count = put;
   edPolyLine.instanceMatrix.needsUpdate = true;
   if (edPolyLine.instanceColor) edPolyLine.instanceColor.needsUpdate = true;
+  edTintEdges();
 }
 
 /* How wide the ground tool works. Raising one square at a time is a
@@ -8936,26 +9003,100 @@ var ZOOMS = [0.3, 0.5, 0.7, 1, 1.5, 2, 3];
    exactly the moment you want to see it and no other.
    ------------------------------------------------------------------ */
 function edBox() {
-  /* The Floor view frames the whole sheet, not just the room.
-
-     Everywhere else, framing the room is right - it is what you are
-     working on. But the Floor view is the one place where the point is
-     to change how big the room IS, and framing the room there meant the
-     paper it could grow into was off screen: you could take hold of a
-     corner, drag it to the edge of the view and nothing happened,
-     because there was nowhere to put it. You had to know to zoom out
-     first, which is a thing to know before you can do the obvious
-     thing. Here the paper is simply always there. */
+  /* The Floor view is about how big the room may get, so the paper is
+     part of what you are working on there. Everywhere else the room is. */
   if (mode === "edit" && ed.view === "floor")
     return { c0: 0, c1: COLS - 1, r0: 0, r1: ROWS - 1, w: COLS, h: ROWS };
   return (game.box || (game.reBox ? game.reBox() : null) ||
           { c0: 0, c1: COLS - 1, r0: 0, r1: ROWS - 1, w: COLS, h: ROWS });
 }
-function edFrameW() { return Math.max(8, edBox().w); }
-function edFrameH() { return Math.max(8, edBox().h); }
+
+/* ====================================================================
+   WHAT 100% MEANS
+
+   The editor's cameras used to be solved to FIT: stand back far enough
+   that the room is on screen, whatever size the room and whatever size
+   the window. Two things went wrong with that. Resizing the window
+   silently changed the zoom - the same room in a taller window was
+   drawn bigger, so "1x" meant nothing you could rely on and nothing you
+   could return to. And a big room was drawn small to make it fit, which
+   is the opposite of what you want when you are placing bricks in it.
+
+   So one square is a fixed number of pixels: SQUARE_PX at 1x, times the
+   zoom. A bigger window shows MORE of the cellar at the same size
+   rather than the same cellar bigger - which is how every map editor
+   behaves and the only way a zoom number means anything.
+
+   What follows from that is scrolling: at 1x a full-size room does not
+   fit, so the view follows the cursor, and stops at the edges of the
+   map rather than wandering off into the dark. When the whole thing
+   does fit, it sits still in the middle and there is nothing to scroll.
+
+   Play is untouched. That camera is over the man's shoulder and is
+   nobody's map.
+   ==================================================================== */
+var SQUARE_PX = 26;
+
+function edSeeing() {
+  var half = Math.tan(camera.fov * Math.PI / 360);
+  var px = SQUARE_PX * (ed.zoom > 0 ? ed.zoom : 1);
+  var h = Math.max(120, renderer.domElement.clientHeight || innerHeight || 600);
+  var dist = h / (2 * px * half);          /* one square is px pixels */
+
+  /* The scale is the scale. A short window shows less of the cellar at
+     the same size, which is the whole point and is what panning is for.
+     The only floor on it is enough clearance not to stand the camera
+     inside the stonework - eight squares, well under any real window. */
+  dist = Math.max(8, dist);
+  var seeH = 2 * dist * half;
+  /* Math.max(0.25, NaN) is NaN, not 0.25 - and an aspect of NaN before
+     the first resize turned into a NaN camera position, which lerp then
+     carried forward for ever. Nothing recovers from that on its own. */
+  var aspect = (camera.aspect > 0) ? camera.aspect : 1;
+  return { dist: dist, h: seeH, w: seeH * Math.max(0.25, aspect) };
+}
+
+/* ====================================================================
+   PANNING
+
+   With the scale fixed, a cellar bigger than the window is simply
+   bigger than the window - so there has to be a way to move about it.
+   Three, in fact, because there are three ways people reach for it:
+
+     drag with two fingers      the way a phone is panned
+     hold space and drag        the way every drawing program is panned
+     the arrow keys             the way somebody without either is
+
+   Where it has not been panned it sits in the middle of the map, and
+   panning is held inside the map so it cannot be scrolled off into the
+   dark. Zooming out until everything fits releases it back to the
+   middle, which saves ever being lost.
+   ==================================================================== */
+function edPanTo(x, z) {
+  if (!isFinite(x) || !isFinite(z)) return;
+  var b = edBox(), see = edSeeing();
+  var cx = b.c0 + b.w / 2, cz = ROWS - 1 - b.r1 + b.h / 2;
+  var slackX = Math.max(0, (b.w - see.w) / 2);
+  var slackZ = Math.max(0, (b.h - see.h * 0.9) / 2);
+  ed.panX = Math.max(cx - slackX, Math.min(cx + slackX, x));
+  ed.panZ = Math.max(cz - slackZ, Math.min(cz + slackZ, z));
+  if (!slackX && !slackZ) { ed.panX = null; ed.panZ = null; }   /* it all fits */
+}
+
+function edPanBy(dx, dz) {
+  var b = edBox();
+  var atX = (ed.panX == null) ? b.c0 + b.w / 2 : ed.panX;
+  var atZ = (ed.panZ == null) ? ROWS - 1 - b.r1 + b.h / 2 : ed.panZ;
+  edPanTo(atX + dx, atZ + dz);
+}
+
 function edFrame(v) {
   var b = edBox();
-  return v.set(b.c0 + b.w / 2, 0, ROWS - 1 - b.r1 + b.h / 2);
+  if (ed.panX == null || ed.panZ == null)
+    edPanTo(b.c0 + b.w / 2, ROWS - 1 - b.r1 + b.h / 2);
+  var x = (ed.panX == null) ? b.c0 + b.w / 2 : ed.panX;
+  var z = (ed.panZ == null) ? ROWS - 1 - b.r1 + b.h / 2 : ed.panZ;
+  return v.set(x, 0, z);
 }
 
 function edZoomBar() {
@@ -9187,6 +9328,10 @@ function edViewTo(key) {
    drags without it.
    ==================================================================== */
 
+function edSideName(v) {
+  return v === 1 ? "good stone" : v === MF.SHEER ? "a sheer drop" : "a lip";
+}
+
 function edEdgeBar() {
   var el = $("edEdges");
   if (!el) return;
@@ -9195,20 +9340,25 @@ function edEdgeBar() {
   el.hidden = !on;
   if (!on) { el.innerHTML = ""; return; }
 
-  var flags = edSegs(), now = flags[ed.segPick] ? 1 : 0;
+  var flags = edSegs(), now = flags[ed.segPick] | 0;
   el.innerHTML = "";
-  [[1, "Stone", "A brick driven at it stops dead. Stone counts as a side of a trap, so two " +
-                "bricks will hold something in a stone corner where four would be needed."],
-   [0, "A drop", "The floor stops. A brick shoved over goes with it and does not come back, " +
-                 "it is no help at all in walling anything in - and nor are you, if you walk off."]
+  [[1, "wall", "Stone",
+    "A brick driven at it stops dead. Stone is the only side that counts as a side of a " +
+    "trap, so two bricks will hold something in a stone corner where four would be needed."],
+   [0, "lip", "A lip",
+    "The floor ends in a small kerb. Bricks still go over it and so do you - but a marble " +
+    "rolling at it comes back slower, unless it is going fast enough to ride over."],
+   [MF.SHEER, "sheer", "A sheer drop",
+    "Nothing at all at the edge. Everything that reaches it goes over, a marble at any " +
+    "speed included, and none of it comes back."]
   ].forEach(function (row) {
     var b = document.createElement("button");
     b.className = "edEdgePick" + (row[0] === now ? " here" : "");
     b.type = "button";
     b.setAttribute("aria-pressed", row[0] === now ? "true" : "false");
-    var pic = edgePortrait(!!row[0], 240, 150);
+    var pic = edgePortrait(row[1], 240, 150);
     b.innerHTML = (pic ? '<img alt="" src="' + pic + '">' : "") +
-                  "<b>" + row[1] + "</b><span>" + row[2] + "</span>";
+                  "<b>" + row[2] + "</b><span>" + row[3] + "</span>";
     b.addEventListener("click", function () {
       var f = edSegs();
       if (f[ed.segPick] === row[0]) return;
@@ -9217,7 +9367,7 @@ function edEdgeBar() {
       edPolyFill(false);
       edPolyDraw();
       edEdgeBar();
-      edSay("that side is now " + (row[0] ? "good stone" : "open \u2014 a drop"));
+      edSay("that side is now " + row[2].toLowerCase());
     });
     el.appendChild(b);
   });
@@ -9468,8 +9618,7 @@ function edStamp(quiet) {
     ed.segPick = seg;
     edPolyDraw();
     edEdgeBar();
-    return edSay("that side is " + (flags[seg] ? "good stone" : "open \u2014 a drop") +
-                 " \u2014 pick what it should be");
+    return edSay("that side is " + edSideName(flags[seg]) + " \u2014 pick what it should be");
   } else if (t.act === "edge") {
     /* Only means anything OFF the floor - that is where an edge is. A
        shaped level has boundaries all over it, not just four sides, so
@@ -9589,6 +9738,55 @@ function cellUnder(clientX, clientY) {
 var edHover = null;
 
 /* ====================================================================
+   A SELECTED SIDE IS BLUE ALL THE WAY UP
+
+   Marking the choice with a bar along the floor left the stonework
+   itself its usual pale grey, so a picked side was a blue line with a
+   white wall standing on it - and the white, being the biggest thing
+   there, is what you saw. What is selected has to be the obvious thing
+   in the picture, not a stripe under it.
+
+   So the wall and the kerb are tinted too. Instance colour multiplies
+   the material, and stone is dark, so the numbers go well above one to
+   land the result on the same blue the bar is drawn in.
+   ==================================================================== */
+var _tintC = null;
+
+function edSideOfPiece(cell) {
+  for (var d = 0; d < 4; d++) {
+    var dd = [[1, 0], [-1, 0], [0, 1], [0, -1]][d];
+    var nc = cell[0] + dd[0], nr = cell[1] + dd[1];
+    if (game.inField(nc, nr)) return edEdgeNear(nc, nr);
+  }
+  return -1;
+}
+
+function edTintEdges() {
+  if (!props.edgeWall) return;
+  if (!_tintC) _tintC = new THREE.Color();
+  var lit = (mode === "edit" && ed.view === "walls" && ed.polyShut && ed.segPick >= 0);
+
+  [[props.edgeWall, 0.73, 2.30, 3.85], [props.edgeLip, 1.10, 3.45, 5.90]]
+  .forEach(function (row) {
+    var mesh = row[0];
+    if (!mesh.count) return;
+    /* setColorAt sizes the buffer from count the first time it is
+       called, and count moves about - so it is made once, at the mesh's
+       full capacity, and never caught short */
+    if (!mesh.instanceColor)
+      mesh.instanceColor = new THREE.InstancedBufferAttribute(
+        new Float32Array(mesh.instanceMatrix.count * 3).fill(1), 3);
+    var cells = mesh.userData.cells || [];
+    for (var i = 0; i < mesh.count; i++) {
+      var blue = lit && cells[i] && edSideOfPiece(cells[i]) === ed.segPick;
+      _tintC.setRGB(blue ? row[1] : 1, blue ? row[2] : 1, blue ? row[3] : 1);
+      mesh.setColorAt(i, _tintC);
+    }
+    mesh.instanceColor.needsUpdate = true;
+  });
+}
+
+/* ====================================================================
    CLICKING THE WALL IS CLICKING THE SIDE
 
    Squares are picked by firing a ray at the floor, which works for
@@ -9690,17 +9888,37 @@ function edPointTo(x, y, andStamp) {
      started, or a pinch leaves a corner dropped halfway across the room
      on the way to zooming out.
      ------------------------------------------------------------------ */
-  var touches = {}, pinchFrom = 0;
+  var touches = {}, pinchFrom = 0, panFrom = null, spaceDown = false;
+  addEventListener("keydown", function (e) { if (e.key === " ") spaceDown = true; });
+  addEventListener("keyup", function (e) { if (e.key === " ") spaceDown = false; });
   function pinchGap() {
     var ids = Object.keys(touches);
     if (ids.length < 2) return 0;
     var a = touches[ids[0]], b = touches[ids[1]];
     return Math.hypot(a.x - b.x, a.y - b.y);
   }
+  function pinchMid() {
+    var ids = Object.keys(touches);
+    if (ids.length < 2) return null;
+    var a = touches[ids[0]], b = touches[ids[1]];
+    return { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
+  }
+  /* how far the world moves for a pixel of drag, at the scale in use */
+  function worldPerPixel() {
+    var see = edSeeing();
+    var h = Math.max(1, renderer.domElement.clientHeight || innerHeight);
+    return see.h / h;
+  }
   el.addEventListener("pointermove", function (e) {
     if (mode !== "edit") return;
     if (touches[e.pointerId]) { touches[e.pointerId].x = e.clientX; touches[e.pointerId].y = e.clientY; }
     if (Object.keys(touches).length >= 2) {
+      var mid = pinchMid();
+      if (mid && panFrom) {
+        var k = worldPerPixel();
+        edPanBy(-(mid.x - panFrom.x) * k, -(mid.y - panFrom.y) * k / 0.9);
+        panFrom = mid;
+      }
       var gap = pinchGap();
       if (pinchFrom > 8 && gap > 8) {
         var ratio = gap / pinchFrom;
@@ -9795,11 +10013,18 @@ function edPointTo(x, y, andStamp) {
     e.preventDefault();
     touches[e.pointerId] = { x: e.clientX, y: e.clientY };
     if (Object.keys(touches).length >= 2) {
-      /* a pinch has begun - undo whatever the first finger was doing */
+      /* two fingers: a pinch, a pan, or both - and whichever it turns
+         out to be, whatever one finger had started is called off */
       pinchFrom = pinchGap();
+      panFrom = pinchMid();
       ed.dragNode = -1;
       if (ed.band) { ed.band = null; edBandDraw(); }
       stop();
+      return;
+    }
+    if (spaceDown || e.button === 1) {
+      /* space and drag, or the middle button */
+      panFrom = { x: e.clientX, y: e.clientY };
       return;
     }
     if (el.setPointerCapture) { try { el.setPointerCapture(e.pointerId); } catch (err) {} }
@@ -9879,7 +10104,7 @@ function edPointTo(x, y, andStamp) {
   ["pointerup", "pointerleave", "pointercancel"].forEach(function (n) {
     el.addEventListener(n, function (e) {
       if (e && e.pointerId !== undefined) delete touches[e.pointerId];
-      if (Object.keys(touches).length < 2) pinchFrom = 0;
+      if (Object.keys(touches).length < 2) { pinchFrom = 0; panFrom = null; }
       stop();
     });
   });
@@ -10296,6 +10521,16 @@ addEventListener("keydown", function (e) {
      turns was simply lost - press, nothing happens, press again. The
      latch survives until a turn has consumed it, so no press is ever
      dropped however briefly it was made. */
+  if (mode === "edit" && k.indexOf("arrow") === 0) {
+    /* In the editor the arrows pan the view - Z X : / still walk the
+       cursor, which is what they do everywhere else in the game. They
+       have to be taken before KEYMAP claims them for walking. */
+    e.preventDefault();
+    var st = 4;
+    edPanBy(k === "arrowleft" ? -st : k === "arrowright" ? st : 0,
+            k === "arrowup" ? st : k === "arrowdown" ? -st : 0);
+    return;
+  }
   if (a) { e.preventDefault(); held[a] = true; tapped[a] = true; Beeb.wake(); return; }
   if (k === " ") {
     e.preventDefault();
@@ -10572,76 +10807,78 @@ function monsterPortrait(kind, px) {
    ==================================================================== */
 var EDGE_PICS = {};
 
-function edgePortrait(stone, w, h) {
-  var key = (stone ? "wall" : "drop") + w + "x" + h;
+function edgePortrait(kind, w, h) {
+  var key = kind + w + "x" + h;
   if (EDGE_PICS[key]) return EDGE_PICS[key];
   try {
     /* ------------------------------------------------------------------
-       What was wrong with the first pair, since it is worth writing down.
+       Made of the cellar's own things.
 
-       They were two photographs of the same thing. Same pale cream
-       floor, same angle, same light; the only difference was a low pale
-       wall at the back of one, in the same colour as the floor, so it
-       read as more floor tipped up. Neither looked like the cellar -
-       which is warm brown stone in lamplight, not cream - so neither
-       told you what you would actually be looking at. And the brick,
-       which was there to say what the edge DOES, just sat about: in one
-       it was near the wall, in the other it was in the middle, and
-       neither showed it being stopped or being lost.
-
-       So: the cellar's own colours. Stone is grey and stands well up,
-       against a floor that is brown - two materials, not one. And the
-       brick shows the consequence. Against stone it is pressed hard up
-       to the wall, stopped. At a drop it is over the side and falling,
-       with the lit edge of the floor above it and nothing underneath.
+       Every go at these until now built lookalikes - pale boxes standing
+       in for stone, a plain orange block standing in for a brick - and
+       they did not look like the game because they were not made of it.
+       The wall here is the wall: the same geometry and the same material
+       the room is built from, so what you are shown is exactly what you
+       will be looking at. Same for the kerb, the floor and the brick.
        ------------------------------------------------------------------ */
     var sc = new THREE.Scene();
-    /* The cellar is graded with ACES filmic at 1.32 exposure, which is
-       tuned for a dark room lit by a couple of torches. Point that at a
-       small brightly-lit vignette and everything above about half
-       brightness lands on white - which is how two goes at these came
-       out as pale slabs. The exposure is put back to one for the
-       photograph and the lamps are set to suit it. */
-    sc.add(new THREE.HemisphereLight(0x2e2618, 0x0b0908, 0.32));
-    var lamp = new THREE.DirectionalLight(0xffcf9a, 1.05);
-    lamp.position.set(1.6, 4.5, 3.2);
+    sc.add(new THREE.HemisphereLight(0x2e2618, 0x0b0908, 0.30));
+    var lamp = new THREE.DirectionalLight(0xffcf9a, 1.0);
+    lamp.position.set(1.4, 4.5, 3.4);
     sc.add(lamp);
 
-    var stoneMat = new THREE.MeshStandardMaterial({ color: 0x8d8578, roughness: 0.92 });
-    var floorA = new THREE.MeshStandardMaterial({ color: 0x7a6647, roughness: 0.96 });
-    var floorB = new THREE.MeshStandardMaterial({ color: 0x655338, roughness: 0.96 });
-    var brickMat = new THREE.MeshStandardMaterial({ color: 0xc4502f, roughness: 0.8 });
+    var floorMat = (terrains[0] && terrains[0].material) ||
+                   new THREE.MeshStandardMaterial({ color: 0x6d5f49 });
+    var wallMat = (props.edgeWall && props.edgeWall.material) ||
+                  new THREE.MeshStandardMaterial({ color: 0x574c42 });
+    var lipMat = (props.edgeLip && props.edgeLip.material) ||
+                 new THREE.MeshStandardMaterial({ color: 0x3b332c });
 
-    /* floor, ending where the edge is */
-    for (var r = 0; r < 5; r++) for (var c = -3; c <= 3; c++) {
-      var t = new THREE.Mesh(new THREE.BoxGeometry(0.94, 1.1, 0.94),
-                             (r + c) % 2 ? floorA : floorB);
-      t.position.set(c, -0.55, -r);
+    /* Three rows, not five. The subject is the edge and what it does to
+       the thing that reaches it; floor stretching away behind that is
+       just something else to look at. */
+    for (var r = 0; r < 3; r++) for (var c = -3; c <= 3; c++) {
+      var t = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), floorMat);
+      t.position.set(c, -0.5, -r);
+      t.rotation.y = (Math.floor(((r * 7 + c * 3) % 4 + 4) % 4) * Math.PI) / 2;
       sc.add(t);
     }
 
-    if (stone) {
+    if (kind === "wall") {
       for (var c2 = -3; c2 <= 3; c2++) {
-        var wsl = new THREE.Mesh(new THREE.BoxGeometry(0.94, 2.6, 0.94), stoneMat);
-        wsl.position.set(c2, 1.3, -5);
+        var wsl = new THREE.Mesh(new THREE.BoxGeometry(1.02, 3.4, 1.02), wallMat);
+        wsl.position.set(c2, 1.7, -3);
         sc.add(wsl);
       }
-      /* stopped dead against it */
-      var b1 = new THREE.Mesh(new THREE.BoxGeometry(0.84, 0.8, 0.84), brickMat);
-      b1.position.set(0, 0.4, -4);
-      sc.add(b1);
+    } else if (kind === "lip") {
+      for (var c3 = -3; c3 <= 3; c3++) {
+        var lp = new THREE.Mesh(new THREE.BoxGeometry(1.02, 0.26, 1.02), lipMat);
+        lp.position.set(c3, 0.13, -3);
+        sc.add(lp);
+      }
+    }
+
+    /* and the thing that edge does something to */
+    if (kind === "wall") {
+      /* the game colours its bricks per instance, so the bare material
+         comes out the wrong colour on its own - it is given the red the
+         cellar would have given it */
+      var bm = BRICK_MAT ? BRICK_MAT.clone() : new THREE.MeshStandardMaterial();
+      bm.color = new THREE.Color(0xb8462e);
+      var brick = new THREE.Mesh(new THREE.BoxGeometry(0.92, 0.92, 0.92), bm);
+      brick.position.set(0, 0.46, -2);            /* stopped against it */
+      sc.add(brick);
     } else {
-      /* over the side, and going */
-      var b2 = new THREE.Mesh(new THREE.BoxGeometry(0.84, 0.8, 0.84), brickMat);
-      /* just over the lip and going, still in frame */
-      b2.position.set(0, -0.75, -5.35);
-      b2.rotation.set(0.55, 0.3, 0.4);
-      sc.add(b2);
+      var mb = new THREE.Mesh(new THREE.SphereGeometry(0.42, 18, 14),
+        new THREE.MeshStandardMaterial({ color: 0xcfd6dd, roughness: 0.25, metalness: 0.35 }));
+      if (kind === "lip") mb.position.set(0, 0.42, -2.1);   /* come back off it */
+      else mb.position.set(0, -1.0, -3.6);                  /* gone over */
+      sc.add(mb);
     }
 
     var cam = new THREE.PerspectiveCamera(40, w / h, 0.1, 60);
-    cam.position.set(0, 2.7, 4.4);
-    cam.lookAt(0, 0.1, -2.6);
+    cam.position.set(0, 2.1, 2.9);
+    cam.lookAt(0, 0.35, -1.9);
 
     var was = new THREE.Vector2();
     renderer.getSize(was);
@@ -10805,8 +11042,13 @@ function frame() {
     edLit += (wantLit - edLit) * (1 - Math.pow(0.002, dt));
     if (Math.abs(wantLit - edLit) < 0.004) edLit = wantLit;
     if (scene.fog) scene.fog.density = FOG_PLAY * (1 - 0.9 * edLit);
-    if (skyLight) skyLight.intensity = 0.52 + 1.55 * edLit;
-    if (edSun) edSun.intensity = 2.3 * edLit;
+    /* More of the light comes from the sky and less from the sun than
+       it did. A single strong sun blew out whichever wall it happened to
+       be facing - the near one, mostly, which is the biggest thing on
+       screen in the Walls view and came out as a white slab with no
+       timber visible in it at all. */
+    if (skyLight) skyLight.intensity = 0.52 + 1.35 * edLit;
+    if (edSun) edSun.intensity = 1.05 * edLit;
   }
 
   if (mode === "edit") {
@@ -10993,12 +11235,7 @@ function frame() {
        anything and the whole floor is reachable.
        ------------------------------------------------------------ */
     edFrame(camAim);
-    var halfP = Math.tan(camera.fov * Math.PI / 360);
-    var upFor = Math.max((edFrameW() / 2 + 1) / (halfP * Math.max(0.25, camera.aspect)),
-                         (edFrameH() / 2 + 1) / halfP) / ed.zoom;
-    if (ed.zoom > 1)
-      camAim.lerp(_aimAt.set(game.manC + 0.5, 0, ROWS - 1 - game.manR + 0.5), 0.85);
-    camPos.set(camAim.x, upFor, camAim.z + 0.01);   /* a hair off true vertical */
+    camPos.set(camAim.x, edSeeing().dist, camAim.z + 0.01);  /* a hair off vertical */
     camera.position.lerp(camPos, 1 - Math.pow(0.004, dt));
     camera.lookAt(camAim);
   } else if (mode === "edit" &&
@@ -11038,15 +11275,13 @@ function frame() {
        could not tell. From down here a wall stands up against the dark
        and a drop is the floor simply ending. */
     var low = edViewNow().cam === "low";
-    var lean = low ? tmp.set(0, 11, 27) : tmp.set(0, 30.5, 15.5);
-    var half = Math.tan(camera.fov * Math.PI / 360);
-    var tilt = Math.atan2(lean.y, lean.z);
-    var forWide = (edFrameW() / 2 + 1.5) / (half * Math.max(0.25, camera.aspect));
-    var forDeep = (edFrameH() * Math.sin(tilt) / 2 + 1.5) / half;
-    /* moved in, it cannot see the whole room, so it follows the cursor */
-    if (ed.zoom > 1)
-      camAim.lerp(_aimAt.set(game.manC + 0.5, 0, ROWS - 1 - game.manR + 0.5), 0.85);
-    camPos.copy(camAim).add(lean.normalize().multiplyScalar(Math.max(forWide, forDeep) / ed.zoom));
+    /* Low enough that a wall stands up and high enough to see over the
+       nearest one - at eleven the near wall filled the bottom third of
+       the frame and hid the rows of floor behind it, which is a lot of
+       room to give up to the one side you are already standing at. */
+    var lean = low ? tmp.set(0, 17, 26) : tmp.set(0, 30.5, 15.5);
+    camPos.copy(camAim).add(lean.normalize().multiplyScalar(edSeeing().dist));
+    if (!isFinite(camPos.x)) camPos.set(COLS / 2, 30, ROWS / 2 + 16);
     camera.position.lerp(camPos, 1 - Math.pow(0.004, dt));
     camera.lookAt(camAim);
   } else {
@@ -11074,6 +11309,16 @@ function frame() {
      ------------------------------------------------------------------ */
   var far = Math.max(220, camera.position.distanceTo(camAim) + Math.max(COLS, ROWS) + 40);
   if (Math.abs(camera.far - far) > 2) { camera.far = far; camera.updateProjectionMatrix(); }
+
+  /* A camera that has once been NaN stays NaN: lerp carries it forward
+     and every frame after is blank, with nothing in the console to say
+     why. Caught and put back where it belongs instead. */
+  if (!isFinite(camera.position.x) || !isFinite(camera.position.y) ||
+      !isFinite(camera.position.z)) {
+    camera.position.set(COLS / 2, 30, ROWS / 2 + 16);
+    camAim.set(COLS / 2, 0, ROWS / 2);
+    camera.lookAt(camAim);
+  }
 
   if (bannerT > 0) { bannerT -= dt * 1000; if (bannerT <= 0) $("banner").hidden = true; }
   renderer.render(scene, camera);

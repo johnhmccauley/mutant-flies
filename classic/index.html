@@ -444,7 +444,21 @@
      cellar. Come back to a saved game and it is where you left it. */
   function clamp(v, lo, hi) { return v < lo ? lo : (v > hi ? hi : v); }
 
-  var DROP = 0, WALL = 1;
+  /* ------------------------------------------------------------------
+     Three things a side of a room can be.
+
+     DROP is what the floor has always done here: it ends in a small lip.
+     A brick shoved over goes and does not come back, and so do you - but
+     a marble rolling at it clouts the lip and comes back slower unless
+     it is going fast enough to ride over. That lip has been in the game
+     since marbles were, quietly, as part of "drop".
+
+     SHEER is the new one: no lip at all, nothing to catch anything. A
+     marble reaches it and is gone whatever speed it was doing.
+
+     WALL is good stone, and it is the only one that holds anything in.
+     ------------------------------------------------------------------ */
+  var DROP = 0, WALL = 1, SHEER = 2;
 
   function mulberry32(a) {
     return function () {
@@ -1249,8 +1263,10 @@
       if (r < 0) return this.edge.S[clamp(c, 0, COLS - 1)];
       return this.edge.N[clamp(c, 0, COLS - 1)];
     }
-    if (this.bound)
-      return this.bound[r * COLS + c] === WALL ? WALL : DROP;
+    if (this.bound) {
+      var b = this.bound[r * COLS + c];
+      return (b === WALL || b === SHEER) ? b : DROP;
+    }
 
     var b = this.box || this.reBox();
     if (c < b.c0) return this.edge.W[clamp(r, 0, ROWS - 1)];
@@ -2198,7 +2214,7 @@
                   /* it goes over, and it is not coming back either */
                   ev.lostOverEdge = 1;
                   line.pop();
-                } else if (this.classic || this.edgeAt(cc, rr) === DROP) {
+                } else if (this.classic || this.edgeAt(cc, rr) !== WALL) {
                   /* 1985: the brick was drawn outside the graphics
                      viewport, clipped away, and never came back. Down
                      here the floor just stops, which comes to the same
@@ -2354,12 +2370,13 @@
         var dh = this.h(nc, nr) - this.h(m.c, m.r);
 
         if (!this.inField(nc, nr)) {
-          if (this.classic || this.edgeAt(nc, nr) === WALL) { this.bounce(m, 0.45); continue; }
-          /* No wall here, only the lip the floor ends in. Fast enough and
-             it rides over and is gone; short of that it clouts the lip
-             and comes back slower - and rougher ground robs it of more
-             on the way back. */
-          if (m.v >= lipSpeed(m)) {
+          var side = this.classic ? WALL : this.edgeAt(nc, nr);
+          if (side === WALL) { this.bounce(m, 0.45); continue; }
+          /* No wall here. A drop still ends in a lip: fast enough and it
+             rides over and is gone; short of that it clouts the lip and
+             comes back slower, and rougher ground robs it of more on the
+             way back. A sheer edge has no lip to clout. */
+          if (side === SHEER || m.v >= lipSpeed(m)) {
             this.grid[this.idx(m.c, m.r)] = EMPTY;
             m.gone = true; m.v = 0;
             ev.overTheEdge.push(m);
@@ -2723,7 +2740,7 @@
 
   root.MutantFly = {
     Game: Game,
-    COLS: COLS, ROWS: ROWS, FIELD_C: FIELD_C, FIELD_R: FIELD_R,
+    COLS: COLS, ROWS: ROWS, FIELD_C: FIELD_C, FIELD_R: FIELD_R, SHEER: SHEER,
     TICK_HZ: TICK_HZ, MAX_H: MAX_H,
     EMPTY: EMPTY, BRICK: BRICK, TREE: TREE, MARBLE: MARBLE,
     VAT_TAR: VAT_TAR, VAT_WATER: VAT_WATER, COOLED: COOLED, CHOPPER: CHOPPER,

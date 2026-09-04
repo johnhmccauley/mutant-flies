@@ -1782,5 +1782,65 @@ function onSlope(what, blocks) {
   }
 }
 
+
+/* ============ three kinds of edge ================================== */
+/* Stone holds things in. A drop ends in a lip: a brick goes over it and
+   so do you, but a marble short of speed clouts it and comes back. A
+   sheer edge has no lip at all and takes the marble too. */
+{
+  function sided(kind) {
+    const g = bare();
+    ["W", "E", "S", "N"].forEach((k) => g.edge[k].fill(kind));
+    return g;
+  }
+  const FAST = 9, SLOW = 1.4;
+
+  function rollAt(kind, speed) {
+    const g = sided(kind);
+    const m = marble(g, MF.FIELD_C - 2, 10);
+    m.dc = 1; m.dr = 0; m.v = speed;
+    const ev = { rolled: [], smashed: 0, overTheEdge: [], crushed: [] };
+    for (let t = 0; t < 6; t++) g.rollMarbles(ev);
+    /* the engine flags it rather than splicing it out of the list */
+    return { gone: !!m.gone, v: m.v };
+  }
+
+  ok("a slow marble comes back off a lip", rollAt(MF.DROP, SLOW).gone, false);
+  ok("and a fast one rides over it", rollAt(MF.DROP, FAST).gone, true);
+  ok("a sheer edge takes the slow one as well", rollAt(MF.SHEER, SLOW).gone, true);
+  ok("stone sends both of them back",
+     [rollAt(MF.WALL, SLOW).gone, rollAt(MF.WALL, FAST).gone], [false, false]);
+
+  /* a brick goes over either kind of drop, and stops at stone */
+  function shove(kind) {
+    const g = sided(kind);
+    /* the brick on the very last square, so the next shove takes it
+       over the edge rather than one square further along the floor */
+    g.manC = MF.FIELD_C - 2; g.manR = 10;
+    put(g, MF.FIELD_C - 1, 10);
+    const had = g.bricks;
+    const ev = g.step("right");
+    return { lost: had - g.bricks, blocked: !!ev.blocked, manC: g.manC };
+  }
+  ok("a brick goes over a lip", shove(MF.DROP).lost, 1);
+  ok("and over a sheer edge", shove(MF.SHEER).lost, 1);
+  ok("and stops dead at stone", [shove(MF.WALL).lost, shove(MF.WALL).blocked], [0, true]);
+
+  /* only stone is a side of a trap */
+  function boxedAgainst(kind) {
+    const g = sided(kind);
+    const m = monster(g, "fly", MF.FIELD_C - 1, 10);
+    g.cellsOf(m).forEach(([c, r]) => {
+      [[1, 0], [-1, 0], [0, 1], [0, -1]].forEach(([dc, dr]) => {
+        if (g.inField(c + dc, r + dr) && !g.isPartOf(m, c + dc, r + dr)) put(g, c + dc, r + dr);
+      });
+    });
+    return g.isBoxed(m);
+  }
+  ok("stone is a side of a trap, and neither drop is",
+     [boxedAgainst(MF.WALL), boxedAgainst(MF.DROP), boxedAgainst(MF.SHEER)],
+     [true, false, false]);
+}
+
 console.log("\n" + pass + " passed, " + fail + " failed");
 process.exit(fail ? 1 : 0);
