@@ -222,3 +222,36 @@ CREATE TABLE IF NOT EXISTS podium_awards (
   PRIMARY KEY (period, place)
 );
 CREATE INDEX IF NOT EXISTS podium_by_player ON podium_awards (player_id);
+
+-- ---------------------------------------------------------------------
+-- WHAT WENT WRONG
+--
+-- The editor can hand something back when it breaks, and what it hands
+-- back is a row here. Keyed on an op id made on the client for the same
+-- reason a play is: the moment somebody's connection drops halfway
+-- through sending one they will press the button again, and two copies
+-- of one fault is noise in the only table anybody reads while they are
+-- already looking for a needle.
+--
+-- player_id is nullable, and that is the point of the table rather than
+-- an oversight in it. The reports worth having come from a game that
+-- has just fallen over, and whatever fell over may well have taken the
+-- signing machinery with it - or the player never made a key at all.
+-- A report from nobody is still a report. level_id is nullable for a
+-- duller reason: plenty of things break with no level open, and one
+-- that names a level nobody can find any more is still worth keeping,
+-- so there is no foreign key on it either.
+-- ---------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS reports (
+  id        TEXT PRIMARY KEY,       -- the op id, made where the fault was
+  player_id TEXT,                   -- if it was signed, which it need not be
+  level_id  TEXT,                   -- what was open at the time, if anything
+  text      TEXT NOT NULL,          -- what they said, and what the game said
+  page      TEXT,                   -- the url and the browser it happened in
+  -- the server's clock, not the sender's: a client that is confused
+  -- enough to crash is confused enough to be wrong about the date
+  made      INTEGER NOT NULL
+);
+-- newest first, because the fault nobody has looked at yet is always
+-- the most recent one
+CREATE INDEX IF NOT EXISTS reports_by_made ON reports (made DESC);

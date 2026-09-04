@@ -954,6 +954,79 @@ function freshDb() {
     ok("asking three times in the beta still gets one welcome", [a === b, b === c], [true, true]);
   }
 
+  console.log("\nWhen it breaks\n");
+  {
+    /* the ordinary case: somebody signed in, in the editor, with a
+       level open in front of them */
+    const d = freshDb();
+    const amy = await player();
+    const r = await call(d, amy, "POST", "/api/report",
+      { id: "rep-aaaaaaaa", text: "the stamp tool threw", levelId: "lv-1",
+        page: "https://mutantfly.test/#edit Firefox/141" });
+    const row = d.sqlite.prepare("SELECT * FROM reports").get();
+    ok("a report is kept, under the name the signature proved",
+       [r.status, r.body.stored, row.text, row.player_id, row.level_id, row.made],
+       [200, true, "the stamp tool threw", amy.id, "lv-1", 1_700_000_000_000]);
+  }
+  {
+    /* the editor sends again when it cannot tell whether the first
+       attempt arrived, which is most of the time - the connection it
+       would have heard the answer on is the one that broke */
+    const d = freshDb();
+    const amy = await player();
+    const send = () => call(d, amy, "POST", "/api/report",
+      { id: "rep-bbbbbbbb", text: "again" });
+    const first = await send(), again = await send();
+    const n = d.sqlite.prepare("SELECT COUNT(*) AS n FROM reports").get().n;
+    ok("the same report sent twice is one report, and says which it was",
+       [first.body.stored, again.body.stored, Number(n)], [true, false, 1]);
+  }
+  {
+    const d = freshDb();
+    const amy = await player();
+    ok("a report with nothing in it is refused",
+       (await call(d, amy, "POST", "/api/report",
+                   { id: "rep-cccccccc", text: "   " })).status, 400);
+    ok("and one with no op id, because a resend could not be spotted",
+       (await call(d, amy, "POST", "/api/report", { text: "help" })).status, 400);
+  }
+  {
+    /* cut down rather than bounced: the front of a long stack trace
+       still says what broke, and a refused report is one nobody reads */
+    const d = freshDb();
+    const amy = await player();
+    const r = await call(d, amy, "POST", "/api/report",
+      { id: "rep-dddddddd", text: "x".repeat(9000), page: "y".repeat(2000) });
+    const row = d.sqlite.prepare("SELECT * FROM reports").get();
+    ok("an enormous report is trimmed rather than thrown away",
+       [r.status, r.body.stored, row.text.length, row.page.length],
+       [200, true, 4000, 500]);
+  }
+  {
+    /* the whole reason the route is written this way. A game that has
+       just fallen over may not be in a state to sign anything, and the
+       player may never have made a key at all */
+    const d = freshDb();
+    const r = await call(d, null, "POST", "/api/report",
+      { id: "rep-eeeeeeee", text: "it went white and stopped" });
+    const row = d.sqlite.prepare("SELECT * FROM reports").get();
+    ok("a report from nobody at all is still kept",
+       [r.status, r.body.stored, row.player_id], [200, true, null]);
+  }
+  {
+    /* a signature that does not check out is treated as none at all
+       rather than refused - there is nothing here worth forging your
+       way into, and the machinery that signs is exactly what may have
+       broken */
+    const d = freshDb();
+    const amy = await player(), bob = await player();
+    const r = await call(d, amy, "POST", "/api/report",
+      { id: "rep-ffffffff", text: "signed by the wrong key" }, { signAs: bob });
+    const row = d.sqlite.prepare("SELECT player_id FROM reports").get();
+    ok("a report whose signature does not hold is kept without a name",
+       [r.status, row && row.player_id], [200, null]);
+  }
+
   console.log("\n" + pass + " passed, " + fail + " failed");
   process.exit(fail ? 1 : 0);
 })().catch((e) => { console.error(e); process.exit(1); });

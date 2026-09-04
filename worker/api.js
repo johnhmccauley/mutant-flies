@@ -32,6 +32,10 @@ const NONCE_TTL = 120 * 1000;           /* two minutes to sign and send */
 const MAX_BODY = 8000;                  /* a level packs to ~1.9k; this is slack */
 const MAX_NAME = 48;
 const MAX_THUMB = 60000;                /* a 384x240 jpeg of a dark room, with room to spare */
+const MAX_REPORT = 4000;                /* a sentence, and the stack under it */
+/* the url and the browser a fault happened in. Not MAX_PAGE, which
+   would read as the size of a page of the board. */
+const MAX_CONTEXT = 500;
 const PAGE = 50;
 
 /* ------------------------------------------------------------------
@@ -602,6 +606,71 @@ export async function handle(req, env, ctx) {
       out.locked = true;
     }
     return json(out);
+  }
+
+  /* --- something went wrong ---------------------------------------
+
+     The one route here that does not insist on knowing who is calling.
+
+     Everything else that writes is somebody acting on a level or a
+     wallet of their own, where a signature is the least the request
+     can carry. A fault report is the opposite case. The ones worth
+     having come from a game that has just fallen over, and whatever
+     fell over may well have taken the signing machinery down with it -
+     or the player never made a key at all, not having published
+     anything yet. Refusing those throws away precisely the reports
+     that exist because something was broken.
+
+     So the caller is identified if the request is signed, and the
+     report is kept without a name if it is not. A signature that does
+     not check out is treated the same as none at all rather than
+     refused, for the same reason: there is nothing here worth forging
+     your way into.
+
+     What that costs is that anybody at all can put a row in this
+     table. The op id, the caps and the limiter below are between them
+     what it is paid for with. What it buys is hearing about the crash.
+     ---------------------------------------------------------------- */
+  if (path === "/api/report" && req.method === "POST") {
+    /* Charged against the limiter a second time, on top of the once
+       every request already pays at the door. There is one limiter
+       bound and it counts a key rather than a route, so spending more
+       of the same allowance is the only way this file has of saying
+       "costs more than a browse does". Somebody pressing a button in a
+       popup will not come near either number; something sending
+       reports in a loop reaches it in half the time browsing would. */
+    if (await tooFast(env, req, req.headers.get("x-mf-id"))) return oops(429, "slow down");
+
+    const id = String(body.id || "");
+    if (!/^[A-Za-z0-9_-]{8,64}$/.test(id)) return oops(400, "that report has no op id");
+    /* Cut down to size rather than refused. A stack trace can be any
+       length at all and the first four thousand characters of a long
+       one still say what broke, whereas a report bounced for being too
+       big is a report nobody ever reads - and whoever sent it has
+       already had one thing go wrong today. */
+    const text = String(body.text || "").trim().slice(0, MAX_REPORT);
+    if (!text) return oops(400, "a report with nothing in it says nothing");
+    const context = String(body.page || "").trim().slice(0, MAX_CONTEXT) || null;
+    /* Not checked against the levels table, on purpose: a report about
+       a level that has since been deleted is still a report about what
+       went wrong while it was open. */
+    const level = String(body.levelId || "").trim().slice(0, 64) || null;
+
+    /* Whose name goes on it is decided by the signature and never by
+       the body. A report is the one thing in here that a person reads
+       and believes, so being able to file one under somebody else
+       would be worth somebody's while. */
+    const signed = await whoIsThis(db, req, path, rawBody, now);
+    const put = await db.prepare(
+      "INSERT OR IGNORE INTO reports (id, player_id, level_id, text, page, made)" +
+      " VALUES (?,?,?,?,?,?)")
+      .bind(id, signed ? signed.id : null, level, text, context, now).run();
+    /* The same report sent twice is one report. Saying which of the two
+       this was is not a nicety: the editor sends again when it cannot
+       tell whether the first attempt arrived, which is most of the
+       time - the connection it would have heard the answer on is the
+       one that broke. */
+    return json({ id, stored: !!(put.meta && put.meta.changes === 1) });
   }
 
   /* everything past here changes something, so it has to be proved */
