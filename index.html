@@ -545,6 +545,11 @@
 #edSay .bad { color: #e0785c; }
 #edSay .good { color: #8fc07a; }
 /* the new-version notice: quiet, but not so quiet nobody sees it */
+.goStack { position: relative; display: inline-flex; }
+.goUnder { position: absolute; left: 50%; top: 100%; transform: translateX(-50%);
+  margin-top: 6px; white-space: nowrap; color: #cbbfab;
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: clamp(10px, 1.7vw, 12px); }
 #freshSays { color: #ffd27a; }
 #freshSays button { background: #503c25; border: 1px solid #b98c3e; color: #ffe6b8;
   border-radius: 4px; padding: 3px 10px; font: inherit; font-size: 12px;
@@ -653,8 +658,11 @@
       guarding every level down. You cannot kill it &mdash; <b>you can only wall it in.</b></p>
     <ul class="bestiary" id="bestiary"></ul>
     <div class="row">
-      <button class="go" id="continue" type="button" hidden>Continue</button>
-      <button class="go" id="start" type="button">Go down</button>
+      <span class="goStack" id="contStack" hidden>
+        <button class="go" id="continue" type="button">Continue</button>
+        <span class="goUnder" id="whereYouWere"></span>
+      </span>
+      <button class="go" id="start" type="button">New run</button>
       <button class="go quiet" id="build" type="button" hidden>Build a cellar</button>
     </div>
     <p class="fine" id="record"></p>
@@ -8510,8 +8518,19 @@ function enterTitle() {
   manRig.rotation.y = 0;
 
   var s = MF.save.read() || {};
-  $("continue").hidden = !s.level;
-  if (s.level) $("continue").textContent = "Continue — cellar " + s.level;
+  $("contStack").hidden = !s.level;
+  /* A generated cellar is a number and a made one is a name. The save
+     only carries a number today, because the only way to play a made
+     cellar is to test one you are building and a test deliberately
+     writes nothing - but the name is read if it is ever there, so the
+     day a published cellar can be played this says what it is called
+     rather than how deep it was. */
+  var where = $("whereYouWere");
+  /* a made cellar has a name and a generated one is a number */
+  if (where) where.textContent = !s.level ? ""
+    : (s.levelName ? s.levelName : "Cellar " + s.level);
+  if (s.level) $("continue").title = "back into " +
+    (s.levelName ? s.levelName : "cellar " + s.level);
   $("record").textContent = s.best ? "Best " + s.best + " · deepest cellar " + (s.deepest || 1) : "";
   game.HI = s.best || 0;
 }
@@ -11791,7 +11810,7 @@ addEventListener("keydown", function (e) {
     /* In the editor space is how you take hold of the room to move it
        about - the mouse is what puts things down. */
     if (mode === "edit") return;
-    else if (mode === "title") ($("continue").hidden ? newGame() : continueGame());
+    else if (mode === "title") ($("contStack").hidden ? newGame() : continueGame());
     else if (mode === "brief") beginTurns();
     return;
   }
@@ -13007,11 +13026,12 @@ function frame() {
     camera.position.lerp(camPos, 1 - Math.pow(0.004, dt));
     camera.lookAt(camAim);
   } else {
-    camAim.copy(manPos).add(tmp.set(0, 0.9, 0));
+    camAim.copy(mode === "title" ? TITLE_AIM : manPos).add(tmp.set(0, 0.9, 0));
     /* Clamping this to keep the camera over the cellar was worse: it
        closes the distance to the man at the near edge and the perspective
        skews. Let it follow him straight. */
-    camPos.set(manPos.x, 16.5, manPos.z + 12.8);
+    var look = (mode === "title") ? TITLE_AIM : manPos;
+    camPos.set(look.x, 16.5, look.z + 12.8);
     camera.position.lerp(camPos, 1 - Math.pow(0.002, dt));
     camera.lookAt(camAim);
   }
