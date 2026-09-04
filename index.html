@@ -501,6 +501,14 @@
   stroke-linecap: round; stroke-linejoin: round; }
 .edIcon svg .fill { fill: currentColor; stroke: none; }
 .edIcon.zoomed { color: #ffe6b8; }
+/* a labelled icon is a little wider than a square one, and the label
+   is the first thing to go when the row runs out of room */
+#edPublish { width: auto; gap: 5px; grid-auto-flow: column; padding: 0 8px 0 6px; }
+#edPublish span { font: inherit; font-size: 10px; letter-spacing: .12em;
+  text-transform: uppercase; }
+@media (max-width: 620px) { #edPublish span { display: none; }
+  #edPublish { width: 28px; padding: 0; } }
+
 .edIcon:disabled { opacity: .28; cursor: default; }
 .edIcon:disabled:hover { background: transparent; border-color: transparent; }
 .edIcon.play { color: #5fd07a; }
@@ -743,7 +751,7 @@
     <button class="edIcon" id="edMore" type="button" aria-pressed="false"
             title="Zoom" aria-label="Zoom"><svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="7" cy="7" r="4.5"/><path d="M10.4 10.4 13.9 13.9M5.1 7h3.8"/></svg></button>
     <button class="edIcon" id="edPublish" type="button"
-            title="Make it public" aria-label="Make it public"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 10.6V1.9"/><path d="M4.7 5.2 8 1.9l3.3 3.3"/><path d="M2.4 9.4v4.2h11.2V9.4"/></svg></button>
+            title="Make it public" aria-label="Make it public"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 10.6V1.9"/><path d="M4.7 5.2 8 1.9l3.3 3.3"/><path d="M2.4 9.4v4.2h11.2V9.4"/></svg><span>Publish</span></button>
     <button class="edIcon" id="edBurger" type="button" aria-pressed="false"
             title="Everything else" aria-label="Everything else"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2.6 4.4h10.8M2.6 8h10.8M2.6 11.6h10.8"/></svg></button>
     <div id="edBurgerList" hidden>
