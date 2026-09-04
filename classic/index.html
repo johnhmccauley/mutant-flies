@@ -1522,6 +1522,7 @@
       var cx = hp[0], cy = hp[1];
       var amp = 1 + this.grnd(MAX_H), rad = 3 + amp * 3 + this.grnd(6);
       for (var r = 0; r < ROWS; r++) for (var c = 0; c < COLS; c++) {
+        if (!this.inField(c, r)) continue;      /* no hills on blank paper */
         var d = Math.sqrt((c - cx) * (c - cx) + (r - cy) * (r - cy));
         if (d > rad) continue;
         var hgt = Math.round(amp * (1 - d / rad));
@@ -1529,9 +1530,22 @@
         if (hgt > this.height[i]) this.height[i] = Math.min(MAX_H, hgt);
       }
     }
-    /* flatten the rim and the ground everyone starts on */
-    for (var c2 = 0; c2 < COLS; c2++) { this.height[this.idx(c2, 0)] = 0; this.height[this.idx(c2, ROWS - 1)] = 0; }
-    for (var r2 = 0; r2 < ROWS; r2++) { this.height[this.idx(0, r2)] = 0; this.height[this.idx(COLS - 1, r2)] = 0; }
+    /* Flatten the rim - the ROOM's rim.
+
+       This walked the sheet's edges, which stopped being the room's
+       edges when the sheet grew: it was levelling row 51 and column 67,
+       out in the blank paper nobody can stand on, and leaving the
+       cellar's own far and near rows sloping. A hill running off the
+       edge of the room is a hill you meet as a step. */
+    var bx = this.box || this.reBox();
+    for (var c2 = bx.c0; c2 <= bx.c1; c2++) {
+      this.height[this.idx(c2, bx.r0)] = 0;
+      this.height[this.idx(c2, bx.r1)] = 0;
+    }
+    for (var r2 = bx.r0; r2 <= bx.r1; r2++) {
+      this.height[this.idx(bx.c0, r2)] = 0;
+      this.height[this.idx(bx.c1, r2)] = 0;
+    }
     /* Nothing about where people are standing may shape the ground: the
        land is seeded and they are not, so flattening around them made the
        same cellar come out different every time. They are placed on the

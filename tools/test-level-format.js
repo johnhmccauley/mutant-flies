@@ -245,7 +245,13 @@ console.log("\nTwo people, one code, the same cellar\n");
     }
     return { trace: trace.join("#"), turns: turns };
   }
-  const a = playIt(90210), b = playIt(90210);
+  /* 90210 used to carry the man past a hundred turns and now walks him
+     into the fly around turn forty - the cellar changed under it when
+     the rim flattening was corrected to level the ROOM's edge rather
+     than the sheet's. The test is about two loads of one code not
+     diverging, so it needs a run of luck long enough to be worth
+     comparing; 5150 survives all two hundred. */
+  const a = playIt(5150), b = playIt(5150);
   console.log("        (they ran " + a.turns + " turns before anything ended it)");
   ok("turn for turn, the two are the same cellar",
      [a.turns >= 100, a.trace === b.trace], [true, true]);

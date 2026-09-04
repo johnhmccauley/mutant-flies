@@ -285,10 +285,10 @@
 .edNothing { color: #6f6456; font-size: 11px; padding: 4px 2px; }
 
 /* how wide the ground tools work */
-#edBrush, #edZoom, #edPick { display: flex; gap: 5px; align-items: center; margin-left: 4px;
+#edBrush, #edZoom { display: flex; gap: 5px; align-items: center; margin-left: 4px;
   padding-left: 9px; border-left: 1px solid #372c21; }
-.edPickBtn[aria-pressed="true"] { background: #503c25; border-color: #b98c3e; color: #ffe6b8; }
-.edZoomDot { width: auto; min-width: 22px; padding: 0 4px; }
+.edZoomNow { color: #cbbfab; font-size: 11px; min-width: 3ch; text-align: center; }
+.edBrushDot:disabled { opacity: .35; cursor: default; }
 #edBrush .edBrushName { color: #7d7365; font-size: 10px; letter-spacing: .1em;
   text-transform: uppercase; margin-right: 2px; }
 .edBrushDot { background: #1d1712; border: 1px solid #372c21; color: #b8ab99;
@@ -503,7 +503,6 @@
   <div class="edRow">
     <div id="edTools"></div>
     <span id="edBrush" hidden></span>
-    <span id="edPick" hidden></span>
     <span id="edZoom"></span>
   </div>
   <div class="edRow">
@@ -1976,6 +1975,7 @@
       var cx = hp[0], cy = hp[1];
       var amp = 1 + this.grnd(MAX_H), rad = 3 + amp * 3 + this.grnd(6);
       for (var r = 0; r < ROWS; r++) for (var c = 0; c < COLS; c++) {
+        if (!this.inField(c, r)) continue;      /* no hills on blank paper */
         var d = Math.sqrt((c - cx) * (c - cx) + (r - cy) * (r - cy));
         if (d > rad) continue;
         var hgt = Math.round(amp * (1 - d / rad));
@@ -1983,9 +1983,22 @@
         if (hgt > this.height[i]) this.height[i] = Math.min(MAX_H, hgt);
       }
     }
-    /* flatten the rim and the ground everyone starts on */
-    for (var c2 = 0; c2 < COLS; c2++) { this.height[this.idx(c2, 0)] = 0; this.height[this.idx(c2, ROWS - 1)] = 0; }
-    for (var r2 = 0; r2 < ROWS; r2++) { this.height[this.idx(0, r2)] = 0; this.height[this.idx(COLS - 1, r2)] = 0; }
+    /* Flatten the rim - the ROOM's rim.
+
+       This walked the sheet's edges, which stopped being the room's
+       edges when the sheet grew: it was levelling row 51 and column 67,
+       out in the blank paper nobody can stand on, and leaving the
+       cellar's own far and near rows sloping. A hill running off the
+       edge of the room is a hill you meet as a step. */
+    var bx = this.box || this.reBox();
+    for (var c2 = bx.c0; c2 <= bx.c1; c2++) {
+      this.height[this.idx(c2, bx.r0)] = 0;
+      this.height[this.idx(c2, bx.r1)] = 0;
+    }
+    for (var r2 = bx.r0; r2 <= bx.r1; r2++) {
+      this.height[this.idx(bx.c0, r2)] = 0;
+      this.height[this.idx(bx.c1, r2)] = 0;
+    }
     /* Nothing about where people are standing may shape the ground: the
        land is seeded and they are not, so flattening around them made the
        same cellar come out different every time. They are placed on the
@@ -6188,6 +6201,42 @@ function init3D() {
   edRingMesh.frustumCulled = false;
   scene.add(edRingMesh);
 
+  /* ------------------------------------------------------------------
+     HOW BIG A ROOM IS ALLOWED TO GET
+
+     There is a limit - the sheet a level is drawn on - and until now it
+     was invisible: outside the room there was only dark, so how far you
+     could drag a corner was something you found out by dragging one and
+     watching it stop. A limit you cannot see is a limit that feels like
+     a bug.
+
+     So the sheet is drawn, in its own cold slate, under the room's warm
+     stone. Two grounds, plainly different: the one you have, and the one
+     you may have. It shows in the views where the size of the room is
+     the thing you are changing, and nowhere else.
+     ------------------------------------------------------------------ */
+  var sheetGeo = new THREE.PlaneGeometry(COLS, ROWS);
+  sheetGeo.rotateX(-Math.PI / 2);
+  edSheetMesh = new THREE.Mesh(sheetGeo,
+    new THREE.MeshBasicMaterial({ color: 0x1b2733, toneMapped: false }));
+  edSheetMesh.position.set(COLS / 2, -0.06, ROWS / 2);
+  edSheetMesh.visible = false;
+  edSheetMesh.frustumCulled = false;
+  scene.add(edSheetMesh);
+
+  /* and a line round its edge, so the boundary itself is a thing you
+     can see rather than where the colour happens to stop */
+  var rimGeo = new THREE.BufferGeometry();
+  var rimPts = [0, 0, 0, COLS, 0, 0, COLS, 0, 0, COLS, 0, ROWS,
+                COLS, 0, ROWS, 0, 0, ROWS, 0, 0, ROWS, 0, 0, 0];
+  rimGeo.setAttribute("position", new THREE.Float32BufferAttribute(rimPts, 3));
+  var rim = new THREE.LineSegments(rimGeo,
+    new THREE.LineBasicMaterial({ color: 0x40607d, toneMapped: false }));
+  rim.position.y = -0.04;
+  rim.frustumCulled = false;
+  edSheetMesh.add(rim);
+  rim.position.set(-COLS / 2, 0.02, -ROWS / 2);
+
   var bandGeo = new THREE.BufferGeometry();
   bandGeo.setAttribute("position", new THREE.BufferAttribute(new Float32Array(8 * 3), 3));
   edBandLine = new THREE.LineSegments(bandGeo,
@@ -8002,7 +8051,7 @@ var ed = {
      builder happened to leave him when they stopped building - which
      was almost never where they meant the player to begin. */
   startC: 4, startR: 4, brush: 2, poly: [], polyWall: [], polyShut: false, dragNode: -1, picked: [], band: null,
-  picking: false, zoom: 1, testing: false,
+  dragFrom: null, zoom: 1, testing: false,
   /* The single most important thing an editor has, and the first
      version did not have it: somewhere to put the last forty things you
      did so you can take one of them back. Whole cellars, because a
@@ -8297,11 +8346,54 @@ function edSegs() {
    ==================================================================== */
 function edPicked(i) { return ed.picked.indexOf(i) >= 0; }
 
+/* ====================================================================
+   A SELECTION IS A RUN, NOT A HANDFUL
+
+   Picking corners scattered round the room and dragging them all at
+   once is a way to make a shape nobody meant. What you actually ever
+   want is a stretch of wall: this corner, and the next, and the next -
+   a contiguous run along the outline, which slides as one piece and
+   leaves the room still looking like a room.
+
+   So a selection is kept to a run. A band round part of the room takes
+   the longest unbroken stretch it caught; shift-clicking extends the
+   run at either end, and shift-clicking somewhere else entirely starts
+   a new one there rather than making a scatter.
+   ==================================================================== */
+function edIsRun(list) {
+  var n = ed.poly.length;
+  if (list.length <= 1 || list.length >= n) return true;
+  var has = {};
+  list.forEach(function (i) { has[i] = 1; });
+  var heads = list.filter(function (i) { return !has[(i - 1 + n) % n]; });
+  return heads.length === 1;
+}
+
+/* the longest unbroken stretch in a set of corners */
+function edLongestRun(list) {
+  var n = ed.poly.length;
+  if (!list.length) return [];
+  var has = {};
+  list.forEach(function (i) { has[i] = 1; });
+  if (list.length >= n) return list.slice();
+  var best = [];
+  for (var s0 = 0; s0 < n; s0++) {
+    if (!has[s0] || has[(s0 - 1 + n) % n]) continue;   /* must be a head */
+    var run = [];
+    for (var k = 0; k < n; k++) {
+      var at = (s0 + k) % n;
+      if (!has[at]) break;
+      run.push(at);
+    }
+    if (run.length > best.length) best = run;
+  }
+  return best;
+}
+
 function edPickToggle(i) {
   var at = ed.picked.indexOf(i);
   if (at >= 0) ed.picked.splice(at, 1); else ed.picked.push(i);
   edNodesDraw();
-  edPickBar();
   edSay(ed.picked.length ? ed.picked.length + " corner" +
         (ed.picked.length === 1 ? "" : "s") + " picked \u2014 drag any of them to move them together"
         : "nothing picked");
@@ -8311,23 +8403,86 @@ function edPickNone(quiet) {
   if (!ed.picked.length) return;
   ed.picked = [];
   edNodesDraw();
-  edPickBar();
   if (!quiet) edSay("nothing picked");
 }
 
+/* ====================================================================
+   A ROOM HAS ONE OUTLINE, AND IT DOES NOT CROSS ITSELF
+
+   Every corner is joined to the next and the last back to the first -
+   one contiguous ring - and that ring may not cut across itself. This
+   is not tidiness. The floor is worked out by asking, of every square,
+   whether it is inside the outline; a figure of eight has no honest
+   answer to that. The crossing-number test would call the middle of it
+   OUTSIDE, so a room drawn that way would come out with a hole through
+   the waist that nobody asked for and no handle to grab.
+
+   Illustrator and Inkscape will happily let a path cross itself, and
+   they are right to - a path there is a drawing. Here it is the wall of
+   a room, so a move that would cross it is refused and says why.
+   ==================================================================== */
+function edCross(p1, p2, p3, p4) {
+  function side(a, b, c) {
+    var v = (b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0]);
+    return v > 0 ? 1 : v < 0 ? -1 : 0;
+  }
+  function on(a, b, c) {          /* c on the segment a-b, all collinear */
+    return Math.min(a[0], b[0]) <= c[0] && c[0] <= Math.max(a[0], b[0]) &&
+           Math.min(a[1], b[1]) <= c[1] && c[1] <= Math.max(a[1], b[1]);
+  }
+  var d1 = side(p3, p4, p1), d2 = side(p3, p4, p2);
+  var d3 = side(p1, p2, p3), d4 = side(p1, p2, p4);
+  if (d1 !== d2 && d3 !== d4) return true;
+  if (d1 === 0 && on(p3, p4, p1)) return true;
+  if (d2 === 0 && on(p3, p4, p2)) return true;
+  if (d3 === 0 && on(p1, p2, p3)) return true;
+  if (d4 === 0 && on(p1, p2, p4)) return true;
+  return false;
+}
+
+function edWhySick(pts) {
+  var n = pts.length;
+  if (n < 3) return "a room needs at least three corners";
+  for (var i = 0; i < n; i++) {
+    var a1 = pts[i], a2 = pts[(i + 1) % n];
+    if (a1[0] === a2[0] && a1[1] === a2[1]) return "two corners would land on each other";
+    for (var j = i + 1; j < n; j++) {
+      if (j === (i + 1) % n || (j + 1) % n === i) continue;   /* they share an end */
+      if (edCross(a1, a2, pts[j], pts[(j + 1) % n])) return "the wall would cross itself";
+    }
+  }
+  return null;
+}
+
 /* move every picked corner by the same amount, or none of them */
+/* ------------------------------------------------------------------
+   Moving several corners at once.
+
+   They all move by the same amount, which is what Illustrator and
+   Inkscape do with a multiple selection and what a side of a room
+   sliding across ought to feel like.
+   ------------------------------------------------------------------ */
 function edPickMove(dc, dr) {
   if (!dc && !dr) return false;
+
+  /* work it out in full before touching anything, so a refusal leaves
+     the room exactly as it was rather than half moved */
+  var want = ed.poly.map(function (v) { return [v[0], v[1]]; });
   for (var i = 0; i < ed.picked.length; i++) {
-    var v = ed.poly[ed.picked[i]];
-    if (!v) return false;
-    var nc = v[0] + dc, nr = v[1] + dr;
-    if (nc < 0 || nr < 0 || nc >= COLS || nr >= ROWS) return false;
+    var at = ed.picked[i], v0 = ed.poly[at];
+    if (!v0) return false;
+    var nc = v0[0] + dc, nr = v0[1] + dr;
+    if (nc < 0 || nr < 0 || nc >= COLS || nr >= ROWS) {
+      edSay("that is the edge of the sheet — " + COLS + " by " + ROWS +
+            " is as big as a room gets", "bad");
+      return false;
+    }
+    want[at] = [nc, nr];
   }
-  for (var j = 0; j < ed.picked.length; j++) {
-    var w = ed.poly[ed.picked[j]];
-    w[0] += dc; w[1] += dr;
-  }
+  var sick = edWhySick(want);
+  if (sick) { edSay(sick, "bad"); return false; }
+
+  for (var j = 0; j < ed.poly.length; j++) { ed.poly[j][0] = want[j][0]; ed.poly[j][1] = want[j][1]; }
   return true;
 }
 
@@ -8386,7 +8541,6 @@ function edBandTake(add) {
     if (ed.picked.indexOf(i) < 0) ed.picked.push(i);
   }
   edNodesDraw();
-  edPickBar();
   edSay(ed.picked.length ? ed.picked.length + " corner" +
         (ed.picked.length === 1 ? "" : "s") + " picked \u2014 drag any of them to move them together"
         : "nothing in there");
@@ -8431,7 +8585,12 @@ function edNodeNear(c, r) {
 function edEdgeNear(c, r) {
   var hit = edEdgeAt(c, r);
   if (hit >= 0) return hit;
-  var reach = edReach();
+  /* Half the forgiveness a corner gets. Taking hold of a corner is the
+     thing you do most, and adding one is the thing you do occasionally
+     - so a press that could be either has to be a corner, and a press
+     that lands short of a wall should do nothing rather than quietly
+     put a new corner in it. */
+  var reach = Math.max(1, Math.floor(edReach() / 2));
   for (var ring = 1; ring <= reach; ring++)
     for (var dc = -ring; dc <= ring; dc++)
       for (var dr = -ring; dr <= ring; dr++) {
@@ -8517,7 +8676,8 @@ function edNodesDraw() {
 }
 
 /* the outline as you are drawing it, laid on the floor */
-var edPolyLine = null, edNodeMesh = null, edRingMesh = null, edBandLine = null;
+var edPolyLine = null, edNodeMesh = null, edRingMesh = null, edBandLine = null,
+    edSheetMesh = null;
 function edPolyDraw() {
   if (!edPolyLine) return;
   var n = ed.poly.length;
@@ -8599,6 +8759,18 @@ var ZOOMS = [0.3, 0.5, 0.7, 1, 1.5, 2, 3];
    exactly the moment you want to see it and no other.
    ------------------------------------------------------------------ */
 function edBox() {
+  /* The Floor view frames the whole sheet, not just the room.
+
+     Everywhere else, framing the room is right - it is what you are
+     working on. But the Floor view is the one place where the point is
+     to change how big the room IS, and framing the room there meant the
+     paper it could grow into was off screen: you could take hold of a
+     corner, drag it to the edge of the view and nothing happened,
+     because there was nowhere to put it. You had to know to zoom out
+     first, which is a thing to know before you can do the obvious
+     thing. Here the paper is simply always there. */
+  if (mode === "edit" && ed.view === "floor")
+    return { c0: 0, c1: COLS - 1, r0: 0, r1: ROWS - 1, w: COLS, h: ROWS };
   return (game.box || (game.reBox ? game.reBox() : null) ||
           { c0: 0, c1: COLS - 1, r0: 0, r1: ROWS - 1, w: COLS, h: ROWS });
 }
@@ -8612,19 +8784,30 @@ function edFrame(v) {
 function edZoomBar() {
   var el = $("edZoom");
   if (!el) return;
+  /* Two buttons and a number, instead of a chip for every step. Seven
+     of those was a row of arithmetic to read before you could look
+     closer at something, and the wheel and a pinch already walk the
+     steps without any of it. */
   el.innerHTML = '<span class="edBrushName">zoom</span>';
-  ZOOMS.forEach(function (z) {
+  function knob(label, by, tip) {
     var b = document.createElement("button");
-    b.className = "edBrushDot edZoomDot";
+    b.className = "edBrushDot";
     b.type = "button";
-    b.setAttribute("aria-pressed", z === ed.zoom ? "true" : "false");
-    b.textContent = (z === 1) ? "1" : (z < 1 ? z.toFixed(1).replace("0.", ".") : z + "\u00d7");
-    b.title = z < 1 ? "stand back - see a big level whole"
-                    : z > 1 ? "move in - the view follows the cursor"
-                            : "the whole room";
-    b.addEventListener("click", function () { edZoomTo(z); });
-    el.appendChild(b);
-  });
+    b.textContent = label;
+    b.title = tip;
+    b.disabled = (ZOOMS.indexOf(ed.zoom) + by < 0) ||
+                 (ZOOMS.indexOf(ed.zoom) + by >= ZOOMS.length);
+    b.addEventListener("click", function () { edZoomStep(by); });
+    return b;
+  }
+  el.appendChild(knob("−", -1, "Stand back"));
+  var now = document.createElement("span");
+  now.className = "edZoomNow";
+  now.textContent = (ed.zoom === 1) ? "1×"
+                  : (ed.zoom < 1 ? ed.zoom.toFixed(1).replace("0.", ".") : ed.zoom + "") + "×";
+  now.title = "Wheel or pinch does this too";
+  el.appendChild(now);
+  el.appendChild(knob("+", 1, "Move in"));
 }
 
 function edZoomTo(z) {
@@ -8657,7 +8840,7 @@ function edZoomStep(by) {
 var ED_VIEWS = [
   { key: "floor", name: "Floor", cam: "plan", show: "floor",
     tools: ["Outline", "Cut out"],
-    how: "The floor on its own, with a handle on every corner of it. Zoom out to see the paper it can grow into." },
+    how: "The floor on its own, with a handle on every corner. Drag one to change the shape of the room; the darker ground round it is room to grow into." },
   { key: "walls", name: "Walls", cam: "plan", show: "walls",
     tools: ["Wall/drop"],
     how: "Click a square OUTSIDE the floor to switch what lies beyond it between good stone and a drop. Stone counts as a side of a trap; a drop does not." },
@@ -8722,6 +8905,10 @@ var edHidden = null;
 
 function edDress() {
   var want = (mode === "edit") ? edViewNow().show : "all";
+  /* the paper shows where the room may grow to, which is only a
+     question in the views that change its shape */
+  if (edSheetMesh)
+    edSheetMesh.visible = (mode === "edit" && (ed.view === "floor" || ed.view === "walls"));
 
   /* everything back the way it was found first - half of what is hidden
      is hidden for its own reasons (a trapped monster, a piece of kit
@@ -8735,7 +8922,7 @@ function edDress() {
   var keepWalls = (want === "walls");
   edHidden = [];
   scene.children.forEach(function (o) {
-    if (o === floorSkin || o.isLight || o.isCamera) return;
+    if (o === floorSkin || o === edSheetMesh || o.isLight || o.isCamera) return;
     if (terrains.indexOf(o) >= 0) return;             /* the body under the floor */
     if (keepWalls && (o === props.edgeWall || o === props.edgeLip)) return;
     if (o.visible === false) return;
@@ -8785,38 +8972,28 @@ function edViewTo(key) {
   resize();
 }
 
-/* Shift is not a key a phone has. The same job, as a latch you can
-   press: while it is on, touching a handle picks it out instead of
-   dragging it, and a box drawn round several adds them to what is
-   already picked. */
-function edPickBar() {
-  var el = $("edPick");
-  if (!el) return;
-  var t = ED_TOOLS[ed.tool];
-  if (!t || t.act !== "poly") { el.hidden = true; return; }
-  el.hidden = false;
-  el.innerHTML = "";
-  var b = document.createElement("button");
-  b.className = "edBtn edPickBtn";
-  b.type = "button";
-  b.setAttribute("aria-pressed", ed.picking ? "true" : "false");
-  b.textContent = ed.picking ? "Picking" : "Pick";
-  b.title = "Touch corners to pick them out, then drag any one to move them together";
-  b.addEventListener("click", function () {
-    ed.picking = !ed.picking;
-    if (!ed.picking) edPickNone(true);
-    edPickBar();
-    edSay(ed.picking ? "picking \u2014 touch the corners you want, then drag any of them"
-                     : "picking off");
-  });
-  el.appendChild(b);
-  if (ed.picked.length) {
-    var n = document.createElement("span");
-    n.className = "edBrushName";
-    n.textContent = ed.picked.length + " picked";
-    el.appendChild(n);
-  }
-}
+/* ====================================================================
+   NO MODES
+
+   There were two latches here - one to pick corners instead of dragging
+   them, one to mirror the picked ones - and between them, the zoom
+   steps and the tool chips, the bottom of the screen was starting to
+   look like a workstation. This is a game about pushing bricks at a
+   fly. Everything they did is still here, done by the gesture instead
+   of by arming a mode first:
+
+     click a corner           picks it, or lets it go again
+     drag a corner            it moves
+     drag on bare floor       a box; the corners inside it are picked
+     drag any picked corner   they all move together
+     press a side             a new corner there, already under you
+     Delete on a corner       it goes
+
+   Mirror is gone rather than hidden. Blender has it and calls it X
+   Mirror, and Blender is a modelling program - the one thing it was
+   good for here was growing a rectangle about its middle, which is two
+   drags without it.
+   ==================================================================== */
 
 function edBrushBar() {
   var el = $("edBrush");
@@ -8900,7 +9077,6 @@ function edPaint() {
   });
 
   edBrushBar();
-  edPickBar();
   edZoomBar();
 }
 
@@ -9105,7 +9281,8 @@ function edCount() {
   $("edDirty").title = ed.dirty ? "unsaved changes" : "saved";
   var bx = game.box || (game.reBox && game.reBox());
   var bits = ["cellar " + game.F];
-  if (bx) bits.push(bx.w + "\u00d7" + bx.h);
+  if (bx) bits.push(bx.w + "\u00d7" + bx.h +
+                    (ed.view === "floor" ? " of " + COLS + "\u00d7" + ROWS : ""));
   bits.push(bricks + " brick" + (bricks === 1 ? "" : "s"));
   if (rocks) bits.push(rocks + " rock" + (rocks === 1 ? "" : "s"));
   var loose = game.monsters.filter(function (m) { return !m.gone; }).length;
@@ -9254,13 +9431,25 @@ function edPointTo(x, y, andStamp) {
     }
     if (ed.dragNode >= 0) {
       var to = cellUnder(e.clientX, e.clientY);
-      if (!to) return;
+      if (!to) {
+        /* off the sheet altogether. It used to stop dead and say
+           nothing, which reads as the drag having broken rather than as
+           having reached the end of the paper. */
+        edSay("that is the edge of the sheet — " + COLS + " by " + ROWS +
+              " is as big as a room gets", "bad");
+        return;
+      }
       var was = ed.poly[ed.dragNode];
       if (!was || (was[0] === to[0] && was[1] === to[1])) return;
       if (edPicked(ed.dragNode) && ed.picked.length > 1) {
         /* the whole selection comes along, by the amount this one moved */
         if (!edPickMove(to[0] - was[0], to[1] - was[1])) return;
       } else {
+        /* one corner, and the same rule: the wall may not cross itself */
+        var try1 = ed.poly.map(function (v) { return [v[0], v[1]]; });
+        try1[ed.dragNode] = [to[0], to[1]];
+        var bad1 = edWhySick(try1);
+        if (bad1) { edSay(bad1, "bad"); return; }
         ed.poly[ed.dragNode] = [to[0], to[1]];
       }
       game.manC = to[0]; game.manR = to[1];
@@ -9289,9 +9478,26 @@ function edPointTo(x, y, andStamp) {
     if (ed.band) edBandTake(ed.band.add);
     if (ed.dragNode >= 0) {
       var many = edPicked(ed.dragNode) && ed.picked.length > 1;
-      ed.dragNode = -1;
+      var here = ed.poly[ed.dragNode];
+      var went = ed.dragFrom && here &&
+                 (here[0] !== ed.dragFrom[0] || here[1] !== ed.dragFrom[1]);
+      var wasNode = ed.dragNode;
+      ed.dragNode = -1; ed.dragFrom = null;
+      if (!went) {
+        /* A press that let go without going anywhere is a CLICK, and a
+           click on a corner picks it out - or lets it go again if it was
+           already picked. Drag to move, click to choose: two gestures on
+           the same handle, told apart by whether it went anywhere, so
+           there is no mode to be in first.
+
+           It also means a refused drag - one that would have crossed the
+           wall - stops reporting "moved", which was the opposite of true
+           and wiped out the reason it would not go. */
+        edPickToggle(wasNode);
+        return;
+      }
       edSay(many ? ed.picked.length + " corners moved together"
-                 : "moved \u2014 " + ed.poly.length + " corners in all");
+                 : "moved — " + ed.poly.length + " corners in all");
     }
   }
   el.addEventListener("pointerdown", function (e) {
@@ -9326,7 +9532,7 @@ function edPointTo(x, y, andStamp) {
            with the latch down was splitting the wall and then selecting
            the piece it had just made, so choosing two corners of a
            square quietly turned it into a hexagon. */
-        var picking = e.shiftKey || ed.picking;
+        var picking = e.shiftKey;
         if (hit < 0 && !picking) {
           var eg = edEdgeNear(cell[0], cell[1]);
           if (eg >= 0) {
@@ -9344,9 +9550,8 @@ function edPointTo(x, y, andStamp) {
             game.manC = cell[0]; game.manR = cell[1];
             return;
           }
-          /* dragging an unpicked corner is about that corner alone */
-          if (!edPicked(hit)) edPickNone(true);
           ed.dragNode = hit;
+          ed.dragFrom = [ed.poly[hit][0], ed.poly[hit][1]];
           game.manC = cell[0]; game.manR = cell[1];
           edPolyDraw(); edNodesDraw();
           return;                      /* taken hold; nothing is stamped */
@@ -9804,6 +10009,9 @@ addEventListener("keydown", function (e) {
       if (on >= 0) {
         e.preventDefault();
         if (ed.poly.length <= 3) return edSay("a room needs at least three corners", "bad");
+        var without = ed.poly.filter(function (v, k) { return k !== on; });
+        var illGone = edWhySick(without);
+        if (illGone) return edSay("losing that corner would leave " + illGone, "bad");
         edMark();
         ed.poly.splice(on, 1);
         edSegs().splice(on, 1);
