@@ -214,6 +214,43 @@
      that is a fact about the cellar worth knowing. */
   var RESIST_TURN = 2.0, RESIST_CAP = 2;
 
+  /* ------------------------------------------------------------------
+     WHETHER IT STAYS ON THE SLOPE
+
+     A block resting on an incline stays put while friction can hold it,
+     and the textbook answer is that it does so exactly when
+
+         tan(angle)  <=  the coefficient of friction
+
+     Which has a consequence worth being straight about: the WEIGHT
+     cancels out. Gravity pulls a heavy block down the slope harder, and
+     presses it into the slope harder in precisely the same proportion,
+     so mass appears on both sides and disappears. A heavy block and a
+     light one of the same material slide at the same angle. That is not
+     an approximation, it is the whole of it - and it is why a lorry and
+     a coin slide off the same tilted plank together.
+
+     What weight does decide is everything AFTER it lets go: how far it
+     runs, what it flattens, and how much of your arm it takes to shove
+     it back up. Which is where weight already lives in this game.
+
+     The other half is that every slope down here is the same slope. The
+     ground rises one step between neighbours and never more, so the
+     angle is always 0.55 of a square over one square - about
+     twenty-nine degrees - and the question is only ever whether a
+     block's friction beats that one number.
+
+         timber  0.18   slides
+         brick   0.35   slides
+         set tar 0.55   holds, just
+         rock    0.75   holds
+
+     So bricks run downhill and rocks sit where you put them, which was
+     already true of bricks and is now true for a reason rather than
+     because it was written that way.
+     ------------------------------------------------------------------ */
+  var SLOPE_TAN = 0.55;      /* one step of floor across one square */
+
   /* and what can be running across it. The cellars are old and things
      have been sealed up down here for a long time. */
   var DRY = 0, WATER = 1, TAR = 2;
@@ -650,6 +687,13 @@
     this.blocks = null;
     this.shape = null;
     this.bound = null;
+    /* Which of the level's own floor colours each square is painted, or
+       nought for the cellar's own stone. A plane rather than a property
+       of anything, because it is a property of the FLOOR - you can paint
+       a square and then build on it, or paint it and leave it bare, and
+       neither should disturb the other. */
+    this.tint = new Uint8Array(COLS * ROWS);
+    this.floors = null;
     this.HI = 0;
     this.seed = (opts && opts.seed) || ((Math.random() * 0x7FFFFFFF) | 0);
     this.variant = {};          /* bumped by regenerate(), per level */
@@ -696,6 +740,8 @@
     if (v === BRICK && this.wood) return DRAG_WOOD;
     return DRAG[v] === undefined ? 0.35 : DRAG[v];
   };
+  /* will it hold on a one-step slope, or run down it? */
+  Game.prototype.holdsOnSlope = function (v) { return this.dragOf(v) >= SLOPE_TAN; };
   Game.prototype.tough = function (v) {
     if (v === ROCK) return true;
     var made = this.madeOf(v);
@@ -1134,6 +1180,7 @@
     this.fvol.fill(0);
     this.sealed.fill(0);
     this.gnaw.fill(0);
+    this.tint.fill(0);
     this.burn.fill(0);
     this.stress.fill(0);
     this.marbles.length = 0;
@@ -1361,46 +1408,63 @@
      LIFTING THE GROUND
 
      Raising one square on its own would make a cliff, and a cliff is
-     not a thing this floor has: the steepest the ground gets is one
-     step between neighbours. So lifting a square lifts what is around
-     it too, and the higher it goes the further out that reaches - a
-     cone rather than a pillar, spreading until it runs into the edge
-     of the cellar or into ground already high enough.
+     not a thing this floor has. So lifting a square lifts what is
+     around it too, and the higher it goes the further out that reaches
+     - a cone rather than a pillar, spreading until it runs into the
+     edge of the cellar or into ground already high enough.
 
-     One step is 0.55 of a square, which is about twenty-nine degrees.
-     Two would be forty-eight, which is past the limit, so one step
-     between neighbours is both the rule and the only choice the grid
-     offers.
+     HOW STEEP that cone is, is the builder's to choose. `run` is how
+     many squares the ground takes to climb one step:
+
+       run 1   step, step, step        0.55 in 1    about 29 degrees
+       run 2   step, flat, step, flat  0.55 in 2    about 15
+       run 3   ...                     0.55 in 3    about 10
+
+     So a long hill is not a shallower incline - the grid has no such
+     thing, heights are whole steps - it is the same one-step edges with
+     flat ground between them, and the further apart they are the gentler
+     the hill reads and walks. One step per square is the steepest the
+     ground goes, and at twenty-nine degrees it is comfortably inside the
+     forty-five this floor will not exceed.
+
+     That also means the sliding rule below does not change with the
+     length of the hill: a block is either standing on the flat, where
+     nothing is pulling it anywhere, or on one of those one-step edges,
+     which is always the same edge.
 
      Lowering does the same in reverse: pull a square down and anything
-     left standing more than a step above it comes down after it. Which
-     means the ground is always walkable and always renderable - every
-     change of height is a ramp, and there is nothing anywhere that a
-     brick could be pushed off but not onto.
+     left standing too high above it comes down after it. Which means
+     the ground is always walkable and always renderable - every change
+     of height is a ramp, and there is nothing anywhere that a brick
+     could be pushed off but not back onto.
      ------------------------------------------------------------------ */
-  Game.prototype.terrace = function (c, r, delta) {
+  Game.prototype.terrace = function (c, r, delta, run) {
     if (!this.inField(c, r)) return 0;
+    run = Math.max(1, Math.min(6, run || 1));
     var i = this.idx(c, r);
     var want = Math.max(0, Math.min(MAX_H, this.height[i] + delta));
     if (want === this.height[i]) return 0;
     this.height[i] = want;
-    return this.relax(delta > 0);
+    return this.relax(delta > 0, run);
   };
 
-  /* Make every neighbour within one step, either by bringing the low
-     ones up (after a lift) or the high ones down (after a dig). Runs to
-     a fixed point, which cannot take more passes than the ground is
-     tall multiplied by how wide the room is. */
-  Game.prototype.relax = function (raising) {
-    var D = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+  /* Bring the ground within one step per `run` squares - the low ones
+     up after a lift, the high ones down after a dig. Runs to a fixed
+     point, which cannot take more passes than the room is wide. */
+  Game.prototype.relax = function (raising, run) {
+    run = Math.max(1, Math.min(6, run || 1));
     var moved = 0;
     for (var pass = 0; pass < COLS + ROWS; pass++) {
       var changed = false;
       for (var r = 0; r < ROWS; r++) for (var c = 0; c < COLS; c++) {
         if (!this.inField(c, r)) continue;
         var i = this.idx(c, r), best = raising ? 0 : MAX_H;
-        for (var d = 0; d < 4; d++) {
-          var nc = c + D[d][0], nr = r + D[d][1];
+        /* everything within `run` squares, because that is how far the
+           ground is allowed to take to change by one */
+        for (var dr = -run; dr <= run; dr++) for (var dc = -run; dc <= run; dc++) {
+          if (Math.abs(dc) + Math.abs(dr) > run) continue;
+          if (!dc && !dr) continue;
+          var nc = c + dc, nr = r + dr;
           if (!this.inField(nc, nr)) continue;    /* the edge is not a height */
           var h = this.height[this.idx(nc, nr)];
           best = raising ? Math.max(best, h) : Math.min(best, h);
@@ -1564,7 +1628,11 @@
 
     for (var r = 0; r < ROWS; r++) for (var c = 0; c < COLS; c++) {
       var i = this.idx(c, r);
-      if (this.grid[i] !== BRICK) continue;
+      var what = this.grid[i];
+      /* anything that can be shoved can also slide - and whether it
+         does is friction against the slope, nothing else */
+      if (what !== BRICK && what !== ROCK && what < MADE) continue;
+      if (this.holdsOnSlope(what)) continue;
 
       /* tar sets round anything standing in it */
       if (this.fluid[i] === TAR || this.grid[i] === COOLED) continue;
@@ -1586,7 +1654,9 @@
         if (this.monsterAt(nc, nr)) continue;
         bestH = this.height[ni]; best = ni;
       }
-      if (best !== null) { this.grid[i] = EMPTY; this.grid[best] = BRICK; moved++; }
+      /* it arrives as whatever it was: a level's own block does not
+         turn into a brick by rolling downhill */
+      if (best !== null) { this.grid[i] = EMPTY; this.grid[best] = what; moved++; }
     }
 
     /* A single brick resting against a tree does nothing for ever. Two
@@ -2453,7 +2523,7 @@
     VAT_TAR: VAT_TAR, VAT_WATER: VAT_WATER, COOLED: COOLED, CHOPPER: CHOPPER,
     ROCK: ROCK, ROCK_WEIGHT: ROCK_WEIGHT, PUSH_POWER: PUSH_POWER,
     MADE: MADE, MAX_MADE: MAX_MADE, DEALABLE: DEALABLE,
-    DRAG: DRAG, DRAG_WOOD: DRAG_WOOD, RESIST_TURN: RESIST_TURN,
+    DRAG: DRAG, DRAG_WOOD: DRAG_WOOD, RESIST_TURN: RESIST_TURN, SLOPE_TAN: SLOPE_TAN,
     DRY: DRY, WATER: WATER, TAR: TAR,
     NOTHING: NOTHING, BOOTS: BOOTS, FROST: FROST, SAW: SAW, JAR: JAR, ITEMS: ITEMS,
     levelOf: levelOf, monstersFor: monstersFor, featuresFor: featuresFor,

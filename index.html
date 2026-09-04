@@ -258,6 +258,8 @@
 .edTool[aria-pressed="true"] { background: #503c25; border-color: #b98c3e; color: #ffe6b8; }
 .edSwatch { width: 9px; height: 9px; border-radius: 2px; border: 1px solid rgba(0,0,0,.55); }
 .edKey { opacity: .45; }
+#edBar input[type="color"] { width: 26px; height: 22px; padding: 0; border: 1px solid #46372a;
+  border-radius: 3px; background: #14100c; cursor: pointer; flex: 0 0 auto; }
 #edBar input[type="text"] { background: #14100c; border: 1px solid #372c21; color: #efe4d2;
   border-radius: 3px; padding: 3px 7px; font: inherit; font-size: 11px;
   flex: 0 1 200px; min-width: 120px; }
@@ -400,6 +402,8 @@
   </div>
   <div class="edRow">
     <input type="text" id="edName" maxlength="48" placeholder="Name this cellar" spellcheck="false">
+    <input type="color" id="edColour" value="#6b8f4e" title="The colour Paint floor puts down">
+
     <button class="edBtn" id="edSave" type="button">Save</button>
     <button class="edBtn" id="edOpen" type="button">Open</button>
     <button class="edBtn" id="edNew" type="button">New</button>
@@ -551,6 +555,43 @@
      two rocks uphill genuinely impossible rather than merely slow, and
      that is a fact about the cellar worth knowing. */
   var RESIST_TURN = 2.0, RESIST_CAP = 2;
+
+  /* ------------------------------------------------------------------
+     WHETHER IT STAYS ON THE SLOPE
+
+     A block resting on an incline stays put while friction can hold it,
+     and the textbook answer is that it does so exactly when
+
+         tan(angle)  <=  the coefficient of friction
+
+     Which has a consequence worth being straight about: the WEIGHT
+     cancels out. Gravity pulls a heavy block down the slope harder, and
+     presses it into the slope harder in precisely the same proportion,
+     so mass appears on both sides and disappears. A heavy block and a
+     light one of the same material slide at the same angle. That is not
+     an approximation, it is the whole of it - and it is why a lorry and
+     a coin slide off the same tilted plank together.
+
+     What weight does decide is everything AFTER it lets go: how far it
+     runs, what it flattens, and how much of your arm it takes to shove
+     it back up. Which is where weight already lives in this game.
+
+     The other half is that every slope down here is the same slope. The
+     ground rises one step between neighbours and never more, so the
+     angle is always 0.55 of a square over one square - about
+     twenty-nine degrees - and the question is only ever whether a
+     block's friction beats that one number.
+
+         timber  0.18   slides
+         brick   0.35   slides
+         set tar 0.55   holds, just
+         rock    0.75   holds
+
+     So bricks run downhill and rocks sit where you put them, which was
+     already true of bricks and is now true for a reason rather than
+     because it was written that way.
+     ------------------------------------------------------------------ */
+  var SLOPE_TAN = 0.55;      /* one step of floor across one square */
 
   /* and what can be running across it. The cellars are old and things
      have been sealed up down here for a long time. */
@@ -988,6 +1029,13 @@
     this.blocks = null;
     this.shape = null;
     this.bound = null;
+    /* Which of the level's own floor colours each square is painted, or
+       nought for the cellar's own stone. A plane rather than a property
+       of anything, because it is a property of the FLOOR - you can paint
+       a square and then build on it, or paint it and leave it bare, and
+       neither should disturb the other. */
+    this.tint = new Uint8Array(COLS * ROWS);
+    this.floors = null;
     this.HI = 0;
     this.seed = (opts && opts.seed) || ((Math.random() * 0x7FFFFFFF) | 0);
     this.variant = {};          /* bumped by regenerate(), per level */
@@ -1034,6 +1082,8 @@
     if (v === BRICK && this.wood) return DRAG_WOOD;
     return DRAG[v] === undefined ? 0.35 : DRAG[v];
   };
+  /* will it hold on a one-step slope, or run down it? */
+  Game.prototype.holdsOnSlope = function (v) { return this.dragOf(v) >= SLOPE_TAN; };
   Game.prototype.tough = function (v) {
     if (v === ROCK) return true;
     var made = this.madeOf(v);
@@ -1472,6 +1522,7 @@
     this.fvol.fill(0);
     this.sealed.fill(0);
     this.gnaw.fill(0);
+    this.tint.fill(0);
     this.burn.fill(0);
     this.stress.fill(0);
     this.marbles.length = 0;
@@ -1699,46 +1750,63 @@
      LIFTING THE GROUND
 
      Raising one square on its own would make a cliff, and a cliff is
-     not a thing this floor has: the steepest the ground gets is one
-     step between neighbours. So lifting a square lifts what is around
-     it too, and the higher it goes the further out that reaches - a
-     cone rather than a pillar, spreading until it runs into the edge
-     of the cellar or into ground already high enough.
+     not a thing this floor has. So lifting a square lifts what is
+     around it too, and the higher it goes the further out that reaches
+     - a cone rather than a pillar, spreading until it runs into the
+     edge of the cellar or into ground already high enough.
 
-     One step is 0.55 of a square, which is about twenty-nine degrees.
-     Two would be forty-eight, which is past the limit, so one step
-     between neighbours is both the rule and the only choice the grid
-     offers.
+     HOW STEEP that cone is, is the builder's to choose. `run` is how
+     many squares the ground takes to climb one step:
+
+       run 1   step, step, step        0.55 in 1    about 29 degrees
+       run 2   step, flat, step, flat  0.55 in 2    about 15
+       run 3   ...                     0.55 in 3    about 10
+
+     So a long hill is not a shallower incline - the grid has no such
+     thing, heights are whole steps - it is the same one-step edges with
+     flat ground between them, and the further apart they are the gentler
+     the hill reads and walks. One step per square is the steepest the
+     ground goes, and at twenty-nine degrees it is comfortably inside the
+     forty-five this floor will not exceed.
+
+     That also means the sliding rule below does not change with the
+     length of the hill: a block is either standing on the flat, where
+     nothing is pulling it anywhere, or on one of those one-step edges,
+     which is always the same edge.
 
      Lowering does the same in reverse: pull a square down and anything
-     left standing more than a step above it comes down after it. Which
-     means the ground is always walkable and always renderable - every
-     change of height is a ramp, and there is nothing anywhere that a
-     brick could be pushed off but not onto.
+     left standing too high above it comes down after it. Which means
+     the ground is always walkable and always renderable - every change
+     of height is a ramp, and there is nothing anywhere that a brick
+     could be pushed off but not back onto.
      ------------------------------------------------------------------ */
-  Game.prototype.terrace = function (c, r, delta) {
+  Game.prototype.terrace = function (c, r, delta, run) {
     if (!this.inField(c, r)) return 0;
+    run = Math.max(1, Math.min(6, run || 1));
     var i = this.idx(c, r);
     var want = Math.max(0, Math.min(MAX_H, this.height[i] + delta));
     if (want === this.height[i]) return 0;
     this.height[i] = want;
-    return this.relax(delta > 0);
+    return this.relax(delta > 0, run);
   };
 
-  /* Make every neighbour within one step, either by bringing the low
-     ones up (after a lift) or the high ones down (after a dig). Runs to
-     a fixed point, which cannot take more passes than the ground is
-     tall multiplied by how wide the room is. */
-  Game.prototype.relax = function (raising) {
-    var D = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+  /* Bring the ground within one step per `run` squares - the low ones
+     up after a lift, the high ones down after a dig. Runs to a fixed
+     point, which cannot take more passes than the room is wide. */
+  Game.prototype.relax = function (raising, run) {
+    run = Math.max(1, Math.min(6, run || 1));
     var moved = 0;
     for (var pass = 0; pass < COLS + ROWS; pass++) {
       var changed = false;
       for (var r = 0; r < ROWS; r++) for (var c = 0; c < COLS; c++) {
         if (!this.inField(c, r)) continue;
         var i = this.idx(c, r), best = raising ? 0 : MAX_H;
-        for (var d = 0; d < 4; d++) {
-          var nc = c + D[d][0], nr = r + D[d][1];
+        /* everything within `run` squares, because that is how far the
+           ground is allowed to take to change by one */
+        for (var dr = -run; dr <= run; dr++) for (var dc = -run; dc <= run; dc++) {
+          if (Math.abs(dc) + Math.abs(dr) > run) continue;
+          if (!dc && !dr) continue;
+          var nc = c + dc, nr = r + dr;
           if (!this.inField(nc, nr)) continue;    /* the edge is not a height */
           var h = this.height[this.idx(nc, nr)];
           best = raising ? Math.max(best, h) : Math.min(best, h);
@@ -1902,7 +1970,11 @@
 
     for (var r = 0; r < ROWS; r++) for (var c = 0; c < COLS; c++) {
       var i = this.idx(c, r);
-      if (this.grid[i] !== BRICK) continue;
+      var what = this.grid[i];
+      /* anything that can be shoved can also slide - and whether it
+         does is friction against the slope, nothing else */
+      if (what !== BRICK && what !== ROCK && what < MADE) continue;
+      if (this.holdsOnSlope(what)) continue;
 
       /* tar sets round anything standing in it */
       if (this.fluid[i] === TAR || this.grid[i] === COOLED) continue;
@@ -1924,7 +1996,9 @@
         if (this.monsterAt(nc, nr)) continue;
         bestH = this.height[ni]; best = ni;
       }
-      if (best !== null) { this.grid[i] = EMPTY; this.grid[best] = BRICK; moved++; }
+      /* it arrives as whatever it was: a level's own block does not
+         turn into a brick by rolling downhill */
+      if (best !== null) { this.grid[i] = EMPTY; this.grid[best] = what; moved++; }
     }
 
     /* A single brick resting against a tree does nothing for ever. Two
@@ -2791,7 +2865,7 @@
     VAT_TAR: VAT_TAR, VAT_WATER: VAT_WATER, COOLED: COOLED, CHOPPER: CHOPPER,
     ROCK: ROCK, ROCK_WEIGHT: ROCK_WEIGHT, PUSH_POWER: PUSH_POWER,
     MADE: MADE, MAX_MADE: MAX_MADE, DEALABLE: DEALABLE,
-    DRAG: DRAG, DRAG_WOOD: DRAG_WOOD, RESIST_TURN: RESIST_TURN,
+    DRAG: DRAG, DRAG_WOOD: DRAG_WOOD, RESIST_TURN: RESIST_TURN, SLOPE_TAN: SLOPE_TAN,
     DRY: DRY, WATER: WATER, TAR: TAR,
     NOTHING: NOTHING, BOOTS: BOOTS, FROST: FROST, SAW: SAW, JAR: JAR, ITEMS: ITEMS,
     levelOf: levelOf, monstersFor: monstersFor, featuresFor: featuresFor,
@@ -3828,7 +3902,13 @@
   var MF = root.MutantFly, IO = root.MutantLevelIO;
   var N = MF.COLS * MF.ROWS;
 
-  var PLANES = ["grid", "height", "item", "fluid", "fvol", "sealed", "gnaw", "burn", "stress"];
+  /* `tint` is the newest of these, and it is a good example of why
+     planes are read by name: a level written before it existed simply
+     has no tint plane, that reads as zeroes, and zero means "the
+     cellar's own stone" - which is exactly right and needed no
+     migration at all. */
+  var PLANES = ["grid", "height", "item", "fluid", "fvol", "sealed", "gnaw", "burn",
+                "stress", "tint"];
   var SIDES = [["W", MF.ROWS], ["E", MF.ROWS], ["S", MF.COLS], ["N", MF.COLS]];
 
   /* ------------------------------------------------------------------
@@ -3884,7 +3964,7 @@
   var KNOWN = ["v", "needs", "F", "cols", "rows", "cells", "edge", "man", "bricks",
                "marbleCount", "carry", "CO", "monsters", "marbles", "robots",
                "sources", "id", "name", "author", "made", "note",
-               "blocks", "shape", "bound", "deal"];
+               "blocks", "shape", "bound", "deal", "floors"];
 
   /* One step per version, applied in order. A record from v1 goes
      through migrate[2] and comes out current. */
@@ -3941,6 +4021,10 @@
     /* the blocks this level invented, the shape it is, and anything it
        would rather have dealt out than drawn */
     if (g.blocks && g.blocks.length) rec.blocks = g.blocks.map(cleanBlock);
+    /* Painted floors do NOT raise the bar: an older game that has never
+       heard of them shows the cellar's own stone and plays exactly the
+       same cellar. Poorer to look at, not wrong - which is the line. */
+    if (g.floors && g.floors.length) rec.floors = g.floors.slice(0, 16).map(cleanColour);
     if (g.shape) rec.shape = IO.packArray(g.shape);
     if (g.bound) rec.bound = IO.packArray(g.bound);
     if (g.deal && g.deal.length) rec.deal = g.deal.map(function (d) {
@@ -3964,6 +4048,10 @@
      can actually run. A weight of nought would be a block with no
      weight at all, which the push loop would count as free and let you
      shove a thousand of. */
+  function cleanColour(c) {
+    return /^#[0-9a-fA-F]{6}$/.test(c) ? String(c).toLowerCase() : "#6b5f4e";
+  }
+
   function cleanBlock(b) {
     var name = String((b && b.name) || "Block").slice(0, 20);
     var colour = /^#[0-9a-fA-F]{6}$/.test(b && b.colour) ? b.colour : "#8a7a5e";
@@ -4023,6 +4111,8 @@
     /* what the level brought with it, before anything is placed */
     g.blocks = (rec.blocks || []).slice(0, MF.MAX_MADE - MF.MADE).map(cleanBlock);
     if (!g.blocks.length) g.blocks = null;
+    g.floors = (rec.floors || []).slice(0, 16).map(cleanColour);
+    if (!g.floors.length) g.floors = null;
     g.shape = rec.shape ? IO.unpackArray(rec.shape, N) : null;
     g.bound = rec.bound ? IO.unpackArray(rec.bound, N) : null;
     g.deal = rec.deal || null;
@@ -4173,6 +4263,7 @@
   root.MutantLevelFormat = {
     VERSION: VERSION, NEEDS: NEEDS, NEEDS_RICH: NEEDS_RICH,
     PLANES: PLANES, KNOWN: KNOWN, upgrade: upgrade, cleanBlock: cleanBlock,
+    cleanColour: cleanColour,
     capture: capture, apply: apply, toCode: toCode, fromCode: fromCode, faults: faults
   };
 })(typeof window !== "undefined" ? window : globalThis);
@@ -6235,7 +6326,17 @@ function syncTerrain() {
        two neighbours match. */
     var v = 0.56 + 0.17 * lvl + (b - 0.5) * 0.1;
     var warm = 0.9 + 0.07 * lvl;
-    col.setRGB(v * (0.94 + 0.09 * lvl), v * 0.95, v * warm * 0.92);
+    var painted = game.tint && game.tint[r * COLS + c];
+    if (painted && game.floors && game.floors[painted - 1]) {
+      /* a square the builder painted. Its own colour, but still lit by
+         the same value, so a painted floor rises and falls with the
+         ground like everything else rather than sitting on top of it
+         as a flat sticker. */
+      col.set(game.floors[painted - 1]);
+      col.multiplyScalar(0.62 + v * 0.62);
+    } else {
+      col.setRGB(v * (0.94 + 0.09 * lvl), v * 0.95, v * warm * 0.92);
+    }
     mesh.setColorAt(n[cut], col);
     n[cut]++;
   }
@@ -6851,7 +6952,10 @@ var ed = {
      did so you can take one of them back. Whole cellars, because a
      cellar is two kilobytes and being clever about deltas here would
      buy nothing and cost correctness. */
-  undo: [], redo: [], painting: false
+  undo: [], redo: [], painting: false,
+  /* how long the current pull has been going on. Not a setting - it is
+     reset the moment the key comes up or the cursor moves. */
+  liftN: 0, liftAt: ""
 };
 var UNDO_DEEP = 40;
 
@@ -6907,7 +7011,8 @@ var ED_TOOLS = [
   { name: "Start",     key: "g", swatch: "#ffd27a", act: "man" },
   { name: "Raise",     key: "+", swatch: "#7a6a52", act: "hi", v: 1 },
   { name: "Lower",     key: "-", swatch: "#4a4034", act: "hi", v: -1 },
-  { name: "Wall/drop", key: "h", swatch: "#574c42", act: "edge" }
+  { name: "Wall/drop", key: "h", swatch: "#574c42", act: "edge" },
+  { name: "Paint floor", key: "c", swatch: "#8a6a3a", act: "tint" }
 ];
 
 function edSay(text, cls) {
@@ -6936,6 +7041,8 @@ function edPaint() {
 function edStamp(quiet) {
   if (mode !== "edit") return;
   var t = ED_TOOLS[ed.tool], c = game.manC, r = game.manR, i = r * COLS + c;
+  /* a pull that has moved to another square is a new pull */
+  if (ed.liftAt !== c + "," + r) { ed.liftN = 0; ed.liftAt = c + "," + r; }
   if (!quiet) edMark();
 
   if (t.act === "cell") {
@@ -6967,13 +7074,43 @@ function edStamp(quiet) {
     ed.startC = c; ed.startR = r;
     edSay("the player starts here");
   } else if (t.act === "hi") {
-    /* lifting a square lifts what is round it, spreading further the
-       higher it goes, because the ground does not do cliffs */
-    var moved = game.terrace(c, r, t.v);
-    edSay(t.v > 0
-      ? (moved ? "lifted, and " + moved + " squares came up with it" : "lifted")
-      : (moved ? "lowered, and " + moved + " came down after it" : "lowered"));
+    /* ------------------------------------------------------------
+       Pulling the ground up.
+
+       One gesture, not a tool and a separate setting. Tap it and you
+       get a sharp little mound; hold it and the ground keeps coming up
+       and the hill keeps spreading out, which is what "pulling a tile
+       up" ought to feel like when the input you have is a key rather
+       than a mouse. The slope length is not something to know about
+       and set - it is how long you held on.
+
+       Once the middle is as high as the floor goes, holding on stops
+       raising and starts widening, so a long pull gives a broad hill
+       rather than doing nothing.
+       ------------------------------------------------------------ */
+    ed.liftN = (ed.liftN || 0) + 1;
+    var run = Math.min(5, 1 + ((ed.liftN - 1) >> 1));
+    var moved = game.terrace(c, r, t.v, run);
+    if (!moved) moved = game.relax(t.v > 0, run);   /* at the top: spread it */
+    var grade = (Math.atan(0.55 / run) * 180 / Math.PI).toFixed(0);
+    edSay((t.v > 0 ? "pulling up" : "pushing down") +
+          " - a step every " + run + " square" + (run > 1 ? "s" : "") +
+          ", about " + grade + " degrees" +
+          (moved ? " (" + moved + " squares moved)" : " (nothing left to move)"));
     syncTerrain(); syncEdges();
+  } else if (t.act === "tint") {
+    var want = ($("edColour").value || "#6b8f4e").toLowerCase();
+    if (!game.floors) game.floors = [];
+    var slot = game.floors.indexOf(want);
+    if (slot < 0) {
+      if (game.floors.length >= 16) return edSay("sixteen floor colours is the lot", "bad");
+      game.floors.push(want);
+      slot = game.floors.length - 1;
+    }
+    /* painting the same colour twice takes it back to bare stone, so
+       one tool both paints and unpaints */
+    game.tint[i] = (game.tint[i] === slot + 1) ? 0 : slot + 1;
+    syncTerrain();
   } else if (t.act === "edge") {
     /* only means anything on the border, where there IS an edge */
     var side = (c === 0) ? "W" : (c === COLS - 1) ? "E" : (r === 0) ? "S" : (r === ROWS - 1) ? "N" : null;
@@ -7302,7 +7439,10 @@ addEventListener("keydown", function (e) {
   if (a) { e.preventDefault(); held[a] = true; Beeb.wake(); return; }
   if (k === " ") {
     e.preventDefault();
-    if (mode === "edit") edStamp();
+    /* the browser repeats a held key for us, which is the hold gesture
+       - but only the first of a stroke is worth an undo step, or taking
+       a hill back would be thirty presses */
+    if (mode === "edit") { edStamp(e.repeat); }
     else if (mode === "title") ($("continue").hidden ? newGame() : continueGame());
     else if (mode === "brief") beginTurns();
     return;
@@ -7337,6 +7477,7 @@ addEventListener("keydown", function (e) {
 addEventListener("keyup", function (e) {
   var a = KEYMAP[e.key.toLowerCase()];
   if (a) held[a] = false;
+  if (e.key === " ") { ed.liftN = 0; ed.liftAt = ""; }   /* the pull ended */
 });
 addEventListener("blur", function () { held = {}; if (mode === "play") pause(true); });
 
@@ -7358,6 +7499,22 @@ addEventListener("blur", function () { held = {}; if (mode === "play") pause(tru
   for (var wk in edWire) (function (id, fn) {
     var el = $(id); if (el) el.addEventListener("click", fn);
   })(wk, edWire[wk]);
+  /* holding the button is the same gesture as holding the key, so the
+     hill can be pulled up on a phone too */
+  (function () {
+    var btn = $("edStampBtn"), timer = null;
+    if (!btn) return;
+    var stop = function () { clearInterval(timer); timer = null; ed.liftN = 0; ed.liftAt = ""; };
+    btn.addEventListener("pointerdown", function (e) {
+      e.preventDefault();
+      edStamp();
+      timer = setInterval(function () { edStamp(true); }, 110);
+    });
+    ["pointerup", "pointerleave", "pointercancel"].forEach(function (n) {
+      btn.addEventListener(n, stop);
+    });
+  })();
+
   if ($("edCopy")) $("edCopy").addEventListener("click", function () {
     var box = $("edCode");
     box.select();

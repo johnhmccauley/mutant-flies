@@ -1542,5 +1542,60 @@ const B = MF.BRICK, R = MF.ROCK;
      [g.height[I(0, 0)], g.height[I(1, 0)], g.height[I(2, 0)], g.height[I(3, 0)]], [3, 2, 1, 0]);
 }
 
+
+/* ---- what stays on a slope, and what runs down it ----------------- */
+function onSlope(what, blocks) {
+  const g = bare(12);
+  g.height.fill(0);
+  if (blocks) g.blocks = blocks;
+  /* a slope running east, one step per column, so every square has a
+     lower one beside it - which is the situation being tested */
+  for (let c = 0; c < MF.COLS; c++) {
+    const h = Math.max(0, MF.MAX_H - c);
+    for (let r = 0; r < MF.ROWS; r++) g.height[I(c, r)] = h;
+  }
+  g.manC = 20; g.manR = 2;
+  g.grid[I(1, 14)] = what;          /* height 2, with height 1 to the east */
+  const before = [1, 14];
+  for (let t = 0; t < 6; t++) g.step(null);
+  let now = null;
+  for (let r = 0; r < MF.ROWS; r++) for (let c = 0; c < MF.COLS; c++)
+    if (g.grid[I(c, r)] === what) now = [c, r];
+  return { moved: !now || now[0] !== before[0] || now[1] !== before[1], now };
+}
+{
+  ok("a brick runs down a slope", onSlope(MF.BRICK).moved, true);
+  ok("and a rock sits where you put it", onSlope(MF.ROCK).moved, false);
+}
+{
+  /* the level's own blocks decide it for themselves */
+  const slippy = [{ name: "Ice", colour: "#9fd8e8", weight: 0.25, friction: 0.05 }];
+  const grippy = [{ name: "Rubber", colour: "#2a2a2a", weight: 0.25, friction: 0.9 }];
+  ok("a level's own slippery block runs", onSlope(MF.MADE, slippy).moved, true);
+  ok("and its grippy one holds", onSlope(MF.MADE, grippy).moved, false);
+}
+{
+  /* the point worth being straight about: weight cancels. Heavy and
+     light of the same material slide at the same angle - gravity pulls
+     a heavy block down the slope harder and presses it into the slope
+     harder in exactly the same proportion. */
+  const heavySlippy = [{ name: "Lead ice", colour: "#888888", weight: 2, friction: 0.05 }];
+  const lightGrippy = [{ name: "Cork", colour: "#c8a060", weight: 0.25, friction: 0.9 }];
+  ok("a heavy block with no grip still slides", onSlope(MF.MADE, heavySlippy).moved, true);
+  ok("and a light one with grip still holds", onSlope(MF.MADE, lightGrippy).moved, false);
+}
+{
+  /* it arrives as what it was, rather than turning into a brick */
+  const slippy = [{ name: "Ice", colour: "#9fd8e8", weight: 0.25, friction: 0.05 }];
+  const r = onSlope(MF.MADE, slippy);
+  ok("and it is still the same block when it gets there", !!r.now, true);
+}
+{
+  const g = bare(12);
+  ok("the ladder of materials runs the way it should",
+     [g.holdsOnSlope(MF.ROCK), g.holdsOnSlope(MF.BRICK), g.holdsOnSlope(MF.COOLED)],
+     [true, false, true]);
+}
+
 console.log("\n" + pass + " passed, " + fail + " failed");
 process.exit(fail ? 1 : 0);

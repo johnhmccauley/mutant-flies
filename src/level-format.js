@@ -46,7 +46,13 @@
   var MF = root.MutantFly, IO = root.MutantLevelIO;
   var N = MF.COLS * MF.ROWS;
 
-  var PLANES = ["grid", "height", "item", "fluid", "fvol", "sealed", "gnaw", "burn", "stress"];
+  /* `tint` is the newest of these, and it is a good example of why
+     planes are read by name: a level written before it existed simply
+     has no tint plane, that reads as zeroes, and zero means "the
+     cellar's own stone" - which is exactly right and needed no
+     migration at all. */
+  var PLANES = ["grid", "height", "item", "fluid", "fvol", "sealed", "gnaw", "burn",
+                "stress", "tint"];
   var SIDES = [["W", MF.ROWS], ["E", MF.ROWS], ["S", MF.COLS], ["N", MF.COLS]];
 
   /* ------------------------------------------------------------------
@@ -102,7 +108,7 @@
   var KNOWN = ["v", "needs", "F", "cols", "rows", "cells", "edge", "man", "bricks",
                "marbleCount", "carry", "CO", "monsters", "marbles", "robots",
                "sources", "id", "name", "author", "made", "note",
-               "blocks", "shape", "bound", "deal"];
+               "blocks", "shape", "bound", "deal", "floors"];
 
   /* One step per version, applied in order. A record from v1 goes
      through migrate[2] and comes out current. */
@@ -159,6 +165,10 @@
     /* the blocks this level invented, the shape it is, and anything it
        would rather have dealt out than drawn */
     if (g.blocks && g.blocks.length) rec.blocks = g.blocks.map(cleanBlock);
+    /* Painted floors do NOT raise the bar: an older game that has never
+       heard of them shows the cellar's own stone and plays exactly the
+       same cellar. Poorer to look at, not wrong - which is the line. */
+    if (g.floors && g.floors.length) rec.floors = g.floors.slice(0, 16).map(cleanColour);
     if (g.shape) rec.shape = IO.packArray(g.shape);
     if (g.bound) rec.bound = IO.packArray(g.bound);
     if (g.deal && g.deal.length) rec.deal = g.deal.map(function (d) {
@@ -182,6 +192,10 @@
      can actually run. A weight of nought would be a block with no
      weight at all, which the push loop would count as free and let you
      shove a thousand of. */
+  function cleanColour(c) {
+    return /^#[0-9a-fA-F]{6}$/.test(c) ? String(c).toLowerCase() : "#6b5f4e";
+  }
+
   function cleanBlock(b) {
     var name = String((b && b.name) || "Block").slice(0, 20);
     var colour = /^#[0-9a-fA-F]{6}$/.test(b && b.colour) ? b.colour : "#8a7a5e";
@@ -241,6 +255,8 @@
     /* what the level brought with it, before anything is placed */
     g.blocks = (rec.blocks || []).slice(0, MF.MAX_MADE - MF.MADE).map(cleanBlock);
     if (!g.blocks.length) g.blocks = null;
+    g.floors = (rec.floors || []).slice(0, 16).map(cleanColour);
+    if (!g.floors.length) g.floors = null;
     g.shape = rec.shape ? IO.unpackArray(rec.shape, N) : null;
     g.bound = rec.bound ? IO.unpackArray(rec.bound, N) : null;
     g.deal = rec.deal || null;
@@ -391,6 +407,7 @@
   root.MutantLevelFormat = {
     VERSION: VERSION, NEEDS: NEEDS, NEEDS_RICH: NEEDS_RICH,
     PLANES: PLANES, KNOWN: KNOWN, upgrade: upgrade, cleanBlock: cleanBlock,
+    cleanColour: cleanColour,
     capture: capture, apply: apply, toCode: toCode, fromCode: fromCode, faults: faults
   };
 })(typeof window !== "undefined" ? window : globalThis);
