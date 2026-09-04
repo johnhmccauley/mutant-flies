@@ -6003,12 +6003,33 @@ function init3D() {
   var polyGeo = new THREE.BufferGeometry();
   polyGeo.setAttribute("position",
     new THREE.BufferAttribute(new Float32Array((COLS * ROWS + 4) * 3), 3));
-  edPolyLine = new THREE.Line(polyGeo,
-    new THREE.LineBasicMaterial({ color: 0xffd27a, depthTest: false }));
+  polyGeo.setAttribute("color",
+    new THREE.BufferAttribute(new Float32Array((COLS * ROWS + 4) * 3), 3));
+  edPolyLine = new THREE.LineSegments(polyGeo,
+    new THREE.LineBasicMaterial({ vertexColors: true, depthTest: false }));
   edPolyLine.renderOrder = 10;
   edPolyLine.visible = false;
   edPolyLine.frustumCulled = false;
   scene.add(edPolyLine);
+
+  edNodeMesh = new THREE.InstancedMesh(
+    new THREE.BoxGeometry(1, 1, 1),
+    new THREE.MeshBasicMaterial({ depthTest: false }),
+    256);
+  edNodeMesh.renderOrder = 11;
+  edNodeMesh.visible = false;
+  edNodeMesh.frustumCulled = false;
+  scene.add(edNodeMesh);
+
+  var bandGeo = new THREE.BufferGeometry();
+  bandGeo.setAttribute("position", new THREE.BufferAttribute(new Float32Array(8 * 3), 3));
+  edBandLine = new THREE.LineSegments(bandGeo,
+    new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.75,
+                                  depthTest: false }));
+  edBandLine.renderOrder = 12;
+  edBandLine.visible = false;
+  edBandLine.frustumCulled = false;
+  scene.add(edBandLine);
   keyLight = new THREE.SpotLight(0xffb163, 3.6, 40, 0.9, 0.5, 1.05);
   keyLight.castShadow = true;
   keyLight.shadow.mapSize.set(1024, 1024);
@@ -7634,6 +7655,13 @@ function continueGame() {
 function restartCellar() {
   Beeb.wake();
   game.over = false; game.won = false;
+  /* During a test, "again" means the level being tested, not a fresh
+     generated cellar - sheet() would replace the thing under test. */
+  if (ed.testing && ed.rec) {
+    MutantLevelFormat.apply(game, ed.rec);
+    enterLevel();
+    return;
+  }
   game.sheet();
   enterLevel();
 }
@@ -7707,6 +7735,10 @@ function turn() {
     mode = "over";
     FX.death();
     burst(game.manC, ROWS - 1 - game.manR, 0x7a6244);
+    if (ed.testing) {
+      setTimeout(function () { edStopTest("bad", "it killed you - " + ev.lostTo); }, 1500);
+      return;
+    }
     MF.save.end(game.HI);
     setTimeout(function () {
       if (ai.on) { restartCellar(); return; }     /* it plays on */
@@ -7716,6 +7748,12 @@ function turn() {
     mode = "won";
     FX.cleared();
     banner("CLEARED", "bonus " + ev.bonus, null, 2200);
+    if (ed.testing) {
+      setTimeout(function () {
+        edStopTest("good", "it can be finished \u2014 " + game.steps + " moves, bonus " + ev.bonus);
+      }, 2200);
+      return;
+    }
     MF.save.keep(game.F + 1, game.SC, Math.max(game.HI, game.SC));
     setTimeout(function () {
       if (mode !== "won") return;
@@ -7796,7 +7834,7 @@ var ed = {
      is the cursor, so without this the starting square was wherever the
      builder happened to leave him when they stopped building - which
      was almost never where they meant the player to begin. */
-  startC: 4, startR: 4, brush: 2, poly: [],
+  startC: 4, startR: 4, brush: 2, poly: [], polyWall: [], polyShut: false, dragNode: -1, picked: [], band: null, testing: false,
   /* The single most important thing an editor has, and the first
      version did not have it: somewhere to put the last forty things you
      did so you can take one of them back. Whole cellars, because a
@@ -7953,8 +7991,33 @@ function edStripSquare(c, r) {
   if (game.robots) game.robots = game.robots.filter(function (b) { return !(b.c === c && b.r === r); });
 }
 
+/* ====================================================================
+   THE OUTLINE STAYS
+
+   Closing the loop used to be the end of it: the shape was filled in and
+   the corners thrown away, so changing your mind about one of them meant
+   drawing the whole room again. An outline is not a one-off gesture, it
+   is part of the level - so it is kept, its corners stay on screen as
+   handles, and it can be worked on for as long as the level exists.
+
+   Drag a handle and the room follows it. Click anywhere along an edge
+   and a new handle appears there, already under your finger, so a
+   straight wall becomes a corner by pulling on the middle of it. Press
+   Delete on a handle and it goes, and the two edges either side of it
+   become one.
+
+   It rides with the level in _extra, which the file format carries
+   through untouched, so re-opening a cellar you built last week gets you
+   the outline back and not just the squares it produced.
+   ==================================================================== */
 function edPolyClose() {
   if (ed.poly.length < 3) return edSay("a room needs at least three corners", "bad");
+  ed.polyShut = true;
+  edPolyFill(true);
+}
+
+function edPolyFill(loud) {
+  if (ed.poly.length < 3) return;
   edMark();
   var keep = {};
   for (var v = 0; v < ed.poly.length; v++) {
@@ -7972,7 +8035,40 @@ function edPolyClose() {
     game.shape[i2] = inside ? 1 : 0;
     if (inside) n++; else edStripSquare(c2, r2);
   }
-  ed.poly = [];
+
+  /* ------------------------------------------------------------------
+     The wall goes on the edge of the shape, stretch by stretch.
+
+     Drawing a room is drawing its walls - that is what the line you
+     closed was - so by default every side of it is stone. Left to the
+     bare default the squares outside would all be drops and the room
+     would be a plateau: you could walk off any side, and no side would
+     count as a side of a trap, which is most of what a wall is for.
+
+     But a room wants openings, and an opening is a whole side of it
+     rather than one square. So each stretch between two corners carries
+     its own answer, and this lays that answer down: everything outside
+     starts as a drop, then each stone stretch walls the squares just
+     beyond the cells it runs through.
+     ------------------------------------------------------------------ */
+  for (var r3 = 0; r3 < ROWS; r3++) for (var c3 = 0; c3 < COLS; c3++)
+    if (!game.shape[r3 * COLS + c3]) game.bound[r3 * COLS + c3] = MF.DROP;
+
+  var segs = edSegs(), walled = 0;
+  for (var v2 = 0; v2 < ed.poly.length; v2++) {
+    if (!segs[v2]) continue;                       /* this side is open */
+    edWalkEdge(ed.poly[v2], ed.poly[(v2 + 1) % ed.poly.length], function (ec, er) {
+      for (var d = 0; d < 4; d++) {
+        var dd = [[1, 0], [-1, 0], [0, 1], [0, -1]][d];
+        var nc = ec + dd[0], nr = er + dd[1];
+        if (nc < 0 || nr < 0 || nc >= COLS || nr >= ROWS) continue;
+        var ni = nr * COLS + nc;
+        if (game.shape[ni]) continue;
+        if (game.bound[ni] !== MF.WALL) walled++;
+        game.bound[ni] = MF.WALL;
+      }
+    });
+  }
 
   /* the player has to start somewhere inside it */
   if (!game.shape[ed.startR * COLS + ed.startC]) {
@@ -7988,37 +8084,221 @@ function edPolyClose() {
       game.manC = ed.startC; game.manR = ed.startR;
     }
   }
+  game._extra = game._extra || {};
+  game._extra.outline = ed.poly.map(function (v) { return [v[0], v[1]]; });
+  game._extra.outlineWall = edSegs().slice();
   edRigs(); syncTerrain(); syncEdges(); edDress(); edCount(); edPolyDraw();
   ed.dirty = true;
-  edSay("the cellar is that shape now \u2014 " + n + " square" + (n === 1 ? "" : "s") + " of floor");
+  if (!loud) return;
+  edSay("the cellar is that shape now — " + n + " square" + (n === 1 ? "" : "s") +
+        " of floor, " + walled + " squares of wall round it");
 }
 
 function edPolyDrop() {
   if (!ed.poly.length) return;
-  ed.poly = [];
+  ed.poly = []; ed.polyShut = false; ed.polyWall = []; ed.dragNode = -1; ed.picked = [];
+  if (game._extra) { delete game._extra.outline; delete game._extra.outlineWall; }
   edPolyDraw();
-  edSay("outline abandoned");
+  edSay("outline abandoned \u2014 the floor it made is still there");
+}
+
+/* One flag per stretch between two corners: is that side of the room
+   stone, or is it a drop? Segment i runs from corner i to corner i+1.
+   A new stretch is stone, because a room you have just drawn should be
+   a room and not a plateau. */
+function edSegs() {
+  while (ed.polyWall.length < ed.poly.length) ed.polyWall.push(1);
+  ed.polyWall.length = ed.poly.length;
+  return ed.polyWall;
+}
+
+/* ====================================================================
+   MORE THAN ONE CORNER AT A TIME
+
+   Moving a wall means moving both ends of it, and doing that one corner
+   at a time means the room is wrong in between - you drag one end, look
+   at a shape you did not want, then drag the other end to fix it. Shift
+   picks corners out, and dragging any one of them takes the whole
+   selection with it, so a side slides across as a side.
+
+   The move is worked out as one offset applied to every picked corner,
+   and it is refused outright if it would take any of them off the grid -
+   otherwise a selection dragged into a wall would silently collapse as
+   the corners piled up against the edge.
+   ==================================================================== */
+function edPicked(i) { return ed.picked.indexOf(i) >= 0; }
+
+function edPickToggle(i) {
+  var at = ed.picked.indexOf(i);
+  if (at >= 0) ed.picked.splice(at, 1); else ed.picked.push(i);
+  edNodesDraw();
+  edSay(ed.picked.length ? ed.picked.length + " corner" +
+        (ed.picked.length === 1 ? "" : "s") + " picked \u2014 drag any of them to move them together"
+        : "nothing picked");
+}
+
+function edPickNone(quiet) {
+  if (!ed.picked.length) return;
+  ed.picked = [];
+  edNodesDraw();
+  if (!quiet) edSay("nothing picked");
+}
+
+/* move every picked corner by the same amount, or none of them */
+function edPickMove(dc, dr) {
+  if (!dc && !dr) return false;
+  for (var i = 0; i < ed.picked.length; i++) {
+    var v = ed.poly[ed.picked[i]];
+    if (!v) return false;
+    var nc = v[0] + dc, nr = v[1] + dr;
+    if (nc < 0 || nr < 0 || nc >= COLS || nr >= ROWS) return false;
+  }
+  for (var j = 0; j < ed.picked.length; j++) {
+    var w = ed.poly[ed.picked[j]];
+    w[0] += dc; w[1] += dr;
+  }
+  return true;
+}
+
+/* ====================================================================
+   A RUBBER BAND ROUND THE CORNERS YOU WANT
+
+   Shift-clicking corners one at a time is fine for two and tedious for
+   nine. Pressing on bare floor and dragging draws a rectangle, and
+   everything inside it is picked when you let go - which is how every
+   editor anybody has used already works, and means a whole side of a
+   room can be taken hold of in one gesture. Holding shift adds to what
+   was already picked instead of replacing it.
+   ==================================================================== */
+function edBandDraw() {
+  if (!edBandLine) return;
+  edBandLine.visible = (mode === "edit" && !!ed.band);
+  if (!edBandLine.visible) return;
+  var b = ed.band;
+  var c0 = Math.min(b.c0, b.c1), c1 = Math.max(b.c0, b.c1);
+  var r0 = Math.min(b.r0, b.r1), r1 = Math.max(b.r0, b.r1);
+  var pos = edBandLine.geometry.attributes.position.array, put = 0;
+  /* the rectangle sits on the outside of the squares it covers, so it
+     reads as "everything in here" and not "everything between these
+     four middles" */
+  function corner(c, r) {
+    var x = c, z = ROWS - 1 - r;
+    return [x, z];
+  }
+  var A = corner(c0, r0), B = corner(c1 + 1, r1 + 1);
+  var xs = [A[0], B[0]], zs = [B[1], A[1] + 1];
+  var y = 0.26;
+  function seg(x1, z1, x2, z2) {
+    pos[put * 3] = x1; pos[put * 3 + 1] = y; pos[put * 3 + 2] = z1; put++;
+    pos[put * 3] = x2; pos[put * 3 + 1] = y; pos[put * 3 + 2] = z2; put++;
+  }
+  seg(xs[0], zs[0], xs[1], zs[0]);
+  seg(xs[1], zs[0], xs[1], zs[1]);
+  seg(xs[1], zs[1], xs[0], zs[1]);
+  seg(xs[0], zs[1], xs[0], zs[0]);
+  edBandLine.geometry.setDrawRange(0, put);
+  edBandLine.geometry.attributes.position.needsUpdate = true;
+  edBandLine.geometry.computeBoundingSphere();
+}
+
+function edBandTake(add) {
+  var b = ed.band;
+  ed.band = null;
+  edBandDraw();
+  if (!b) return;
+  var c0 = Math.min(b.c0, b.c1), c1 = Math.max(b.c0, b.c1);
+  var r0 = Math.min(b.r0, b.r1), r1 = Math.max(b.r0, b.r1);
+  if (!add) ed.picked = [];
+  for (var i = 0; i < ed.poly.length; i++) {
+    var v = ed.poly[i];
+    if (v[0] < c0 || v[0] > c1 || v[1] < r0 || v[1] > r1) continue;
+    if (ed.picked.indexOf(i) < 0) ed.picked.push(i);
+  }
+  edNodesDraw();
+  edSay(ed.picked.length ? ed.picked.length + " corner" +
+        (ed.picked.length === 1 ? "" : "s") + " picked \u2014 drag any of them to move them together"
+        : "nothing in there");
+}
+
+/* which handle is on this square, if any */
+function edNodeAt(c, r) {
+  for (var i = 0; i < ed.poly.length; i++)
+    if (ed.poly[i][0] === c && ed.poly[i][1] === r) return i;
+  return -1;
+}
+
+/* which edge runs through this square, if any - the answer is the index
+   of the corner the new one would go after */
+function edEdgeAt(c, r) {
+  for (var i = 0; i < ed.poly.length; i++) {
+    var found = false;
+    edWalkEdge(ed.poly[i], ed.poly[(i + 1) % ed.poly.length], function (ec, er) {
+      if (ec === c && er === r) found = true;
+    });
+    if (found) return i;
+  }
+  return -1;
+}
+
+/* the handles, as their own little markers on the floor */
+function edNodesDraw() {
+  if (!edNodeMesh) return;
+  var show = (mode === "edit" && ED_TOOLS[ed.tool] && ED_TOOLS[ed.tool].act === "poly" &&
+              ed.poly.length > 0);
+  edNodeMesh.visible = show;
+  if (!show) return;
+  var pc = new THREE.Color();
+  for (var i = 0; i < ed.poly.length && i < edNodeMesh.instanceMatrix.count; i++) {
+    worldOf(ed.poly[i][0], ed.poly[i][1], tmp);
+    var big = edPicked(i) ? 0.66 : 0.42;      /* a picked corner is a bigger handle */
+    placeAt(edNodeMesh, i, ed.poly[i][0], ed.poly[i][1], tmp.y + 0.3, big, big, big, 0);
+    pc.setHex(edPicked(i) ? 0xffffff : 0xffd27a);
+    edNodeMesh.setColorAt(i, pc);
+  }
+  if (edNodeMesh.instanceColor) edNodeMesh.instanceColor.needsUpdate = true;
+  edNodeMesh.count = Math.min(ed.poly.length, edNodeMesh.instanceMatrix.count);
+  edNodeMesh.instanceMatrix.needsUpdate = true;
 }
 
 /* the outline as you are drawing it, laid on the floor */
-var edPolyLine = null;
+var edPolyLine = null, edNodeMesh = null, edBandLine = null;
 function edPolyDraw() {
   if (!edPolyLine) return;
   var n = ed.poly.length;
   edPolyLine.visible = (mode === "edit" && n > 0);
   if (!edPolyLine.visible) return;
+
   var pos = edPolyLine.geometry.attributes.position.array;
+  var col = edPolyLine.geometry.attributes.color.array;
   var put = 0;
-  function at(c, r) {
+  function point(c, r, cr, cg, cb) {
     worldOf(c, r, tmp);
     pos[put * 3] = tmp.x; pos[put * 3 + 1] = tmp.y + 0.22; pos[put * 3 + 2] = tmp.z;
+    col[put * 3] = cr; col[put * 3 + 1] = cg; col[put * 3 + 2] = cb;
     put++;
   }
-  for (var i = 0; i < n; i++) at(ed.poly[i][0], ed.poly[i][1]);
-  at(game.manC, game.manR);            /* the leg you are dragging out */
-  at(ed.poly[0][0], ed.poly[0][1]);    /* and back round to the start */
+  function line(a, b, cr, cg, cb) {
+    point(a[0], a[1], cr, cg, cb);
+    point(b[0], b[1], cr, cg, cb);
+  }
+
+  if (ed.polyShut) {
+    /* stone stretches in amber, open ones dim - so where the room is
+       shut and where it lets you fall out is legible at a glance */
+    var segs = edSegs();
+    for (var i = 0; i < n; i++) {
+      var on = segs[i];
+      line(ed.poly[i], ed.poly[(i + 1) % n],
+           on ? 1.0 : 0.32, on ? 0.82 : 0.29, on ? 0.48 : 0.25);
+    }
+  } else {
+    for (var j = 0; j + 1 < n; j++) line(ed.poly[j], ed.poly[j + 1], 1.0, 0.82, 0.48);
+    if (n) line(ed.poly[n - 1], [game.manC, game.manR], 0.62, 0.52, 0.32);
+  }
+
   edPolyLine.geometry.setDrawRange(0, put);
   edPolyLine.geometry.attributes.position.needsUpdate = true;
+  edPolyLine.geometry.attributes.color.needsUpdate = true;
   edPolyLine.geometry.computeBoundingSphere();
 }
 
@@ -8134,7 +8414,10 @@ function edDress() {
 
 
 function edViewTo(key) {
-  if (ed.poly && ed.poly.length) { ed.poly = []; edPolyDraw(); }
+  /* a half-drawn outline is abandoned on the way out of the view; a
+     closed one is part of the level and stays */
+  if (ed.poly.length && !ed.polyShut) { ed.poly = []; edPolyDraw(); }
+  ed.dragNode = -1; ed.picked = []; ed.band = null;
   ed.view = key;
   edDress();
   /* a view comes with its own tools, so it puts one in your hand - going
@@ -8315,6 +8598,20 @@ function edStamp(quiet) {
     game.tint[i] = (game.tint[i] === slot + 1) ? 0 : slot + 1;
     syncTerrain();
   } else if (t.act === "poly") {
+    /* a closed outline is worked on rather than drawn - the pointer
+       handles dragging, this is only the keyboard's way in */
+    if (ed.polyShut) {
+      var onNode = edNodeAt(c, r);
+      if (onNode >= 0) return edSay("that is a corner \u2014 drag it, or press Delete to lose it");
+      var onEdge = edEdgeAt(c, r);
+      if (onEdge >= 0) {
+        ed.poly.splice(onEdge + 1, 0, [c, r]);
+        edSegs().splice(onEdge + 1, 0, ed.polyWall[onEdge] ? 1 : 0);
+        edPolyFill(true);
+        return edSay("a new corner \u2014 " + ed.poly.length + " in all");
+      }
+      return edSay("that is not on the outline \u2014 drag a corner, or click an edge to add one");
+    }
     /* clicking the first corner again closes the loop */
     if (ed.poly.length >= 3 && ed.poly[0][0] === c && ed.poly[0][1] === r)
       return edPolyClose();
@@ -8357,6 +8654,18 @@ function edStamp(quiet) {
     }
     edSay(game.shape[i] ? "put back into the cellar" : "cut out of the cellar");
     syncTerrain(); syncEdges(); edDress();
+  } else if (t.act === "edge" && ed.polyShut && ed.poly.length >= 3) {
+    /* With an outline, a wall is a side of the room rather than a
+       square of it - so clicking anywhere along a stretch opens or
+       closes the whole stretch. */
+    var seg = edEdgeAt(c, r);
+    if (seg < 0)
+      return edSay("click along one of the room's sides to open or close it", "bad");
+    var flags = edSegs();
+    flags[seg] = flags[seg] ? 0 : 1;
+    edPolyFill(false);
+    edPolyDraw();
+    return edSay("that side is now " + (flags[seg] ? "good stone" : "open \u2014 a drop"));
   } else if (t.act === "edge") {
     /* Only means anything OFF the floor - that is where an edge is. A
        shaped level has boundaries all over it, not just four sides, so
@@ -8489,6 +8798,8 @@ function edShowMark() {
      afterwards, so a line hidden between those two moments comes back
      from the dead. Drawing it unconditionally settles it. */
   edPolyDraw();
+  edNodesDraw();
+  edBandDraw();
 }
 
 function edPointTo(x, y, andStamp) {
@@ -8512,6 +8823,30 @@ function edPointTo(x, y, andStamp) {
   el.addEventListener("pointermove", function (e) {
     if (mode !== "edit") return;
     lastX = e.clientX; lastY = e.clientY;
+
+    if (ed.band) {
+      var bt = cellUnder(e.clientX, e.clientY);
+      if (bt) { ed.band.c1 = bt[0]; ed.band.r1 = bt[1]; game.manC = bt[0]; game.manR = bt[1]; }
+      edBandDraw();
+      return;
+    }
+    if (ed.dragNode >= 0) {
+      var to = cellUnder(e.clientX, e.clientY);
+      if (!to) return;
+      var was = ed.poly[ed.dragNode];
+      if (!was || (was[0] === to[0] && was[1] === to[1])) return;
+      if (edPicked(ed.dragNode) && ed.picked.length > 1) {
+        /* the whole selection comes along, by the amount this one moved */
+        if (!edPickMove(to[0] - was[0], to[1] - was[1])) return;
+      } else {
+        ed.poly[ed.dragNode] = [to[0], to[1]];
+      }
+      game.manC = to[0]; game.manR = to[1];
+      edPolyFill(false);               /* the room follows the handle */
+      edPolyDraw(); edNodesDraw();
+      return;
+    }
+
     /* dragging with the button held paints, which is what anybody who
        has used any editor will try first */
     edPointTo(e.clientX, e.clientY, down);
@@ -8529,6 +8864,13 @@ function edPointTo(x, y, andStamp) {
   function stop() {
     down = false; edPainted = false;
     if (again) { clearInterval(again); again = null; }
+    if (ed.band) edBandTake(ed.band.add);
+    if (ed.dragNode >= 0) {
+      var many = edPicked(ed.dragNode) && ed.picked.length > 1;
+      ed.dragNode = -1;
+      edSay(many ? ed.picked.length + " corners moved together"
+                 : "moved \u2014 " + ed.poly.length + " corners in all");
+    }
   }
   el.addEventListener("pointerdown", function (e) {
     if (mode !== "edit") return;
@@ -8537,6 +8879,49 @@ function edPointTo(x, y, andStamp) {
     down = true;
     edPainted = false;
     lastX = e.clientX; lastY = e.clientY;
+
+    /* A closed outline is dragged, not clicked. Pressing on a corner
+       takes hold of it; pressing anywhere along an edge puts a new
+       corner there and takes hold of that, so pulling on the middle of a
+       straight wall bends it - which is how anybody who has used a
+       vector tool expects to make a room more interesting. */
+    var t0 = ED_TOOLS[ed.tool];
+    if (t0 && t0.act === "poly" && ed.polyShut) {
+      var cell = cellUnder(e.clientX, e.clientY);
+      if (cell) {
+        var hit = edNodeAt(cell[0], cell[1]);
+        if (hit < 0) {
+          var eg = edEdgeAt(cell[0], cell[1]);
+          if (eg >= 0) {
+            edMark();
+            ed.poly.splice(eg + 1, 0, [cell[0], cell[1]]);
+            edSegs().splice(eg + 1, 0, ed.polyWall[eg] ? 1 : 0);   /* inherits its side */
+            ed.picked = ed.picked.map(function (x) { return x > eg ? x + 1 : x; });
+            hit = eg + 1;
+            edSay("a new corner \u2014 " + ed.poly.length + " in all");
+          }
+        }
+        if (hit >= 0) {
+          if (e.shiftKey) {            /* picking, not dragging */
+            edPickToggle(hit);
+            game.manC = cell[0]; game.manR = cell[1];
+            return;
+          }
+          /* dragging an unpicked corner is about that corner alone */
+          if (!edPicked(hit)) edPickNone(true);
+          ed.dragNode = hit;
+          game.manC = cell[0]; game.manR = cell[1];
+          edPolyDraw(); edNodesDraw();
+          return;                      /* taken hold; nothing is stamped */
+        }
+        /* bare floor: start a rubber band rather than stamping */
+        ed.band = { c0: cell[0], r0: cell[1], c1: cell[0], r1: cell[1], add: !!e.shiftKey };
+        game.manC = cell[0]; game.manR = cell[1];
+        edBandDraw();
+        return;
+      }
+    }
+
     edPointTo(e.clientX, e.clientY, true);
     if (again) clearInterval(again);
     /* Only the tools where repeating means something. Raise and Lower
@@ -8586,6 +8971,13 @@ function edEnter(rec, back) {
     ed.state = rec.state || "private";
     ed.everPublic = !!rec.everPublic;
     ed.startC = game.manC; ed.startR = game.manR;
+    /* the corners it was drawn with, if it was drawn rather than cut */
+    var back = game._extra && game._extra.outline;
+    ed.poly = (back && back.length) ? back.map(function (v) { return [v[0] | 0, v[1] | 0]; }) : [];
+    ed.polyShut = ed.poly.length >= 3;
+    var backW = game._extra && game._extra.outlineWall;
+    ed.polyWall = (backW && backW.length) ? backW.map(function (x) { return x ? 1 : 0; }) : [];
+    edSegs();
     $("edName").value = rec.name || "";
   } else {
     /* a bare room to build in, not a generated cellar - somebody who
@@ -8600,6 +8992,8 @@ function edEnter(rec, back) {
     game.monsters.length = 0; game.robots.length = 0;
     game.manC = 4; game.manR = 4;
     ed.startC = 4; ed.startR = 4;
+    ed.poly = []; ed.polyShut = false; ed.polyWall = []; ed.picked = [];
+    if (game._extra) { delete game._extra.outline; delete game._extra.outlineWall; }
     ed.id = null; ed.state = "private"; ed.everPublic = false;
     $("edName").value = "";
   }
@@ -8645,7 +9039,29 @@ function edTestPlay() {
   var rec = edAsLevel({ name: $("edName").value });
   var bad = MutantLevelFormat.faults(rec);
   if (bad.length) return edSay(bad.join(" &middot; "), "bad");
+  /* ==================================================================
+     A TEST PLAY IS NOT A RUN
+
+     It used to be. edTestPlay set mode to "play" and left game.F at the
+     cellar number the level was built for, and from there every piece of
+     ordinary end-of-run machinery took over. Clear it and turn() called
+     MF.save.keep(F + 1, SC) - so the player's real progress was
+     overwritten with the editor's cellar number and the editor's stale
+     score, deepest was ratcheted up for free, and they were dropped into
+     a generated cellar. Die, and save.end wrote the high score. Press
+     Escape and it saved and went to the title, which clears the height,
+     items, fluids and marbles - so the unsaved cellar being built was
+     gone. Press R and sheet() generated a new one over the top of it.
+     There was no way back to the editor at all: ed.rec and ed.backTo
+     were both written and never read.
+
+     Somebody testing a level they had just built could lose a twelve
+     cellar run and the level in one keystroke. So a test play says it is
+     one, nothing about it touches the save file, and every way out of it
+     leads back to the editor with the level intact.
+     ================================================================== */
   ed.rec = rec;
+  ed.testing = true;
   ed.view = "blocks"; edDress();    /* a test play looks like the game */
   setTimeout(resize, 0);
   $("edBar").hidden = true;
@@ -8655,6 +9071,23 @@ function edTestPlay() {
   mode = "play"; turnAcc = 0;
   edSay("");
   banner("YOUR CELLAR", $("edName").value || "untitled", [], 1400);
+}
+
+/* Back to the bench, with a verdict and the level exactly as it was. */
+function edStopTest(how, why) {
+  if (!ed.testing) return false;
+  ed.testing = false;
+  ai.on = false;
+  game.over = false; game.won = false;
+  var rec = ed.rec;
+  edEnter(rec, ed.backTo);
+  if (rec) {
+    /* edEnter reads the man out of the record as the start square, which
+       is right - the test moved him and that must not become the level */
+    $("edName").value = rec.name || $("edName").value;
+  }
+  edSay(why, how);
+  return true;
 }
 
 /* The bot, run flat out with no drawing, several times over, because
@@ -8920,15 +9353,34 @@ addEventListener("keydown", function (e) {
     }
     /* the brush, on the two keys next to each other that nothing else
        wanted, and on the wheel over the floor */
-    if (k === "enter" && ed.poly.length) { e.preventDefault(); edPolyClose(); return; }
-    if (k === "backspace" && ed.poly.length) {
+    if (k === "escape" && ed.picked.length) { e.preventDefault(); edPickNone(); return; }
+    if (k === " " && ed.polyShut && e.shiftKey) {
+      var pk = edNodeAt(game.manC, game.manR);
+      if (pk >= 0) { e.preventDefault(); edPickToggle(pk); return; }
+    }
+    if ((k === "delete" || k === "backspace") && ed.polyShut && ed.poly.length) {
+      var on = edNodeAt(game.manC, game.manR);
+      if (on >= 0) {
+        e.preventDefault();
+        if (ed.poly.length <= 3) return edSay("a room needs at least three corners", "bad");
+        edMark();
+        ed.poly.splice(on, 1);
+        edSegs().splice(on, 1);
+        ed.picked = [];                 /* the numbering has moved under it */
+        edPolyFill(false);
+        edPolyDraw(); edNodesDraw();
+        return edSay("corner gone \u2014 " + ed.poly.length + " left");
+      }
+    }
+    if (k === "enter" && ed.poly.length && !ed.polyShut) { e.preventDefault(); edPolyClose(); return; }
+    if (k === "backspace" && ed.poly.length && !ed.polyShut) {
       e.preventDefault();
       ed.poly.pop(); edPolyDraw();
       edSay(ed.poly.length ? ed.poly.length + " corner" + (ed.poly.length === 1 ? "" : "s")
                            : "outline cleared");
       return;
     }
-    if (k === "escape" && ed.poly.length) { e.preventDefault(); edPolyDrop(); return; }
+    if (k === "escape" && ed.poly.length && !ed.polyShut) { e.preventDefault(); edPolyDrop(); return; }
     if (k === "-" || k === "_" || k === "=" || k === "+") {
       e.preventDefault();
       edBrushTo(ed.brush + (k === "=" || k === "+" ? 1 : -1));
@@ -8955,6 +9407,8 @@ addEventListener("keydown", function (e) {
   if (k === "r" && (mode === "play" || mode === "paused")) { restartCellar(); return; }
   if (k === "m") { Beeb.on = !Beeb.on; return; }
   if (k === "escape" && (mode === "play" || mode === "paused")) {
+    e.preventDefault();
+    if (edStopTest("", "back to the bench \u2014 nothing saved from the test")) return;
     MF.save.keep(game.F, game.SC, Math.max(game.HI, game.SC));
     enterTitle();
   }
