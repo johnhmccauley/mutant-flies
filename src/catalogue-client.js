@@ -28,6 +28,11 @@
     this.base = opts.base || "";        /* same origin, which is the point */
     this.who = opts.who || null;        /* a MutantWho.Who, already opened */
     this.timeout = opts.timeout || 12000;
+    /* The app key. Not identity - identity is the player's own signing
+       key - just a note saying the request came from the game rather
+       than from somebody with curl and the URL. It ships in the page,
+       so it is a speed bump and is treated as one. */
+    this.appKey = opts.appKey || root.MF_APP_KEY || "";
   }
 
   /* Never throws. A catalogue that blows up in a game that was playing
@@ -37,6 +42,7 @@
     var ctrl = (typeof AbortController !== "undefined") ? new AbortController() : null;
     var timer = ctrl ? setTimeout(function () { ctrl.abort(); }, self.timeout) : null;
     var init = { method: method, headers: headers || {} };
+    if (self.appKey) init.headers["x-mf-app"] = self.appKey;
     if (body !== undefined && body !== null) {
       init.body = body;
       init.headers["Content-Type"] = "application/json";

@@ -808,6 +808,89 @@ function freshDb() {
        (await call(d, amy, "POST", "/api/claim", { email: "nobody@example.com" })).status, 404);
   }
 
+  console.log("\nThe app key, which is a speed bump and not a wall\n");
+  {
+    const d = freshDb();
+    const amy = await player();
+    const envWith = (keys) => ({ DB: d.DB, NOW: () => 1700000000000, EMAIL_SALT: "pepper", APP_KEYS: keys });
+    const probe = async (keys, sent) => {
+      const h = {};
+      if (sent !== undefined) h["x-mf-app"] = sent;
+      const res = await api.handle(new Request(ORIGIN + "/api/levels?me=x", { headers: h }), envWith(keys), null);
+      return res.status;
+    };
+    ok("with none configured, everything is let through - which is what a local server wants",
+       await probe("", undefined), 200);
+    ok("with one configured, a request carrying it is let through",
+       await probe("s3cret", "s3cret"), 200);
+    ok("and one without it is not", await probe("s3cret", undefined), 403);
+    ok("nor one carrying the wrong one", await probe("s3cret", "guess"), 403);
+    ok("nor one carrying a prefix of it, which is how these get guessed",
+       await probe("s3cret", "s3c"), 403);
+    ok("two keys are accepted at once, so one can be rotated",
+       [await probe("old,new", "old"), await probe("old,new", "new"), await probe("old,new", "other")],
+       [200, 200, 403]);
+  }
+  {
+    /* it gates, it does not identify - a signed write still has to be
+       signed, app key or no app key */
+    const d = freshDb();
+    const amy = await player();
+    const env = { DB: d.DB, NOW: () => 1700000000000, EMAIL_SALT: "pepper", APP_KEYS: "s3cret" };
+    const res = await api.handle(new Request(ORIGIN + "/api/me", {
+      method: "POST", headers: { "x-mf-app": "s3cret" }
+    }), env, null);
+    ok("holding the app key does not make you anybody", res.status, 401);
+  }
+
+  console.log("\nThe beta, and what happens when it ends\n");
+  {
+    const d = freshDb();
+    const amy = await player();
+    const beta = { DB: d.DB, NOW: () => 1700000000000, EMAIL_SALT: "pepper", OPEN_BETA: "1" };
+    const paid = { DB: d.DB, NOW: () => 1700000000000, EMAIL_SALT: "pepper" };
+    const callIn = async (env, method, p2, body) => {
+      const n = await api.handle(new Request(ORIGIN + "/api/nonce"), env, null);
+      const { nonce } = await n.json();
+      const raw = body === undefined ? "" : JSON.stringify(body);
+      const sig = await amy.sign(api.claimText(method, p2, nonce, raw));
+      const res = await api.handle(new Request(ORIGIN + p2, {
+        method, body: body === undefined ? undefined : raw,
+        headers: { "x-mf-id": amy.id, "x-mf-key": amy.pub, "x-mf-nonce": nonce, "x-mf-sig": sig }
+      }), env, null);
+      return { status: res.status, body: await res.json() };
+    };
+
+    ok("before the beta, a player who has bought nothing has nothing",
+       (await callIn(paid, "POST", "/api/me")).body.paid, false);
+
+    const during = await callIn(beta, "POST", "/api/me");
+    ok("during the beta, everything is open", during.body.paid, true);
+
+    /* and the point of it: the beta is over, and they keep it */
+    ok("and when the beta ends they keep what they had",
+       (await callIn(paid, "POST", "/api/me")).body.paid, true);
+
+    const row = d.sqlite.prepare("SELECT provider FROM entitlements WHERE who_key = ?")
+      .get("beta:" + amy.id);
+    ok("because they were given a key on the way past, not just let in",
+       row && row.provider, "beta");
+  }
+  {
+    /* somebody who never turned up during the beta gets nothing from it */
+    const d = freshDb();
+    const latecomer = await player();
+    const paid = { DB: d.DB, NOW: () => 1700000000000, EMAIL_SALT: "pepper" };
+    const n = await api.handle(new Request(ORIGIN + "/api/nonce"), paid, null);
+    const { nonce } = await n.json();
+    const sig = await latecomer.sign(api.claimText("POST", "/api/me", nonce, ""));
+    const res = await api.handle(new Request(ORIGIN + "/api/me", {
+      method: "POST",
+      headers: { "x-mf-id": latecomer.id, "x-mf-key": latecomer.pub, "x-mf-nonce": nonce, "x-mf-sig": sig }
+    }), paid, null);
+    ok("and somebody who arrives after it is over does not", (await res.json()).paid, false);
+  }
+
   console.log("\n" + pass + " passed, " + fail + " failed");
   process.exit(fail ? 1 : 0);
 })().catch((e) => { console.error(e); process.exit(1); });

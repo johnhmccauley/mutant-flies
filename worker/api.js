@@ -40,6 +40,56 @@ const PODIUM = [
   { place: "bronze", award: 300 }
 ];
 
+/* ------------------------------------------------------------------
+   THE APP KEY
+
+   A second layer, and it is worth being honest about what kind.
+
+   It is NOT identity. Identity is the player's own signing key, made on
+   their machine, proved per request, with nothing shared. This is a
+   different job: it keeps the API from being a thing anybody can drive
+   with curl after reading one URL out of the network tab.
+
+   And it is extractable. It ships inside the page, so anybody who
+   really wants it will have it in about a minute. That is fine as long
+   as nobody mistakes it for a wall: it stops casual scripting and
+   drive-by scraping, it gives the rate limiter something to count
+   against, and it does not decide who anybody is or what they own.
+   Every rule that matters is still enforced against a signature.
+
+   Several keys are accepted at once so one can be rotated without
+   breaking every browser still holding a cached copy of the old page.
+   With none configured, everything is allowed - which is what tests and
+   a local server want, and is a deliberate choice rather than an
+   oversight: a missing secret must not lock the game out of its own
+   catalogue.
+   ------------------------------------------------------------------ */
+function appKeyOk(req, env) {
+  const allowed = String(env.APP_KEYS || "").split(",")
+    .map((k) => k.trim()).filter(Boolean);
+  if (!allowed.length) return true;                  /* not configured */
+  const got = req.headers.get("x-mf-app") || "";
+  /* constant time, so the answer does not leak the key a byte at a time */
+  return allowed.some((k) => {
+    if (k.length !== got.length) return false;
+    let bad = 0;
+    for (let i = 0; i < k.length; i++) bad |= k.charCodeAt(i) ^ got.charCodeAt(i);
+    return bad === 0;
+  });
+}
+
+/* Cloudflare's rate limiter, if one is bound. Counted per player where
+   we know who that is and per address where we do not, so one busy
+   player cannot use up everybody else's share. */
+async function tooFast(env, req, whoId) {
+  if (!env.RATE || !env.RATE.limit) return false;
+  const key = whoId || req.headers.get("cf-connecting-ip") || "anon";
+  try {
+    const out = await env.RATE.limit({ key: key });
+    return !(out && out.success);
+  } catch (e) { return false; }
+}
+
 const json = (data, status = 200, extra = {}) =>
   new Response(JSON.stringify(data), {
     status,
@@ -222,10 +272,43 @@ export async function whoIsThis(db, req, path, rawBody, now) {
   return { id, pub };
 }
 
-async function hasPaid(db, playerId) {
+/* ------------------------------------------------------------------
+   THE BETA
+
+   While OPEN_BETA is on, everything is free - and everybody who turns
+   up while it is on is quietly given a permanent entitlement, keyed on
+   their own player id. So the day it is switched off, every player who
+   was there beforehand keeps everything they had, without being asked
+   for anything and without anybody having to remember to do it.
+
+   That is the whole reason it is done this way round rather than as a
+   flag that simply opens the gates. A flag opens the gates and then
+   shuts them on the people who were already inside. This lets them in
+   and gives them a key on the way past.
+
+   Going free to paid is also the only direction that works. Steam
+   allows a paid game to be made free and heavily restricts the reverse;
+   and people who paid early and then watch it go free feel robbed,
+   while people who got in free and then watch it go paid feel lucky.
+   Same event, opposite feelings, and the order decides which.
+   ------------------------------------------------------------------ */
+async function hasPaid(db, playerId, env, now) {
   const row = await db.prepare("SELECT 1 AS ok FROM claims WHERE player_id = ?")
     .bind(playerId).first();
-  return !!row;
+  if (row) return true;
+  if (!env || String(env.OPEN_BETA || "") !== "1") return false;
+
+  /* here during the beta: let them in, and give them the key */
+  const key = "beta:" + playerId;
+  await db.batch([
+    db.prepare("INSERT INTO entitlements (who_key, provider, reference, at)" +
+               " VALUES (?,'beta','open beta',?) ON CONFLICT(who_key) DO NOTHING")
+      .bind(key, now || 0),
+    db.prepare("INSERT INTO claims (player_id, who_key, at) VALUES (?,?,?)" +
+               " ON CONFLICT(player_id) DO NOTHING")
+      .bind(playerId, key, now || 0)
+  ]);
+  return true;
 }
 
 /* ---- the rules, enforced rather than trusted ---------------------- */
@@ -354,6 +437,8 @@ export async function handle(req, env, ctx) {
 
   if (!path.startsWith("/api/")) return null;      /* not ours; let the assets have it */
   if (req.method === "OPTIONS") return json({}, 204);
+  if (!appKeyOk(req, env)) return oops(403, "this is the game's catalogue, not a public API");
+  if (await tooFast(env, req, req.headers.get("x-mf-id"))) return oops(429, "slow down");
 
   const rawBody = (req.method === "POST" || req.method === "DELETE")
     ? await req.text() : "";
@@ -433,7 +518,7 @@ export async function handle(req, env, ctx) {
     const out = publicShape(lv);
     /* the metadata is free to read - that is what a locked catalogue
        shows a player who has not paid. The cellar itself is not. */
-    if (lv.owner === me || await hasPaid(db, me)) {
+    if (lv.owner === me || await hasPaid(db, me, env, now)) {
       const b = await db.prepare("SELECT body FROM level_bodies WHERE level_id = ?")
         .bind(lv.id).first();
       out.code = b ? b.body : null;
@@ -449,7 +534,7 @@ export async function handle(req, env, ctx) {
 
   /* --- who am I, and what have I got ------------------------------ */
   if (path === "/api/me" && req.method === "POST") {
-    const paid = await hasPaid(db, who.id);
+    const paid = await hasPaid(db, who.id, env, now);
     const called = await authorOf(db, who.id);
     const mine = (await db.prepare(
       "SELECT * FROM levels WHERE owner = ? ORDER BY created DESC LIMIT 200")
@@ -461,7 +546,7 @@ export async function handle(req, env, ctx) {
 
   /* --- put a level up --------------------------------------------- */
   if (path === "/api/levels" && req.method === "POST") {
-    if (!await hasPaid(db, who.id)) return oops(402, "the editor is part of the paid game");
+    if (!await hasPaid(db, who.id, env, now)) return oops(402, "the editor is part of the paid game");
     const name = String(body.name || "").trim().slice(0, MAX_NAME);
     const code = String(body.code || "");
     if (!OK_NAME.test(name)) return oops(400, "a level needs a name, of two to forty-eight ordinary characters");
@@ -499,7 +584,7 @@ export async function handle(req, env, ctx) {
     /* --- record a play ------------------------------------------- */
     if (sub === "/play" && req.method === "POST") {
       if (!await visible(db, lv, who.id)) return oops(404, "no such level");
-      if (lv.owner !== who.id && !await hasPaid(db, who.id))
+      if (lv.owner !== who.id && !await hasPaid(db, who.id, env, now))
         return oops(402, "other people's levels are part of the paid game");
       const op = String(body.op || "").slice(0, 64);
       if (!/^[A-Za-z0-9_-]{8,64}$/.test(op)) return oops(400, "that play has no op id");
@@ -567,7 +652,7 @@ export async function handle(req, env, ctx) {
 
     /* --- edit it -------------------------------------------------- */
     if (!sub && req.method === "POST") {
-      if (!await hasPaid(db, who.id)) return oops(402, "the editor is part of the paid game");
+      if (!await hasPaid(db, who.id, env, now)) return oops(402, "the editor is part of the paid game");
       const name = body.name === undefined ? lv.name : String(body.name).trim().slice(0, MAX_NAME);
       if (!OK_NAME.test(name)) return oops(400, "a level needs a name, of two to forty-eight ordinary characters");
       if (lv.ever_public && nameKey(name) !== lv.name_key)
@@ -784,3 +869,5 @@ export async function storeHook(req, env, provider) {
 
 /* kept under its old name because that is what the route is called */
 export function stripeHook(req, env) { return storeHook(req, env, "stripe"); }
+
+export const _test = { appKeyOk };

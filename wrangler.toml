@@ -21,5 +21,30 @@ binding = "DB"
 database_name = "mutant-fly"
 database_id = "put-the-real-id-here"
 
-# EMAIL_SALT, STRIPE_SECRET_KEY and STRIPE_WEBHOOK_SECRET are secrets,
-# not vars: set them with `wrangler secret put NAME`, never in this file.
+# A limiter, so one busy player cannot use up everybody else's share.
+# Counted per player where the request says who it is, per address where
+# it does not.
+[[unsafe.bindings]]
+name = "RATE"
+type = "ratelimit"
+namespace_id = "1001"
+simple = { limit = 120, period = 60 }
+
+# SECRETS, none of which belong in this file. Set each with
+#   wrangler secret put NAME
+#
+#   OPEN_BETA              "1" while the game is free to everybody. Every
+#                          player who turns up while it is on is given a
+#                          permanent entitlement as they go, so switching
+#                          it off never takes anything away from anybody
+#                          who was already here.
+#   APP_KEYS               comma separated, so one can be rotated while
+#                          browsers still hold the old page. Leave it
+#                          unset and the check is off, which is what a
+#                          local server and the tests want.
+#   EMAIL_SALT             so a stored address hash is not a rainbow table
+#   STRIPE_WEBHOOK_SECRET  to check a webhook really came from Stripe
+#   APPLE_ISSUER_KEY       when the App Store is wired up
+#   STEAM_WEB_API_KEY      when Steam is
+#   PLAY_SERVICE_ACCOUNT   when Play is
+#   ITCH_API_KEY           when itch is
