@@ -46,6 +46,12 @@ jobs:
       - name: Check a player can be known without logging in
         run: node tools/test-identity.js
 
+      - name: Check a level survives being written down and sent
+        run: node tools/test-level-format.js
+
+      - name: Check the vault a player's levels live in
+        run: node tools/test-vault.js
+
       - uses: actions/configure-pages@v5
         with:
           enablement: true

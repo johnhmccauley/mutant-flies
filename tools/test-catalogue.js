@@ -79,11 +79,42 @@ console.log("\nThe order things come in\n");
   ok("and the same when sorting by plays", order([a, b], "plays"), ["b", "a"]);
 }
 {
-  /* an unrated level is not a nought-star level */
+  /* An unrated level is not a nought-star level, and it is not a
+     one-star level either. Unrated means unknown, so it sits exactly at
+     the middle - above the level somebody has actually disliked, below
+     anything that has earned a good word. A new level that sorted under
+     every one-star in the catalogue would never be seen long enough to
+     get rated at all. */
   const a = lvl("a", { avg: 1, plays: 0, created: 5 });
   const b = lvl("b", { plays: 0, created: 9 });          /* nobody has rated it */
-  ok("a level nobody has rated sorts below a one-star one",
-     order([b, a], "stars"), ["a", "b"]);
+  ok("a level nobody has rated outranks one that has been disliked",
+     order([a, b], "stars"), ["b", "a"]);
+  ok("but it shows no stars at all rather than pretending to some",
+     [C.stars(b), C.stars(a)], [null, 1]);
+}
+{
+  /* the reason for all of this: one forged five must not beat a level
+     with two hundred real ratings */
+  const forged = lvl("forged", { avg: 5, votes: 1, created: 9 });
+  const earned = lvl("earned", { avg: 4.8, votes: 200, created: 1 });
+  ok("one forged five-star does not top a level with two hundred real ones",
+     order([forged, earned], "stars"), ["earned", "forged"]);
+  ok("and the level still SHOWS the honest average it was given",
+     [C.stars(forged), C.stars(earned)], [5, 4.8]);
+}
+{
+  /* and it fades: once the votes are real, the correction stops mattering */
+  const few = lvl("few", { avg: 5, votes: 3 });
+  const many = lvl("many", { avg: 5, votes: 300 });
+  ok("three fives rank below three hundred fives", order([few, many], "stars"), ["many", "few"]);
+  ok("and by three hundred the shrinking is all but gone",
+     C.rank(many) > 4.9, true);
+}
+{
+  /* a single grumpy vote should not bury a level for ever either */
+  const grumpy = lvl("grumpy", { avg: 1, votes: 1 });
+  const bad = lvl("bad", { avg: 1, votes: 60 });
+  ok("one bad review hurts far less than sixty", C.rank(grumpy) > C.rank(bad), true);
 }
 {
   /* and the order is total: two levels born in the same millisecond do

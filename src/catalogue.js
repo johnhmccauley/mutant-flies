@@ -62,9 +62,44 @@
 
   function canDescend(who, cellar) { return cellar <= gate(who).canDescendTo; }
 
+  /* ------------------------------------------------------------------
+     Stars, and what to sort on.
+
+     What a level SHOWS is the plain average, because that is what a
+     player means by four stars. What it is RANKED on is not, because a
+     plain average is trivially gamed: one five from the author's other
+     device beats a level with two hundred genuine ratings averaging
+     4.8, and the top of the board fills up with levels nobody has
+     played. It is the oldest bug in ratings and it is worth not
+     shipping.
+
+     So ranking pulls every level towards the middle by a fixed number
+     of imaginary average votes - ten of them, at three and a half.
+     A single five becomes (10x3.5 + 5) / 11 = 3.64, which is barely
+     above an unrated level and nowhere near the top; two hundred real
+     ratings at 4.8 come out at 4.74, because by then the ten imaginary
+     ones hardly matter. Votes have to be earned before they count for
+     much, and there is no threshold to game because the effect fades
+     smoothly as real ratings arrive.
+
+     A level nobody has rated scores exactly the prior. That is the
+     right answer as well as the convenient one: unrated means unknown,
+     not bad, and a new level that sorted below every one-star in the
+     catalogue would never be seen long enough to get rated at all.
+     ------------------------------------------------------------------ */
+  var PRIOR = 3.5, PRIOR_WEIGHT = 10;
+
+  /* what the level shows: the honest average, or nothing at all */
   function stars(rec) {
-    if (!rec.ratings || !rec.ratings.count) return -1;   /* unrated sorts last */
+    if (!rec.ratings || !rec.ratings.count) return null;
     return rec.ratings.total / rec.ratings.count;
+  }
+
+  /* what the level is ranked on: the average pulled towards the middle */
+  function rank(rec) {
+    var count = (rec.ratings && rec.ratings.count) || 0;
+    var total = (rec.ratings && rec.ratings.total) || 0;
+    return (PRIOR_WEIGHT * PRIOR + total) / (PRIOR_WEIGHT + count);
   }
   function plays(rec) { return rec.plays || 0; }
   function born(rec) { return rec.created || 0; }
@@ -78,10 +113,10 @@
 
   var SORTS = {
     stars: function (a, b) {
-      return (stars(b) - stars(a)) || (plays(b) - plays(a)) || newest(a, b);
+      return (rank(b) - rank(a)) || (plays(b) - plays(a)) || newest(a, b);
     },
     plays: function (a, b) {
-      return (plays(b) - plays(a)) || (stars(b) - stars(a)) || newest(a, b);
+      return (plays(b) - plays(a)) || (rank(b) - rank(a)) || newest(a, b);
     }
   };
 
@@ -172,7 +207,8 @@
     PRIVATE: PRIVATE, PUBLIC: PUBLIC, HIDDEN: HIDDEN,
     FREE_CELLARS: FREE_CELLARS, EDITOR_AT: EDITOR_AT,
     gate: gate, canDescend: canDescend, canCreate: canCreate,
-    stars: stars, plays: plays, sortLevels: sortLevels, SORTS: SORTS,
+    stars: stars, rank: rank, plays: plays, sortLevels: sortLevels, SORTS: SORTS,
+    PRIOR: PRIOR, PRIOR_WEIGHT: PRIOR_WEIGHT,
     visibleTo: visibleTo, canPlay: canPlay, canDelete: canDelete,
     canEdit: canEdit, canMove: canMove, move: move,
     canRate: canRate, rate: rate
