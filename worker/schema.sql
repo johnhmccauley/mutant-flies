@@ -81,13 +81,35 @@ CREATE TABLE IF NOT EXISTS ratings (
   PRIMARY KEY (level_id, player_id)
 );
 
--- who has paid. Keyed on a hash of the email Stripe collected, because
--- that is the only thing a player can still produce after they have
--- lost the device they bought it on.
+-- ---------------------------------------------------------------------
+-- WHO HAS PAID, WHEREVER THEY PAID
+--
+-- Money does not arrive the same way twice. On the web it is a card
+-- through a processor; on iOS it is StoreKit and nothing else is even
+-- permitted; on Steam it is the player's Steam wallet; on Android it is
+-- Play Billing; on itch it is itch. The game does not get to choose,
+-- and a schema that assumed one of them would have to be rebuilt for
+-- every other.
+--
+-- So a buyer is a PROVIDER and an id that provider knows them by, and
+-- that pair is the only thing the rest of this cares about:
+--
+--   stripe:<hash of the email>      no account, so the address is the
+--                                   only thing they can still produce
+--   apple:<original transaction>    StoreKit's own permanent id
+--   google:<obfuscated account>     Play's, likewise
+--   steam:<steamid>                 they are already logged in
+--   itch:<download key>
+--   beta:<whatever we said>         given away, and still an entitlement
+--
+-- Nothing here stores an email, a name or a card. The stripe row is a
+-- salted hash of an address, kept only so somebody who has lost the
+-- machine they bought on can prove it was them.
+-- ---------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS entitlements (
-  email_hash TEXT PRIMARY KEY,
-  source     TEXT NOT NULL,           -- 'stripe' | 'beta' | 'gift'
-  reference  TEXT,                    -- the Stripe session, for support
+  who_key    TEXT PRIMARY KEY,        -- 'provider:id'
+  provider   TEXT NOT NULL,
+  reference  TEXT,                    -- the store's own receipt, for support
   at         INTEGER NOT NULL
 );
 
@@ -96,10 +118,10 @@ CREATE TABLE IF NOT EXISTS entitlements (
 -- laptop without an account.
 CREATE TABLE IF NOT EXISTS claims (
   player_id  TEXT PRIMARY KEY,
-  email_hash TEXT NOT NULL,
+  who_key    TEXT NOT NULL,
   at         INTEGER NOT NULL
 );
-CREATE INDEX IF NOT EXISTS claims_by_email ON claims (email_hash);
+CREATE INDEX IF NOT EXISTS claims_by_buyer ON claims (who_key);
 
 -- Single-use, short-lived, and the thing that stops a captured request
 -- being replayed for ever. Signed requests sign one of these.
@@ -166,13 +188,19 @@ CREATE TABLE IF NOT EXISTS wallets (
   podium    INTEGER NOT NULL DEFAULT 0
 );
 
+-- Every store sends the same purchase more than once - a retried
+-- webhook, a restored purchase, an app reinstall - so a purchase is
+-- keyed on the store's own transaction id and arriving twice writes
+-- nothing the second time.
 CREATE TABLE IF NOT EXISTS purchases (
-  session_id TEXT PRIMARY KEY,      -- Stripe's, so a repeated webhook is a no-op
-  email_hash TEXT NOT NULL,
-  credits    INTEGER NOT NULL DEFAULT 0,
-  at         INTEGER NOT NULL
+  provider TEXT NOT NULL,
+  txn      TEXT NOT NULL,           -- the store's transaction id
+  who_key  TEXT NOT NULL,
+  credits  INTEGER NOT NULL DEFAULT 0,
+  at       INTEGER NOT NULL,
+  PRIMARY KEY (provider, txn)
 );
-CREATE INDEX IF NOT EXISTS purchases_by_email ON purchases (email_hash);
+CREATE INDEX IF NOT EXISTS purchases_by_buyer ON purchases (who_key);
 
 -- One row per place per month, ever. The primary key is what makes
 -- closing a month safe to do twice - and it will be done twice, because

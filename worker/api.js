@@ -88,6 +88,102 @@ export async function hashEmail(email, salt) {
   return b64(new Uint8Array(h));
 }
 
+/* ------------------------------------------------------------------
+   THE STORES
+
+   Money does not arrive the same way twice, and the game does not get
+   to choose how. On iOS it is StoreKit and nothing else is permitted;
+   on Steam it is the player's wallet; on Android it is Play Billing;
+   on the web it is a card processor. So nothing below this line knows
+   which one it was - a buyer is a provider and an id that provider
+   knows them by, and every store's job is to turn its own kind of
+   proof into that pair.
+
+   Each verifier is handed whatever the client presented and answers
+   with { who, txn, credits } or throws. Stripe's is written; the others
+   are the shape they have to be, and each says plainly that it is not
+   wired up yet rather than quietly letting somebody in. That is
+   deliberate: a stub that returns "yes" is a free game for anybody who
+   reads the source, and the source is right there in the page.
+   ------------------------------------------------------------------ */
+export const STORES = {
+  /* the web. A card through Stripe, arriving as a signed webhook. */
+  stripe: {
+    async fromWebhook(raw, headers, env, now) {
+      const event = await stripeVerify(raw, headers.get("stripe-signature"),
+                                       env.STRIPE_WEBHOOK_SECRET, now);
+      if (event.type !== "checkout.session.completed") return null;
+      const s = event.data.object;
+      const email = (s.customer_details && s.customer_details.email) || s.customer_email;
+      if (!email) return null;
+      return {
+        who: "stripe:" + await hashEmail(email, env.EMAIL_SALT || "mutantfly"),
+        txn: s.id,
+        credits: parseInt((s.metadata && s.metadata.credits) || "0", 10) || 0
+      };
+    },
+    /* somebody who lost the machine they bought on types the address */
+    async fromClient(claim, env) {
+      if (!claim || !claim.email) throw new Error("which purchase?");
+      return { who: "stripe:" + await hashEmail(claim.email, env.EMAIL_SALT || "mutantfly") };
+    }
+  },
+
+  /* iOS. StoreKit signs a transaction as a JWS; the server checks it
+     against Apple's root and reads originalTransactionId out of it.
+     Apple does not permit any other way of unlocking anything, so there
+     is no web-purchase path to fall back on inside the app. */
+  apple: {
+    async fromClient(claim, env) {
+      if (!env.APPLE_ISSUER_KEY) throw new Error("the App Store is not wired up yet");
+      throw new Error("the App Store is not wired up yet");
+    }
+  },
+
+  /* Steam. The player is already signed in to Steam, so the client
+     hands over a ticket and the server asks Steam who it belongs to
+     (ISteamUserAuth) and what they own (ISteamMicroTxn). */
+  steam: {
+    async fromClient(claim, env) {
+      if (!env.STEAM_WEB_API_KEY) throw new Error("Steam is not wired up yet");
+      throw new Error("Steam is not wired up yet");
+    }
+  },
+
+  /* Android. A Play Billing purchase token, verified against the Play
+     Developer API, keyed on the obfuscated account id. */
+  google: {
+    async fromClient(claim, env) {
+      if (!env.PLAY_SERVICE_ACCOUNT) throw new Error("Play is not wired up yet");
+      throw new Error("Play is not wired up yet");
+    }
+  },
+
+  /* itch.io, which hands the buyer a download key and will confirm one */
+  itch: {
+    async fromClient(claim, env) {
+      if (!env.ITCH_API_KEY) throw new Error("itch.io is not wired up yet");
+      throw new Error("itch.io is not wired up yet");
+    }
+  }
+};
+
+/* One way in for every store: record the purchase, and the entitlement
+   with it. Safe to run twice for the same transaction, because every
+   store will send at least one of them twice. */
+export async function grant(db, sale, provider, now) {
+  const key = sale.who;
+  await db.batch([
+    db.prepare("INSERT INTO entitlements (who_key, provider, reference, at)" +
+               " VALUES (?,?,?,?) ON CONFLICT(who_key) DO NOTHING")
+      .bind(key, provider, sale.txn || null, now),
+    db.prepare("INSERT OR IGNORE INTO purchases (provider, txn, who_key, credits, at)" +
+               " VALUES (?,?,?,?,?)")
+      .bind(provider, sale.txn || ("gift-" + key), key, sale.credits | 0, now)
+  ]);
+  return { who: key, credits: sale.credits | 0 };
+}
+
 /* what a signature is actually over: the request, not just the nonce,
    so a signature lifted off one call cannot authorise a different one */
 export function claimText(method, path, nonce, body) {
@@ -192,13 +288,13 @@ function lastMonth(now) {
 async function walletOf(db, playerId) {
   const w = await db.prepare("SELECT royalties, podium FROM wallets WHERE player_id = ?")
     .bind(playerId).first();
-  const claim = await db.prepare("SELECT email_hash FROM claims WHERE player_id = ?")
+  const claim = await db.prepare("SELECT who_key FROM claims WHERE player_id = ?")
     .bind(playerId).first();
   let bought = 0;
   if (claim) {
     const b = await db.prepare(
-      "SELECT COALESCE(SUM(credits), 0) AS n FROM purchases WHERE email_hash = ?")
-      .bind(claim.email_hash).first();
+      "SELECT COALESCE(SUM(credits), 0) AS n FROM purchases WHERE who_key = ?")
+      .bind(claim.who_key).first();
     bought = (b && b.n) || 0;
   }
   const royalties = (w && w.royalties) || 0;
@@ -583,20 +679,84 @@ export async function handle(req, env, ctx) {
 
   /* --- claim a purchase onto this machine ------------------------- */
   if (path === "/api/claim" && req.method === "POST") {
-    const email = String(body.email || "");
-    if (!email) return oops(400, "which purchase?");
-    const hash = await hashEmail(email, env.EMAIL_SALT || "mutantfly");
-    const ent = await db.prepare("SELECT 1 AS ok FROM entitlements WHERE email_hash = ?")
-      .bind(hash).first();
-    if (!ent) return oops(404, "nothing has been bought with that address");
+    const provider = String(body.provider || "stripe");
+    const store = STORES[provider];
+    if (!store || !store.fromClient) return oops(400, "no such shop");
+    let sale;
+    try {
+      sale = await store.fromClient(body, env);
+    } catch (e) {
+      return oops(400, e.message || "that could not be checked");
+    }
+    const ent = await db.prepare("SELECT 1 AS ok FROM entitlements WHERE who_key = ?")
+      .bind(sale.who).first();
+    /* A store that can vouch for the purchase itself - Apple, Steam,
+       Play - has just done so, and its answer is the record. Stripe
+       cannot: an email address is a claim, not a proof, so there has
+       to be a purchase already on file to match it against. */
+    if (!ent) {
+      if (!sale.txn) return oops(404, "nothing has been bought that way");
+      await grant(db, sale, provider, now);
+    }
     await db.prepare(
-      "INSERT INTO claims (player_id, email_hash, at) VALUES (?,?,?)" +
-      " ON CONFLICT(player_id) DO UPDATE SET email_hash = excluded.email_hash")
-      .bind(who.id, hash, now).run();
-    return json({ paid: true });
+      "INSERT INTO claims (player_id, who_key, at) VALUES (?,?,?)" +
+      " ON CONFLICT(player_id) DO UPDATE SET who_key = excluded.who_key")
+      .bind(who.id, sale.who, now).run();
+    return json({ paid: true, provider: provider });
   }
 
   return oops(404, "no such thing here");
+}
+
+/* ------------------------------------------------------------------
+   Checking a webhook really came from Stripe.
+
+   Written out rather than pulled in. The Stripe SDK is a large
+   dependency whose signature check reaches for Node's crypto, which
+   does not exist in a Worker - the documented fix is to hand it a
+   WebCrypto provider, and at that point the only thing being used is
+   thirty lines of HMAC. So here are the thirty lines.
+
+   The header is `t=<unix seconds>,v1=<hex hmac>`, and the thing signed
+   is the timestamp, a dot, and the raw body - the RAW body, before any
+   parsing, because re-serialising JSON changes the bytes and the
+   signature is over bytes. The timestamp is checked as well as the
+   signature, or a genuine old request could be replayed for ever.
+   ------------------------------------------------------------------ */
+const STRIPE_TOLERANCE = 5 * 60;        /* seconds either side */
+
+function timingSafeEqual(a, b) {
+  if (a.length !== b.length) return false;
+  let bad = 0;
+  for (let i = 0; i < a.length; i++) bad |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  return bad === 0;
+}
+
+export async function stripeVerify(raw, header, secret, now) {
+  if (!header || !secret) throw new Error("unsigned");
+  const parts = {};
+  for (const bit of String(header).split(",")) {
+    const eq = bit.indexOf("=");
+    if (eq > 0) {
+      const k = bit.slice(0, eq).trim();
+      /* several v1= signatures can be present while a secret is being
+         rotated, and any one of them matching is enough */
+      if (k === "v1") (parts.v1 = parts.v1 || []).push(bit.slice(eq + 1).trim());
+      else parts[k] = bit.slice(eq + 1).trim();
+    }
+  }
+  if (!parts.t || !parts.v1) throw new Error("no signature");
+  const age = Math.abs(Math.floor((now || Date.now()) / 1000) - parseInt(parts.t, 10));
+  if (!isFinite(age) || age > STRIPE_TOLERANCE) throw new Error("stale");
+
+  const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(secret),
+    { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
+  const mac = await crypto.subtle.sign("HMAC", key,
+    new TextEncoder().encode(parts.t + "." + raw));
+  let want = "";
+  for (const b of new Uint8Array(mac)) want += ("0" + b.toString(16)).slice(-2);
+  if (!parts.v1.some((got) => timingSafeEqual(got, want))) throw new Error("bad signature");
+  return JSON.parse(raw);
 }
 
 /* ------------------------------------------------------------------
@@ -606,38 +766,21 @@ export async function handle(req, env, ctx) {
    And it has to be safe to run twice, because Stripe will send the same
    event again if it does not hear a clean answer.
    ------------------------------------------------------------------ */
-export async function stripeHook(req, env, verify) {
+export async function storeHook(req, env, provider) {
+  const store = STORES[provider];
+  if (!store || !store.fromWebhook) return oops(404, "no such shop");
   const raw = await req.text();
-  const sig = req.headers.get("stripe-signature");
-  let event;
-  try {
-    event = await verify(raw, sig, env.STRIPE_WEBHOOK_SECRET);
-  } catch (e) {
-    return oops(400, "that did not come from Stripe");
-  }
-  if (event.type !== "checkout.session.completed") return json({ ignored: event.type });
-
-  const session = event.data.object;
-  const email = (session.customer_details && session.customer_details.email) ||
-                session.customer_email;
-  if (!email) return json({ ignored: "no email on the session" });
-
   const now = env.NOW ? env.NOW() : Date.now();
-  const hash = await hashEmail(email, env.EMAIL_SALT || "mutantfly");
-
-  /* A session buying credits carries how many in its metadata; one
-     buying the game carries none. Both are keyed on the Stripe session
-     id, so the same event arriving twice - which Stripe says plainly it
-     may - writes nothing the second time. */
-  const credits = parseInt((session.metadata && session.metadata.credits) || "0", 10) || 0;
-
-  await env.DB.batch([
-    env.DB.prepare(
-      "INSERT INTO entitlements (email_hash, source, reference, at) VALUES (?,'stripe',?,?)" +
-      " ON CONFLICT(email_hash) DO NOTHING").bind(hash, session.id, now),
-    env.DB.prepare(
-      "INSERT OR IGNORE INTO purchases (session_id, email_hash, credits, at) VALUES (?,?,?,?)")
-      .bind(session.id, hash, credits, now)
-  ]);
-  return json({ ok: true, credits });
+  let sale;
+  try {
+    sale = await store.fromWebhook(raw, req.headers, env, now);
+  } catch (e) {
+    return oops(400, "that did not come from " + provider);
+  }
+  if (!sale) return json({ ignored: true });
+  const got = await grant(env.DB, sale, provider, now);
+  return json({ ok: true, credits: got.credits });
 }
+
+/* kept under its old name because that is what the route is called */
+export function stripeHook(req, env) { return storeHook(req, env, "stripe"); }

@@ -21,15 +21,10 @@ export default {
     const url = new URL(req.url);
 
     if (url.pathname === "/api/stripe/webhook" && req.method === "POST") {
-      /* Stripe's own verifier needs Node crypto, which does not exist
-         here, so it has to be handed the WebCrypto one - this is the
-         thing that bites on the first deploy and looks like a bad
-         signing secret. */
-      const { default: Stripe } = await import("stripe");
-      const stripe = new Stripe(env.STRIPE_SECRET_KEY);
-      const provider = Stripe.createSubtleCryptoProvider();
-      return stripeHook(req, env, (raw, sig, secret) =>
-        stripe.webhooks.constructEventAsync(raw, sig, secret, undefined, provider));
+      /* The signature check is thirty lines of HMAC in api.js rather
+         than the Stripe SDK, which is a large dependency whose own
+         checker reaches for Node crypto that does not exist here. */
+      return stripeHook(req, env);
     }
 
     if (url.pathname.startsWith("/api/")) {

@@ -19,7 +19,7 @@
    those are network-only: if there is no network there is no catalogue,
    and the game carries on without it.
    ===================================================================== */
-const VERSION = "3007cc5a9269";
+const VERSION = "17a265d85672";
 const CACHE = "mutant-fly-" + VERSION;
 
 const SHELL = [

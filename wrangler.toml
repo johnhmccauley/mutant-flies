@@ -6,7 +6,7 @@
 name = "mutant-fly"
 main = "worker/index.js"
 compatibility_date = "2026-01-15"
-compatibility_flags = ["nodejs_compat"]
+# nothing here needs Node: the Stripe signature check is WebCrypto
 
 [assets]
 directory = "."

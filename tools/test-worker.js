@@ -107,9 +107,14 @@ function freshDb() {
   /* a player who has paid - and who has claimed a name, because
      publishing anything now needs one */
   let nameN = 0;
-  async function paidUp(db, who, email, called) {
-    db.sqlite.prepare("INSERT INTO entitlements (email_hash, source, reference, at) VALUES (?,'stripe','sess',1)")
-      .run(await api.hashEmail(email, "pepper"));
+  async function paidUp(db, who, email, called, credits) {
+    /* through the same door a real purchase comes in by, rather than
+       reaching into the tables - so the tests exercise grant() too */
+    await api.grant(db.DB, {
+      who: "stripe:" + await api.hashEmail(email, "pepper"),
+      txn: "sess-" + email,
+      credits: credits || 0
+    }, "stripe", 1);
     await call(db, who, "POST", "/api/claim", { email });
     return call(db, who, "POST", "/api/name", { name: called || ("Builder " + (++nameN)) });
   }
@@ -509,19 +514,19 @@ function freshDb() {
   {
     const d = freshDb();
     const amy = await player();
-    const hash = await api.hashEmail("amy@x", "pepper");
-    d.sqlite.prepare("INSERT INTO entitlements (email_hash, source, reference, at) VALUES (?,'stripe','s1',1)").run(hash);
-    d.sqlite.prepare("INSERT INTO purchases (session_id, email_hash, credits, at) VALUES ('s1',?,0,1)").run(hash);
+    const buyer = "stripe:" + await api.hashEmail("amy@x", "pepper");
+    await api.grant(d.DB, { who: buyer, txn: "s1", credits: 0 }, "stripe", 1);
     await call(d, amy, "POST", "/api/claim", { email: "amy@x" });
     ok("buying the game buys no credits", (await call(d, amy, "POST", "/api/wallet")).body.bought, 0);
 
-    d.sqlite.prepare("INSERT INTO purchases (session_id, email_hash, credits, at) VALUES ('s2',?,1500,2)").run(hash);
+    await api.grant(d.DB, { who: buyer, txn: "s2", credits: 1500 }, "stripe", 2);
     ok("buying a pack does", (await call(d, amy, "POST", "/api/wallet")).body.bought, 1500);
 
-    /* the same webhook arriving twice, which Stripe says it may */
-    const twice = d.sqlite.prepare("INSERT OR IGNORE INTO purchases (session_id, email_hash, credits, at) VALUES ('s2',?,1500,2)").run(hash);
+    /* the same purchase arriving twice, which every store does */
+    await api.grant(d.DB, { who: buyer, txn: "s2", credits: 1500 }, "stripe", 2);
+    const n = d.sqlite.prepare("SELECT COUNT(*) AS n FROM purchases").get();
     ok("and the same purchase arriving twice does not buy it twice",
-       [Number(twice.changes), (await call(d, amy, "POST", "/api/wallet")).body.bought], [0, 1500]);
+       [Number(n.n), (await call(d, amy, "POST", "/api/wallet")).body.bought], [2, 1500]);
 
     /* the same purchase followed to a second machine */
     const phone = await player();
@@ -540,8 +545,8 @@ function freshDb() {
   {
     const d = freshDb();
     const amy = await player();
-    d.sqlite.prepare("INSERT INTO entitlements (email_hash, source, reference, at) VALUES (?,'stripe','s',1)")
-      .run(await api.hashEmail("amy@x", "pepper"));
+    await api.grant(d.DB, { who: "stripe:" + await api.hashEmail("amy@x", "pepper"),
+                            txn: "s", credits: 0 }, "stripe", 1);
     await call(d, amy, "POST", "/api/claim", { email: "amy@x" });
     const lv = await call(d, amy, "POST", "/api/levels", { name: "Nameless", code: "x", cellar: 5 });
     const pub = await call(d, amy, "POST", "/api/levels/" + lv.body.id + "/state", { state: "public" });
@@ -683,6 +688,124 @@ function freshDb() {
     const mine = (await call(d, amy, "POST", "/api/me")).body;
     ok("a published level points at that uuid", shown.authorId, mine.authorId);
     ok("and never at the thumbprint of their signing key", shown.authorId === amy.id, false);
+  }
+
+  console.log("\nChecking a webhook really came from Stripe\n");
+  {
+    const SECRET = "whsec_test_secret";
+    const NOW = 1_800_000_000_000;
+    const sign = async (body, at, secret) => {
+      const t = Math.floor((at === undefined ? NOW : at) / 1000);
+      const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(secret || SECRET),
+        { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
+      const mac = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(t + "." + body));
+      let hex = "";
+      for (const b of new Uint8Array(mac)) hex += ("0" + b.toString(16)).slice(-2);
+      return "t=" + t + ",v1=" + hex;
+    };
+    const body = JSON.stringify({ type: "checkout.session.completed", data: { object: { id: "cs_1" } } });
+
+    const good = await api.stripeVerify(body, await sign(body), SECRET, NOW);
+    ok("a properly signed event is read", good.data.object.id, "cs_1");
+
+    const tries = [
+      ["one signed with the wrong secret", await sign(body, undefined, "whsec_someone_else")],
+      ["one with no signature header at all", ""],
+      ["one with a header that is not a signature", "t=1,nonsense"],
+      ["one signed hours ago, which is a replay", await sign(body, NOW - 3600 * 1000)]
+    ];
+    for (const [what, header] of tries) {
+      let refused = false;
+      try { await api.stripeVerify(body, header, SECRET, NOW); } catch (e) { refused = true; }
+      ok(what + " is refused", refused, true);
+    }
+
+    /* the body is signed as BYTES, so re-serialising it breaks the seal -
+       which is why the raw text is what gets checked */
+    let refused = false;
+    const header = await sign(body);
+    try { await api.stripeVerify(JSON.stringify(JSON.parse(body)) + " ", header, SECRET, NOW); }
+    catch (e) { refused = true; }
+    ok("and a body that has been touched on the way in is refused", refused, true);
+
+    /* several v1 signatures appear while a secret is being rotated, and
+       any one of them matching is enough */
+    const rotating = (await sign(body, undefined, "whsec_old")) + ",v1=" +
+      (await sign(body)).split("v1=")[1];
+    const ok2 = await api.stripeVerify(body, rotating, SECRET, NOW);
+    ok("a header carrying two signatures passes on the one that matches", ok2.type,
+       "checkout.session.completed");
+  }
+  {
+    /* end to end: a purchase arrives and is recorded once */
+    const d = freshDb();
+    const SECRET = "whsec_e2e";
+    const NOW = 1_800_000_000_000;
+    const body = JSON.stringify({
+      type: "checkout.session.completed",
+      data: { object: { id: "cs_live_1", customer_details: { email: "buyer@example.com" },
+                        metadata: { credits: "1500" } } }
+    });
+    const t = Math.floor(NOW / 1000);
+    const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(SECRET),
+      { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
+    const mac = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(t + "." + body));
+    let hex = ""; for (const b of new Uint8Array(mac)) hex += ("0" + b.toString(16)).slice(-2);
+    const env = { DB: d.DB, NOW: () => NOW, EMAIL_SALT: "pepper", STRIPE_WEBHOOK_SECRET: SECRET };
+    const mk = () => new Request("https://x/api/stripe/webhook", {
+      method: "POST", headers: { "stripe-signature": "t=" + t + ",v1=" + hex }, body });
+
+    const first = await (await api.stripeHook(mk(), env)).json();
+    const again = await (await api.stripeHook(mk(), env)).json();
+    const rows = d.sqlite.prepare("SELECT COUNT(*) AS n FROM purchases").get();
+    ok("a purchase is recorded, and recorded once however many times it arrives",
+       [first.credits, again.credits, Number(rows.n)], [1500, 1500, 1]);
+
+    const buyer = await player();
+    await call(d, buyer, "POST", "/api/claim", { email: "buyer@example.com" });
+    ok("and the buyer can claim it on their machine",
+       (await call(d, buyer, "POST", "/api/wallet")).body.bought, 1500);
+  }
+
+  console.log("\nEvery shop, in its own way\n");
+  {
+    /* The game does not get to choose how money arrives. Each shop
+       turns its own kind of proof into the same pair - who, and which
+       transaction - and nothing past that point knows which shop it
+       was. */
+    const d = freshDb();
+    const amy = await player();
+    await api.grant(d.DB, { who: "steam:76561198000000001", txn: "steam-tx-1", credits: 500 },
+                    "steam", 10);
+    const row = d.sqlite.prepare("SELECT provider, who_key FROM entitlements").get();
+    ok("a Steam purchase is an entitlement like any other",
+       [row.provider, row.who_key], ["steam", "steam:76561198000000001"]);
+  }
+  {
+    /* and a shop that has not been wired up says so, rather than
+       quietly letting somebody in - a stub that returns yes is a free
+       game for anybody who reads the page */
+    const d = freshDb();
+    const amy = await player();
+    for (const shop of ["apple", "steam", "google", "itch"]) {
+      const r = await call(d, amy, "POST", "/api/claim", { provider: shop, receipt: "anything" });
+      ok(shop + " refuses until it is wired up",
+         [r.status, /not wired up yet/.test(r.body.error || "")], [400, true]);
+    }
+  }
+  {
+    const d = freshDb();
+    const amy = await player();
+    ok("and a shop nobody has heard of is refused outright",
+       (await call(d, amy, "POST", "/api/claim", { provider: "wishing" })).status, 400);
+  }
+  {
+    /* an email is a claim, not a proof, so Stripe needs the purchase on
+       file already - the stores that CAN vouch for themselves do not */
+    const d = freshDb();
+    const amy = await player();
+    ok("typing an address nobody bought with gets you nothing",
+       (await call(d, amy, "POST", "/api/claim", { email: "nobody@example.com" })).status, 404);
   }
 
   console.log("\n" + pass + " passed, " + fail + " failed");
