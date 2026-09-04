@@ -11516,9 +11516,8 @@ function edShelfDraw() {
     el.className = "edItem" + (row.id === ed.pick ? " here" : "");
     el.setAttribute("aria-pressed", row.id === ed.pick ? "true" : "false");
     el.innerHTML = (row.thumb ? '<img class="edPic" alt="" src="' + row.thumb + '">' : "") +
-      "<div><b>" + esc(row.name) + "</b><br><span>cellar " + row.cellar +
-      " &middot; " + row.state + (row.everPublic ? " &middot; has been public" : "") +
-      "</span></div>";
+      "<div><b>" + esc(row.name) + "</b><br><span>" + row.state +
+      (row.everPublic ? " &middot; has been public" : "") + "</span></div>";
     el.addEventListener("click", function () {
       ed.pick = row.id;
       edShelfDraw();
