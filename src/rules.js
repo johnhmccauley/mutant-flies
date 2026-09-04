@@ -96,12 +96,75 @@
          line of timber drags like the rock, which is exactly how it
          feels to push a stuck thing
 
+     Uphill there is a second term, and it is the one that separates a
+     heavy load from a light one. Friction is what it takes to keep a
+     thing moving along the ground; going up a slope you also have to
+     LIFT it, and lifting is mass times gravity times the rise:
+
+         resist = cos(a) x SUM( friction x weight )      the dragging
+                + sin(a) x SUM( weight ) x steps risen   the lifting
+
+     One step of floor across one square is about twenty-nine degrees,
+     so cos is 0.88 and sin is 0.48. On the flat the second term is
+     nought and this is the old sum; on a slope it grows with the whole
+     weight of the line, which is why a brick goes up a step easily and
+     eight do not.
+
+     Note what does NOT appear: the weight in the FIRST term is there
+     because friction is proportional to the normal force, and in the
+     second because lifting is work. Neither is the case where mass
+     cancels. Whether a block already sitting on a slope stays there IS
+     that case, and it is decided without any weight at all, a few
+     hundred lines down.
+
      Every two units of resistance costs a whole extra turn, capped at
      two, because a man only has three turns of effort in him and a
-     bottomless cost would just be an unexplained refusal. Which makes
-     two rocks uphill genuinely impossible rather than merely slow, and
-     that is a fact about the cellar worth knowing. */
-  var RESIST_TURN = 2.0, RESIST_CAP = 2;
+     bottomless cost would just be an unexplained refusal. */
+  /* What a unit of resistance is worth in turns. Set so that the whole
+     ladder fits in the three step points a man can hold: eight bricks
+     or one rock costs him a turn on the flat, two rocks costs two, and
+     one rock up a slope costs two - hard, and possible, which it should
+     be. Eight bricks up a slope is not. */
+  var RESIST_TURN = 2.4, RESIST_CAP = 3;
+  var SLOPE_COS = 0.88, SLOPE_SIN = 0.48;
+
+  /* ------------------------------------------------------------------
+     HOW MANY, ON A HILL
+
+     There is a fixed amount of push in a man, and on the flat it comes
+     to eight bricks - or two rocks, which weigh the same. That is the
+     rule, and what follows is only what the same fixed push comes to
+     when the ground is not flat.
+
+     What he is working against is the force it takes to move the load:
+
+         flat      friction only        mu x weight x cos
+         uphill    and lifting it       mu x weight x cos + weight x sin
+         downhill  and gravity helping  mu x weight x cos - weight x sin
+
+     Same push, bigger opposing force, fewer blocks. Same push, gravity
+     taking some of it, more blocks. So the count is lower uphill and
+     higher downhill, and by how much falls out of the numbers rather
+     than being chosen:
+
+         rock, flat        8 units    two rocks
+         rock, uphill      4.6        one rock
+         rock, downhill   29          seven
+
+     And at the bottom of that table something interesting happens. For
+     brick going downhill the opposing force comes out NEGATIVE - the
+     slope is steeper than brick's friction can hold - which is another
+     way of saying a brick placed there would slide on its own. It is
+     the same comparison as the sliding rule, arrived at from the other
+     end, and where it is negative there is no limit at all: you are not
+     pushing them down, you are letting go of them.
+     ------------------------------------------------------------------ */
+  Game.prototype.pushLimit = function (mu, rise) {
+    var flat = mu * SLOPE_COS;
+    var against = flat + SLOPE_SIN * rise;        /* rise is signed */
+    if (against <= 0.02) return Infinity;         /* gravity is doing it */
+    return PUSH_POWER * flat / against;
+  };
 
   /* ------------------------------------------------------------------
      WHETHER IT STAYS ON THE SLOPE
@@ -183,14 +246,20 @@
 
        starting one   a shove is a fixed push, so a heavy marble leaves
                       slowly - v = push / mass
-       keeping going  rolling resistance mostly cancels against weight,
-                      but not quite, so the heavy ones coast further
+       keeping going  at the same rate as everything else. Rolling
+                      resistance is proportional to weight and so is the
+                      inertia resisting the slowdown, so mass cancels and
+                      a heavy marble does NOT coast further - the same
+                      cancellation that decides whether a block holds on
+                      a slope, and it would be odd to believe it there
+                      and not here
        hitting things what breaks a brick or a monster is momentum,
                       mass times speed - a big marble at walking pace
                       does what a small one has to sprint to manage
        the lip        a step stops a small wheel and not a large one, so
                       what matters is the lip against the marble's own
-                      size, not its weight
+                      SIZE. Size and mass happen to be the same number
+                      here, but it is the size that is doing the work
 
      A size-1 marble behaves exactly as marbles did before any of this.
      ------------------------------------------------------------------ */
@@ -225,7 +294,6 @@
   var BURN_WOOD = 12, BURN_BRICK = 3;
   function massOf(m) { return m.size || 1; }
   function shoveSpeed(m) { return 1 / (0.6 + 0.4 * massOf(m)); }
-  function coast(m) { return 0.55 + 0.45 / massOf(m); }
   function momentum(m) { return m.v * massOf(m); }
   /* how fast it has to be going to ride over the lip where the floor ends */
   function lipSpeed(m) {
@@ -1855,9 +1923,22 @@
           }
           var run = line.length;
           var wading = this.fluid[this.idx(nc, nr)] === WATER;
-          var cost2 = this.stepCost(nc, nr, wading) + this.dragCost(drag);
-          if (!this.wood && weight > this.pushPower()) {
-            /* more than there is in his arms. He does not even move */
+          /* Two different costs, and they are both real: stepCost
+             charges the man for climbing, which he pays whether he is
+             pushing anything or not, and the resist below charges for
+             the LOAD - dragging it along, and lifting it if the ground
+             rises. Taking the climb out to make a rock go uphill was
+             wrong: it made pushing a brick up a step cheaper than
+             walking up one empty-handed. */
+          var rise = Math.max(0, this.h(cc - d[0], rr - d[1]) - this.h(this.manC, this.manR));
+          var resist = drag * SLOPE_COS + (rise ? SLOPE_SIN * weight * rise : 0);
+          var cost2 = this.stepCost(nc, nr, wading) + this.dragCost(resist);
+          /* how many, given the ground it is going onto */
+          var slope = this.h(nc, nr) - this.h(this.manC, this.manR);
+          var mu = weight > 0 ? drag / weight : DRAG[BRICK];
+          if (!this.wood && weight > this.pushLimit(mu, slope) + 1e-9) {
+            /* more than there is in his arms on this ground. He does
+               not even move */
             ev.blocked = true;
             ev.tooHeavy = true;
             return false;
@@ -2112,8 +2193,11 @@
            going up - then friction for the square it has arrived on. */
         this.place(m, nc, nr);
         m.v += (dh < 0) ? (-dh * 0.55) : (-dh * 0.95);
+        /* no mass term: friction slows a heavy marble and a light one
+           at the same rate, because what resists the slowing scales
+           with the weight as well */
         m.v -= frictionOn(this.grid[this.idx(nc, nr)], this.fluid[this.idx(nc, nr)],
-                          this.madeOf(this.grid[this.idx(nc, nr)])) * coast(m);
+                          this.madeOf(this.grid[this.idx(nc, nr)]));
         if (m.v <= 0.05) { m.v = 0; m.dc = 0; m.dr = 0; }
       }
       if (m.v <= 0.05) { m.v = 0; m.dc = 0; m.dr = 0; }

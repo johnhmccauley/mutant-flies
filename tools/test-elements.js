@@ -1597,5 +1597,81 @@ function onSlope(what, blocks) {
      [true, false, true]);
 }
 
+
+/* ---- the two places mass cancels, and the two where it does not ---- */
+{
+  /* A heavy marble and a light one, launched at the same speed over the
+     same floor, stop in the same place. Rolling resistance grows with
+     weight and so does the inertia resisting the slowdown, so mass
+     cancels - the same cancellation that decides whether a block holds
+     on a slope. Believing it there and not here would be picking. */
+  const run = (size) => {
+    const g = bare(12);
+    g.height.fill(0);
+    const m = { c: 4, r: 12, dc: 1, dr: 0, v: 3, size: size };
+    g.marbles.push(m); g.grid[I(4, 12)] = MF.MARBLE;
+    g.manC = 2; g.manR = 2;
+    for (let t = 0; t < 20 && m.v > 0; t++) g.step(null);
+    return m.c;
+  };
+  ok("a heavy marble and a light one roll the same distance", run(1), run(3));
+}
+{
+  /* but what it does when it arrives is all about the mass */
+  const hit = (size, v) => {
+    const g = bare(12);
+    g.height.fill(0);
+    const m = { c: 10, r: 12, dc: 1, dr: 0, v: v, size: size };
+    g.marbles.push(m); g.grid[I(10, 12)] = MF.MARBLE;
+    put(g, 11, 12);
+    g.manC = 2; g.manR = 2;
+    return g.step(null).smashed;
+  };
+  ok("and a heavy one at the same speed breaks what a light one bounces off",
+     [hit(3, 1.1), hit(1, 1.1)], [1, 0]);
+}
+{
+  /* Uphill, weight is back - because now you are lifting it, and
+     lifting is mass times the rise. On the flat these two lines are the
+     same weight and cost the same; up a step they do not. */
+  const upCost = (kinds) => {
+    for (let s = 0; s <= 3; s++) {
+      const g = bare(12);
+      g.height.fill(0);
+      for (let c = 11; c < MF.COLS; c++) for (let r = 0; r < MF.ROWS; r++) g.height[I(c, r)] = 1;
+      g.manC = 10; g.manR = 10;
+      kinds.forEach((k, i) => { g.grid[I(11 + i, 10)] = k; });
+      g.steps = s;
+      const ev = g.step("right");
+      if (!ev.strained && !ev.blocked) return s;
+    }
+    return 99;
+  };
+  ok("going up costs more than going along", upCost([B]) > 0, true);
+  ok("and a rock will go up a slope - hard, and possible", upCost([R]) <= 3, true);
+}
+{
+  /* The count is lower uphill and higher downhill, because the push a
+     man has is fixed and the force opposing it is not. */
+  const most = (kind, slope) => {
+    for (let n = 12; n >= 1; n--) {
+      const g = bare(12);
+      g.height.fill(0);
+      if (slope > 0) for (let c = 11; c < MF.COLS; c++) for (let r = 0; r < MF.ROWS; r++) g.height[I(c, r)] = 1;
+      if (slope < 0) for (let c = 0; c <= 10; c++) for (let r = 0; r < MF.ROWS; r++) g.height[I(c, r)] = 1;
+      g.manC = 10; g.manR = 10;
+      for (let i = 0; i < n; i++) g.grid[I(11 + i, 10)] = kind;
+      g.steps = 3;
+      if (!g.step("right").tooHeavy) return n;
+    }
+    return 0;
+  };
+  const up = most(B, 1), flat = most(B, 0), down = most(B, -1);
+  ok("fewer blocks uphill, more downhill", [up < flat, flat < down], [true, true]);
+  ok("and eight on the flat, which is the rule the rest is measured from", flat, 8);
+  ok("rocks the same way, in their own numbers",
+     [most(R, 1) < most(R, 0), most(R, 0) < most(R, -1), most(R, 0)], [true, true, 2]);
+}
+
 console.log("\n" + pass + " passed, " + fail + " failed");
 process.exit(fail ? 1 : 0);
