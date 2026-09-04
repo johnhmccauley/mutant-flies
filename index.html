@@ -6531,7 +6531,8 @@ function slabMaps(variant) {
    SCENE
    ================================================================== */
 var renderer, scene, camera, clock;
-var brickMesh, floorMesh, manRig, motes, debris = [], torches = [], keyLight;
+var brickMesh, brickMeshes = null;
+var floorMesh, manRig, motes, debris = [], torches = [], keyLight;
 var BRICK_MAT, BRICK_TEX = {};
 var monsterRigs = [];
 var SURROUND = null, TIMBER = null;
@@ -6959,6 +6960,19 @@ function buildCellar() {
   brickMesh = new THREE.InstancedMesh(new THREE.BoxGeometry(0.94, 0.66, 0.94), BRICK_MAT, 460);
   brickMesh.castShadow = true; brickMesh.receiveShadow = true; brickMesh.count = 0;
   scene.add(brickMesh);
+
+  /* and one each for the two colours you can ask for by name. Their
+     textures never change, because the whole point of asking is that
+     you get that one whatever the cellar would have chosen. */
+  brickMeshes = { 1: null, 2: null };
+  [[1, BRICK_TEX.red], [2, BRICK_TEX.blue]].forEach(function (k) {
+    var mat = new THREE.MeshStandardMaterial({ map: k[1].map, bumpMap: k[1].bump,
+                                               bumpScale: 0.05, roughness: 0.92, metalness: 0.02 });
+    var m = new THREE.InstancedMesh(new THREE.BoxGeometry(0.94, 0.66, 0.94), mat, 460);
+    m.castShadow = true; m.receiveShadow = true; m.count = 0;
+    scene.add(m);
+    brickMeshes[k[0]] = m;
+  });
 }
 
 /* ------------------------------------------------------------------
@@ -8246,13 +8260,23 @@ function paintBricks(cells, level) {
   var pal = MF.palette(level);
   var t = game.wood ? BRICK_TEX.wood : ((pal.brick === 4) ? BRICK_TEX.blue : BRICK_TEX.red);
   if (BRICK_MAT.map !== t.map) { BRICK_MAT.map = t.map; BRICK_MAT.bumpMap = t.bump; BRICK_MAT.needsUpdate = true; }
-  var n = 0, cap = brickMesh.instanceMatrix.count;
-  for (var i = 0; i < cells.length && n < cap; i++) {
-    placeTilt(brickMesh, n++, cells[i][0], cells[i][1],
-              groundTop(cells[i][0], cells[i][1]) + 0.33);
+  var hue = (game._extra && game._extra.brickHue) || null;
+  var n = 0, n1 = 0, n2 = 0, cap = brickMesh.instanceMatrix.count;
+  for (var i = 0; i < cells.length; i++) {
+    var c = cells[i][0], r = cells[i][1];
+    var k = hue ? (hue[r * COLS + c] | 0) : 0;
+    var into = (k && brickMeshes && brickMeshes[k]) ? brickMeshes[k] : brickMesh;
+    var at = (into === brickMesh) ? n : (k === 1 ? n1 : n2);
+    if (at >= cap) continue;
+    placeTilt(into, at, c, r, groundTop(c, r) + 0.33);
+    if (into === brickMesh) n++; else if (k === 1) n1++; else n2++;
   }
   brickMesh.count = n;
   brickMesh.instanceMatrix.needsUpdate = true;
+  if (brickMeshes) {
+    brickMeshes[1].count = n1; brickMeshes[1].instanceMatrix.needsUpdate = true;
+    brickMeshes[2].count = n2; brickMeshes[2].instanceMatrix.needsUpdate = true;
+  }
 }
 function syncBricks() { syncWorld(); }
 
@@ -8843,7 +8867,8 @@ function edButtons() {
 
 var ED_TOOLS = [
   { name: "Erase",     group: 0, swatch: "#2a231c", act: "cell", v: 0, how: "Click a square to clear whatever is on it." },
-  { name: "Brick",     group: 0, swatch: "#b8462e", act: "cell", v: 1, how: "Click a square to lay a brick. Drag to lay a row." },
+  { name: "Red brick", group: 0, swatch: "#b8462e", act: "cell", v: 1, hue: 1, how: "Click a square to lay a brick. Drag to lay a row. The colour is only a colour - every brick weighs the same and walls a monster in just as well." },
+  { name: "Blue brick", group: 0, swatch: "#5f92c4", act: "cell", v: 1, hue: 2, how: "The same brick in the blue the deep cellars are built from. Handy for telling one wall from another while you build." },
   { name: "Rock",      group: 0, swatch: "#8d8578", act: "cell", v: 8, how: "Click a square for a rock - four bricks of shove, and nothing down here can destroy it." },
   { name: "Tree",      group: 0, swatch: "#2f4a24", act: "cell", v: 2, how: "Click a square to plant a tree. The chopper turns one into bricks." },
   { name: "Marble",    group: 0, swatch: "#cfd6dd", act: "marble", how: "Click a square to drop a marble. It rolls when something shoves it." },
@@ -9862,7 +9887,7 @@ var ED_VIEWS = [
     how: "Pick what a side of the room should be, then press the sides you want it on." },
   { key: "things", name: "Elements", cam: "room", show: "all", pics: true,
     icon: '<path d="M8 1.9 14 5.2v5.6L8 14.1 2 10.8V5.2z"/><path d="M2 5.2 8 8.5l6-3.3M8 8.5v5.6"/>',
-    tools: ["Erase", "Brick", "Rock", "Tree", "Marble", "Chopper",
+    tools: ["Erase", "Red brick", "Blue brick", "Rock", "Tree", "Marble", "Chopper",
             "Tar vat", "Water vat", "Set tar",
             "Boots", "Frost", "Saw", "Jar"],
     /* Erase leads the list, because taking something off a square is
@@ -9870,7 +9895,7 @@ var ED_VIEWS = [
        often. It is not what you are HANDED, though - an editor that
        opens with the rubber in your hand is an editor that rubs out the
        first thing you click on. */
-    first: "Brick",
+    first: "Red brick",
     how: "Everything that stands on a square. Click one to put it down; click it again to take it away. Where the player comes in is the marked square - drag it to move it." },
   { key: "life", name: "Monsters", cam: "room", show: "all", pics: true,
     icon: '<ellipse cx="8" cy="8.6" rx="3.1" ry="4.2"/><path d="M4.9 6 2 4.2M11.1 6 14 4.2M4.6 9H1.7M11.4 9h2.9M5 11.6 2.6 13.4M11 11.6l2.4 1.8"/><path d="M6.6 4.2 5.6 1.9M9.4 4.2l1-2.3"/>',
@@ -10338,6 +10363,11 @@ function edStamp(quiet) {
     });
     game.grid[i] = t.v;
     if (t.v === 0) game.fluid[i] = MF.DRY, game.fvol[i] = 0, game.sealed[i] = 0;
+    /* the colour asked for, or none - and erasing takes the colour with
+       the brick, or the next brick laid there inherits it */
+    game._extra = game._extra || {};
+    if (t.hue) (game._extra.brickHue = game._extra.brickHue || {})[i] = t.hue;
+    else if (game._extra.brickHue) delete game._extra.brickHue[i];
   } else if (t.act === "marble") {
     if (game.grid[i] === MF.MARBLE) return edSay("there is one there already");
     game.grid[i] = MF.MARBLE;
@@ -12177,14 +12207,19 @@ function thingPortrait(name, w, h, spin) {
        its own, against the card. */
 
     var put = [];
-    if (name === "Brick" || name === "Rock" || name === "Marble" ||
+    var brickKind = (name === "Red brick") ? 1 : (name === "Blue brick") ? 2 : 0;
+    if (brickKind || name === "Rock" || name === "Marble" ||
         name === "Set tar" || name === "Tar vat" || name === "Water vat") {
-      var of = { Brick: null, Rock: props.rock, Marble: null,
+      var of = { Rock: props.rock,
                  "Set tar": props.cooled, "Tar vat": props.vatT,
-                 "Water vat": props.vatW }[name];
-      if (name === "Brick") {
+                 "Water vat": props.vatW }[name] || null;
+      if (brickKind) {
+        /* the picture is the brick: the same box, the same material, and
+           the texture that colour actually gets in the room */
+        var pick = (brickKind === 2) ? BRICK_TEX.blue : BRICK_TEX.red;
         var bm = BRICK_MAT ? BRICK_MAT.clone() : new THREE.MeshStandardMaterial();
-        bm.color = new THREE.Color(0xb8462e);
+        if (pick) { bm.map = pick.map; bm.bumpMap = pick.bump; }
+        bm.needsUpdate = true;
         put.push(standOn(new THREE.Mesh(new THREE.BoxGeometry(0.94, 0.66, 0.94), bm)));
       } else if (name === "Marble") {
         /* The marble's own material, mirror and all. It mirrors the
