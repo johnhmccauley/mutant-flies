@@ -398,8 +398,6 @@
   background: rgba(12,9,7,.96); backdrop-filter: blur(3px);
   box-shadow: 0 10px 26px rgba(0,0,0,.55);
   font-family: "IBM Plex Mono", ui-monospace, monospace; }
-#edMenu #edRest { display: flex; flex-wrap: wrap; gap: 4px; max-width: 236px;
-  padding-top: 6px; border-top: 1px solid #2b2219; }
 #edZoom { display: flex; align-items: center; justify-content: center; gap: 2px; }
 #edZoom button { width: 30px; height: 30px; padding: 0; border-radius: 7px;
   border: 1px solid transparent; background: transparent; color: #cbbfab;
@@ -822,9 +820,6 @@
 
 <div id="edMenu" hidden>
   <div id="edZoom"></div>
-  <div class="edRow" id="edRest">
-        <button class="edBtn" id="edShare" type="button">Share as text</button>
-      </div>
 </div>
 
 <div id="edBar" hidden>
@@ -905,6 +900,7 @@
       <button class="edBtn" id="edListNew" type="button">New</button>
       <button class="edBtn" id="edShelfPub" type="button">Publish</button>
       <button class="edBtn" id="edShelfDel" type="button">Delete</button>
+      <button class="edBtn" id="edShelfCode" type="button">Share as text</button>
       <button class="edBtn" id="edListClose" type="button">Back</button>
     </div>
     <div id="edList"></div>
@@ -8265,9 +8261,11 @@ function syncWorld() {
   if (props.tar) props.tar.material.emissiveIntensity = 0.24 + Math.sin(bobT * 5.1) * 0.11;
 
   /* marbles */
+  /* the same answer edDress gave, since it is the same question */
+  var showsAll = (mode !== "edit") || edAngleNow().show === "all";
   for (var m = 0; m < marbleMeshes.length; m++) {
     var mar = game.marbles[m];
-    marbleMeshes[m].visible = !!mar;
+    marbleMeshes[m].visible = !!mar && showsAll;
     if (!mar) continue;
     var mp = marbleMeshes[m].userData;
     /* size is mass, and you want to be able to see which is which */
@@ -9662,7 +9660,7 @@ var BRUSH_MIN = 1, BRUSH_MAX = 3;
    corner of the room can be dragged right out to the far paper. Framing
    the room and halving it only reaches about as far again, which is not
    enough to double the room in both directions. */
-var ZOOMS = [0.3, 0.5, 0.7, 1, 1.5, 2, 3];
+var ZOOMS = [0.15, 0.2, 0.3, 0.5, 0.7, 1, 1.5, 2, 3];
 
 /* ------------------------------------------------------------------
    The camera frames the ROOM, not the sheet.
@@ -9860,8 +9858,10 @@ function edZoomBar() {
   el.appendChild(knob("\u2212", -1, "Stand back  (\u2212, or the wheel)"));
   var now = document.createElement("span");
   now.className = "edZoomNow";
+  /* a tenth of a step rounds .15 to .2 and prints a number the scale
+     does not have */
   now.textContent = (ed.zoom === 1) ? "1\u00d7"
-                  : (ed.zoom < 1 ? ed.zoom.toFixed(1).replace("0.", ".") : ed.zoom + "") + "\u00d7";
+                  : String(ed.zoom).replace("0.", ".") + "\u00d7";
   now.title = "Back to the whole room  (0)";
   /* the number is a button too - the way back to 1x without hunting for
      it in a row of steps */
@@ -9882,9 +9882,18 @@ function edZoomTo(z) {
   ZOOMS.forEach(function (x) { if (Math.abs(x - z) < Math.abs(near - z)) near = x; });
   ed.zoom = near;
   edZoomBar();
-  edSay(near === 1 ? "the whole room"
-                   : near < 1 ? "standing back"
-                              : "moved in \u2014 the view follows the cursor");
+  /* ------------------------------------------------------------------
+     It used to say so: "standing back", "the whole room", "moved in -
+     the view follows the cursor". They are descriptions of something
+     you are looking straight at. The room got bigger or smaller in
+     front of you, the readout says which step you are on and the
+     magnifier carries it in its tooltip - so the sentence is one more
+     thing to read and nothing to learn, and "standing back", met cold
+     with no idea what wrote it, does not even say what it is about.
+
+     The status line is for what you cannot see: what went down, which
+     side you picked, what went wrong.
+     ------------------------------------------------------------------ */
 }
 
 function edZoomStep(by) {
@@ -9919,7 +9928,7 @@ var ED_VIEWS = [
     icon: '<path d="M8 1.7 14.6 8 8 14.3 1.4 8z"/><path d="M4.7 8 8 4.7 11.3 8 8 11.3z"/>',
     tools: ["Outline", "Cut out", "Raise", "Lower", "Paint floor"],
     how: "The ground: what shape the room is, and how it lies. Drag a corner to change the shape; take a brush to the middle to raise or lower it." },
-  { key: "walls", name: "Wall", cam: "low", show: "walls", pics: true,
+  { key: "walls", name: "Wall", cam: "low", show: "all", pics: true,
     /* a bond of bricks, not the rungs of a ladder */
     icon: '<path d="M1.6 3.4h12.8v9.2H1.6z"/><path d="M1.6 6.5h12.8M1.6 9.5h12.8"/><path d="M6 3.4v3.1M10.6 3.4v3.1M3.7 6.5v3M8.3 6.5v3M12.9 6.5v3M6 9.5v3.1M10.6 9.5v3.1"/>',
     tools: ["Stone", "A lip", "A sheer drop"],
@@ -11570,6 +11579,12 @@ function edShelfActs() {
               : bad.length ? "Not yet - " + bad.join("; ")
               : "put it in front of other people";
   }
+  var code = $("edShelfCode");
+  if (code) {
+    code.disabled = !row;
+    code.title = row ? "its code, to paste to anybody - and theirs, to paste back"
+                     : "pick a cellar first";
+  }
   if (del) {
     del.disabled = !row || !!(row && row.everPublic);
     del.title = !row ? "pick a cellar first"
@@ -11602,9 +11617,12 @@ function esc(t) {
 }
 
 /* --- a level as a string ------------------------------------------ */
-function edShare() {
-  var rec = edAsLevel({ name: $("edName").value.trim() });
-  $("edCode").value = MutantLevelFormat.toCode(rec);
+/* the picked cellar as text, straight off the record - it is already
+   stored as a code, so there is nothing to work out */
+function edShareRow() {
+  var row = edPicked();
+  if (!row) return;
+  $("edCode").value = row.body || "";
   $("edCodeSheet").hidden = false;
 }
 
@@ -11615,6 +11633,7 @@ function edLoadCode() {
     var rec = MutantLevelFormat.fromCode(text);
     if (!edSureToLose("Load this one")) return;
     $("edCodeSheet").hidden = true;
+    $("edListSheet").hidden = true;
     edEnter(rec);
     ed.id = null;                    /* somebody else's - yours now, as a copy */
     edSay("loaded" + (rec.name ? ': "' + esc(rec.name) + '"' : ""), "good");
@@ -11803,7 +11822,7 @@ addEventListener("keydown", function (e) {
     e.preventDefault();
     var st = 4;
     edPanBy(k === "arrowleft" ? -st : k === "arrowright" ? st : 0,
-            k === "arrowup" ? st : k === "arrowdown" ? -st : 0);
+            k === "arrowup" ? -st : k === "arrowdown" ? st : 0);
     return;
   }
   if (a) { e.preventDefault(); held[a] = true; tapped[a] = true; Beeb.wake(); return; }
@@ -11938,7 +11957,7 @@ addEventListener("blur", function () { held = {}; tapped = {}; if (mode === "pla
 
   /* held down, it keeps going - a room four sheets wide is a lot of
      separate presses otherwise */
-  [["edPadU", 0, 1], ["edPadD", 0, -1], ["edPadL", -1, 0], ["edPadR", 1, 0]]
+  [["edPadU", 0, -1], ["edPadD", 0, 1], ["edPadL", -1, 0], ["edPadR", 1, 0]]
     .forEach(function (k) {
       var b = $(k[0]);
       if (!b) return;
@@ -12030,7 +12049,7 @@ addEventListener("blur", function () { held = {}; tapped = {}; if (mode === "pla
   var edWire = {
     edUndo: function () { edStepBack(ed.undo, ed.redo); },
     edRedo: function () { edStepBack(ed.redo, ed.undo); },
-    edTest: edTestPlay, edShare: edShare,
+    edTest: edTestPlay,
     edQuit: edLeave,
     edListNew: function () {
       if (!edSureToLose("Start a new one")) return;
@@ -12042,6 +12061,7 @@ addEventListener("blur", function () { held = {}; tapped = {}; if (mode === "pla
     edShelfOpen: edShelfOpen,
     edShelfPub: function () { var r = edPicked(); if (r) edPublishRow(r); },
     edShelfDel: edShelfDelete,
+    edShelfCode: edShareRow,
     edListClose: function () {
       $("edListSheet").hidden = true;
       if (mode !== "edit") $("titleSheet").hidden = false;
