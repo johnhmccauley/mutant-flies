@@ -295,5 +295,42 @@ console.log("\nThe beta\n");
      typeof C.gate(nobody).editorEnabled, "boolean");
 }
 
+
+console.log("\nThe editor in the beta\n");
+{
+  /* open from the first cellar while the beta is on, because the beta
+     wants people building things and finding out what is wrong */
+  const newcomer = { id: "zoe", reached: 1, paid: false, played: {} };
+  const g = C.gate(newcomer, IN_BETA);
+  ok("during the beta the editor is open from cellar one",
+     [g.editorShown, g.editorEnabled], [true, true]);
+  ok("but what they build stays private until they have been down five",
+     [g.canPublish, !!g.publishNeeds], [false, true]);
+  ok("and it says why", /reach cellar 5/.test(g.publishNeeds), true);
+}
+{
+  const been = { id: "amy", reached: 5, paid: false, played: {} };
+  ok("once they have been down five, they can publish",
+     C.gate(been, IN_BETA).canPublish, true);
+}
+{
+  /* after the beta it is the old rule again: earn the editor as well */
+  const newcomer = { id: "zoe", reached: 1, paid: true, played: {} };
+  const g = C.gate(newcomer, AFTER);
+  ok("after the beta the editor has to be reached again",
+     [g.editorShown, g.editorEnabled, g.canPublish], [false, false, false]);
+}
+{
+  const paidUp = { id: "amy", reached: 9, paid: true, played: {} };
+  ok("and somebody who has both gets both",
+     [C.canCreate(paidUp, AFTER), C.canPublish(paidUp, AFTER)], [true, true]);
+}
+{
+  /* publishing is not a money gate in the beta - it is a measure gate */
+  const deep = { id: "amy", reached: 9, paid: false, played: {} };
+  ok("in the beta, being deep enough is all publishing asks",
+     C.canPublish(deep, IN_BETA), true);
+}
+
 console.log("\n" + pass + " passed, " + fail + " failed");
 process.exit(fail ? 1 : 0);

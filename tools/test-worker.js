@@ -417,7 +417,8 @@ function freshDb() {
     const LV = r.body.id;
     await call(d, amy, "POST", "/api/levels/" + LV + "/state", { state: "public" });
 
-    ok("an author starts owed nothing", (await call(d, amy, "POST", "/api/wallet")).body.awarded, 0);
+    ok("an author starts owed nothing but the welcome",
+       (await call(d, amy, "POST", "/api/wallet")).body.royalties, 0);
 
     await call(d, bob, "POST", "/api/levels/" + LV + "/play", { op: "op-11111111" });
     ok("somebody else playing it pays the author",
@@ -435,8 +436,8 @@ function freshDb() {
     ok("but the author playing their own work pays them nothing",
        (await call(d, amy, "POST", "/api/wallet")).body.royalties, 4);
 
-    ok("and a player who has earned nothing is owed nothing",
-       (await call(d, bob, "POST", "/api/wallet")).body.awarded, 0);
+    ok("and a player who has earned nothing is owed no royalties",
+       (await call(d, bob, "POST", "/api/wallet")).body.royalties, 0);
   }
 
   console.log("\nGold, silver and bronze\n");
@@ -541,8 +542,9 @@ function freshDb() {
   {
     const d = freshDb();
     const amy = await player();
-    ok("somebody who has bought nothing is holding nothing",
-       (await call(d, amy, "POST", "/api/wallet")).body, { awarded: 0, royalties: 0, podium: 0, bought: 0, paid: false });
+    const w = (await call(d, amy, "POST", "/api/wallet")).body;
+    ok("somebody who has bought nothing has bought nothing",
+       [w.bought, w.royalties, w.podium, w.paid], [0, 0, 0, false]);
   }
 
   console.log("\nA name of your own\n");
@@ -897,6 +899,59 @@ function freshDb() {
       headers: { "x-mf-id": latecomer.id, "x-mf-key": latecomer.pub, "x-mf-nonce": nonce, "x-mf-sig": sig }
     }), paid, null);
     ok("and somebody who arrives after it is over does not", (await res.json()).paid, false);
+  }
+
+  console.log("\nWhat turning up gets you\n");
+  {
+    /* more the earlier you came, tapering day by day rather than in
+       tiers - a tier makes a cliff, and somebody always arrives an hour
+       late and feels cheated */
+    const early = api.welcomeFor(Date.UTC(2026, 8, 1), {});
+    const mid = api.welcomeFor(Date.UTC(2026, 10, 15), {});
+    const late = api.welcomeFor(Date.UTC(2026, 11, 31), {});
+    const after = api.welcomeFor(Date.UTC(2027, 0, 2), {});
+    ok("the welcome shrinks as the release gets closer",
+       [early > mid, mid > late, late > after], [true, true, true]);
+    ok("and it is a thousand on the first day, a hundred after release",
+       [early, after], [1000, 100]);
+    ok("with no cliff anywhere in it - a day either side of the end is a small step",
+       Math.abs(api.welcomeFor(Date.UTC(2026, 11, 31, 23), {}) - late) < 20, true);
+  }
+  {
+    /* given once, however many times they ask */
+    const d = freshDb();
+    const amy = await player();
+    const first = (await call(d, amy, "POST", "/api/wallet")).body.welcome;
+    const again = (await call(d, amy, "POST", "/api/wallet")).body.welcome;
+    ok("it is given once, not once per visit", [first > 0, first === again], [true, true]);
+  }
+  {
+    /* and a wallet that already exists because of a royalty must not
+       lock somebody out of a welcome they never had */
+    const d = freshDb();
+    const amy = await player();
+    d.sqlite.prepare("INSERT INTO wallets (player_id, royalties) VALUES (?, 40)").run(amy.id);
+    const w = (await call(d, amy, "POST", "/api/wallet")).body;
+    ok("a royalty paid before the welcome does not swallow it",
+       [w.royalties, w.welcome > 0], [40, true]);
+  }
+  {
+    /* it does not make the beta a bottomless supply - it is one grant */
+    const d = freshDb();
+    const amy = await player();
+    const beta = { DB: d.DB, NOW: () => Date.UTC(2026, 8, 15), EMAIL_SALT: "pepper" };
+    const ask = async () => {
+      const n = await api.handle(new Request(ORIGIN + "/api/nonce"), beta, null);
+      const { nonce } = await n.json();
+      const sig = await amy.sign(api.claimText("POST", "/api/wallet", nonce, ""));
+      const res = await api.handle(new Request(ORIGIN + "/api/wallet", {
+        method: "POST",
+        headers: { "x-mf-id": amy.id, "x-mf-key": amy.pub, "x-mf-nonce": nonce, "x-mf-sig": sig }
+      }), beta, null);
+      return (await res.json()).welcome;
+    };
+    const a = await ask(), b = await ask(), c = await ask();
+    ok("asking three times in the beta still gets one welcome", [a === b, b === c], [true, true]);
   }
 
   console.log("\n" + pass + " passed, " + fail + " failed");

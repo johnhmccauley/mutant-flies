@@ -185,7 +185,13 @@ CREATE UNIQUE INDEX IF NOT EXISTS authors_one_each ON authors (player_id);
 CREATE TABLE IF NOT EXISTS wallets (
   player_id TEXT PRIMARY KEY,
   royalties INTEGER NOT NULL DEFAULT 0,
-  podium    INTEGER NOT NULL DEFAULT 0
+  podium    INTEGER NOT NULL DEFAULT 0,
+  -- What they were given for turning up, once, sized by how early that
+  -- was. Minus one means they have not been given it yet, which is the
+  -- difference between "nothing yet" and "nothing, and that was the
+  -- answer" - a wallet row already made by a royalty must not lock
+  -- somebody out of a welcome they never had.
+  welcome   INTEGER NOT NULL DEFAULT -1
 );
 
 -- Every store sends the same purchase more than once - a retried

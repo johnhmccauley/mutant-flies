@@ -34,6 +34,20 @@
      read - what people have built, what it is called, how it is rated,
      how many have played it. You just cannot open any of it.
 
+     DURING THE BETA the editor is open from the first cellar, because
+     the beta wants people building things and finding out what is wrong
+     with the editor, and making them play five cellars first only means
+     fewer of them do it.
+
+     PUBLISHING is not part of that. Putting a level in front of other
+     people needs the fifth cellar, beta or no beta, and the reason is
+     nothing to do with money: somebody who has not played the game has
+     not got the measure of it, and a catalogue whose first hundred
+     entries were built by people who had never seen a wasp is a
+     catalogue nobody comes back to. So the editor opens early and the
+     door out of it does not - what you build before the fifth cellar is
+     yours, and stays private until you have been down there.
+
      Showing the locked thing rather than hiding it is deliberate. A
      player who cannot see what is behind the paywall has no reason to
      go through it, and a menu that grows a new item the moment you pay
@@ -61,18 +75,23 @@
     /* everything is open until the beta ends, and everybody who played
        in it keeps what they had - the server hands out the key */
     var paid = !!who.paid || inBeta(now);
+    var beta = inBeta(now);
+    var deepEnough = reached >= EDITOR_AT;
     return {
       freeCellars: FREE_CELLARS,
-      /* the editor is in the menu from here, working or not */
-      editorShown: reached >= EDITOR_AT,
-      editorEnabled: reached >= EDITOR_AT && paid,
+      /* open to everybody during the beta; earned afterwards */
+      editorShown: deepEnough || beta,
+      editorEnabled: (deepEnough || beta) && paid,
+      /* but going public is earned either way - see above */
+      canPublish: deepEnough && paid,
+      publishNeeds: deepEnough ? null : ("reach cellar " + EDITOR_AT + " before putting a level in front of anybody"),
       /* it arrives with the editor and is readable but never playable */
       catalogueShown: reached >= EDITOR_AT,
       cataloguePlayable: paid,
       /* and the descent itself stops at the fifth cellar */
       canDescendTo: paid ? Infinity : FREE_CELLARS,
       paid: paid,
-      beta: inBeta(now),
+      beta: beta,
       betaEnds: BETA_ENDS
     };
   }
@@ -182,6 +201,7 @@
     return gate(who, now).editorEnabled;
   }
   function canCreate(who, now) { return gate(who, now).editorEnabled; }
+  function canPublish(who, now) { return gate(who, now).canPublish; }
 
   var MOVES = {};
   MOVES[PRIVATE] = [PUBLIC];
@@ -227,7 +247,7 @@
     PRIVATE: PRIVATE, PUBLIC: PUBLIC, HIDDEN: HIDDEN,
     FREE_CELLARS: FREE_CELLARS, EDITOR_AT: EDITOR_AT,
     BETA_ENDS: BETA_ENDS, inBeta: inBeta,
-    gate: gate, canDescend: canDescend, canCreate: canCreate,
+    gate: gate, canDescend: canDescend, canCreate: canCreate, canPublish: canPublish,
     stars: stars, rank: rank, plays: plays, sortLevels: sortLevels, SORTS: SORTS,
     PRIOR: PRIOR, PRIOR_WEIGHT: PRIOR_WEIGHT,
     visibleTo: visibleTo, canPlay: canPlay, canDelete: canDelete,

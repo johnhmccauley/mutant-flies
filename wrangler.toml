@@ -33,6 +33,9 @@ simple = { limit = 120, period = 60 }
 # SECRETS, none of which belong in this file. Set each with
 #   wrangler secret put NAME
 #
+#   BETA_FROM              optional. When the beta started, which is what
+#                          the welcome grant tapers from. 1 September
+#                          2026 without setting anything.
 #   BETA_UNTIL             optional. The beta ends on 1 January 2027 at
 #                          midnight Central without setting anything;
 #                          this moves that date without shipping code.

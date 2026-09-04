@@ -323,6 +323,7 @@
     <div class="row">
       <button class="go" id="continue" type="button" hidden>Continue</button>
       <button class="go" id="start" type="button">Go down</button>
+      <button class="go quiet" id="build" type="button" hidden>Build a cellar</button>
     </div>
     <p class="fine" id="record"></p>
     <p class="fine" id="betaSays"></p>
@@ -4848,6 +4849,20 @@
      read - what people have built, what it is called, how it is rated,
      how many have played it. You just cannot open any of it.
 
+     DURING THE BETA the editor is open from the first cellar, because
+     the beta wants people building things and finding out what is wrong
+     with the editor, and making them play five cellars first only means
+     fewer of them do it.
+
+     PUBLISHING is not part of that. Putting a level in front of other
+     people needs the fifth cellar, beta or no beta, and the reason is
+     nothing to do with money: somebody who has not played the game has
+     not got the measure of it, and a catalogue whose first hundred
+     entries were built by people who had never seen a wasp is a
+     catalogue nobody comes back to. So the editor opens early and the
+     door out of it does not - what you build before the fifth cellar is
+     yours, and stays private until you have been down there.
+
      Showing the locked thing rather than hiding it is deliberate. A
      player who cannot see what is behind the paywall has no reason to
      go through it, and a menu that grows a new item the moment you pay
@@ -4875,18 +4890,23 @@
     /* everything is open until the beta ends, and everybody who played
        in it keeps what they had - the server hands out the key */
     var paid = !!who.paid || inBeta(now);
+    var beta = inBeta(now);
+    var deepEnough = reached >= EDITOR_AT;
     return {
       freeCellars: FREE_CELLARS,
-      /* the editor is in the menu from here, working or not */
-      editorShown: reached >= EDITOR_AT,
-      editorEnabled: reached >= EDITOR_AT && paid,
+      /* open to everybody during the beta; earned afterwards */
+      editorShown: deepEnough || beta,
+      editorEnabled: (deepEnough || beta) && paid,
+      /* but going public is earned either way - see above */
+      canPublish: deepEnough && paid,
+      publishNeeds: deepEnough ? null : ("reach cellar " + EDITOR_AT + " before putting a level in front of anybody"),
       /* it arrives with the editor and is readable but never playable */
       catalogueShown: reached >= EDITOR_AT,
       cataloguePlayable: paid,
       /* and the descent itself stops at the fifth cellar */
       canDescendTo: paid ? Infinity : FREE_CELLARS,
       paid: paid,
-      beta: inBeta(now),
+      beta: beta,
       betaEnds: BETA_ENDS
     };
   }
@@ -4996,6 +5016,7 @@
     return gate(who, now).editorEnabled;
   }
   function canCreate(who, now) { return gate(who, now).editorEnabled; }
+  function canPublish(who, now) { return gate(who, now).canPublish; }
 
   var MOVES = {};
   MOVES[PRIVATE] = [PUBLIC];
@@ -5041,7 +5062,7 @@
     PRIVATE: PRIVATE, PUBLIC: PUBLIC, HIDDEN: HIDDEN,
     FREE_CELLARS: FREE_CELLARS, EDITOR_AT: EDITOR_AT,
     BETA_ENDS: BETA_ENDS, inBeta: inBeta,
-    gate: gate, canDescend: canDescend, canCreate: canCreate,
+    gate: gate, canDescend: canDescend, canCreate: canCreate, canPublish: canPublish,
     stars: stars, rank: rank, plays: plays, sortLevels: sortLevels, SORTS: SORTS,
     PRIOR: PRIOR, PRIOR_WEIGHT: PRIOR_WEIGHT,
     visibleTo: visibleTo, canPlay: canPlay, canDelete: canDelete,
@@ -6584,6 +6605,9 @@ var FX = {
    ================================================================== */
 var game = new MF.Game();
 var mode = "title";          /* title | play | paused | won | over | edit */
+/* what has been pressed since the last turn, whether or not it is still
+   down - so a tap between two turns is not thrown away */
+var tapped = {};
 var edAcc = 0, edPainted = false;
 var held = {}, turnAcc = 0;
 var manPos = new THREE.Vector3(), manWant = new THREE.Vector3();
@@ -6993,6 +7017,33 @@ var titleWalkers = [];
    is the one people mind. Once the date has passed this says nothing,
    because then it is just the price.
    ------------------------------------------------------------------ */
+/* ------------------------------------------------------------------
+   The way in.
+
+   There was not one. Every call to the editor was from inside the
+   editor, so the only way to open it was to type edEnter() into a
+   console - which is fine for the person who wrote it and no use at all
+   to anybody else. A game with an editor nobody can reach does not have
+   an editor.
+
+   It sits on the title screen next to Go down, and it appears when the
+   gate says it should: during the beta that is always, and after it,
+   once somebody has been down five cellars.
+   ------------------------------------------------------------------ */
+function showDoor() {
+  var b = $("build");
+  if (!b) return;
+  var save = MF.save.read() || {};
+  var g = MutantCatalogue.gate({
+    id: "local", reached: save.deepest || 1, paid: false, played: {}
+  }, Date.now());
+  b.hidden = !g.editorShown;
+  b.disabled = !g.editorEnabled;
+  b.title = !g.editorEnabled ? "Reach the fifth cellar to open the editor"
+    : g.canPublish ? "Make a cellar of your own"
+    : "Make a cellar of your own - " + g.publishNeeds;
+}
+
 function sayBeta() {
   var el = $("betaSays");
   if (!el) return;
@@ -7008,6 +7059,7 @@ function sayBeta() {
 function enterTitle() {
   mode = "title";
   sayBeta();
+  showDoor();
   $("hud").hidden = true; plan.hidden = true; $("hint").hidden = true;
   $("banner").hidden = true;
   $("overSheet").hidden = true; $("pauseSheet").hidden = true;
@@ -7145,7 +7197,10 @@ function restartCellar() {
 function turn() {
   var dir = null;
   if (ai.on) dir = MutantBot.play(game, null);
-  else for (var i = 0; i < PRIORITY.length; i++) if (held[PRIORITY[i]]) { dir = PRIORITY[i]; break; }
+  else for (var i = 0; i < PRIORITY.length; i++) {
+    if (held[PRIORITY[i]] || tapped[PRIORITY[i]]) { dir = PRIORITY[i]; break; }
+  }
+  tapped = {};                 /* whatever was waiting has now had its turn */
   var ev = game.step(dir);
 
   /* the drone, once a turn, each kind at its own pitch - a cellar with
@@ -7750,6 +7805,11 @@ function edLoadCode() {
 /* --- publishing --------------------------------------------------- */
 function edPublish() {
   if (!ed.id) return edSay("save it first", "bad");
+  var save = MF.save.read() || {};
+  var g = MutantCatalogue.gate({ id: "local", reached: save.deepest || 1,
+                                 paid: false, played: {} }, Date.now());
+  /* the editor opens early in the beta; the door out of it does not */
+  if (!g.canPublish) return edSay(g.publishNeeds + " - it is saved here, and the Code button will send it to anybody", "bad");
   edSay("sending it up...");
   catalogueSend(ed).then(function (r) {
     if (r.ok) { ed.state = "public"; ed.everPublic = true; edSay("published - other people can find it now", "good"); }
@@ -7787,7 +7847,12 @@ var KEYMAP = { "z": "left", "arrowleft": "left", "x": "right", "arrowright": "ri
                ":": "up", ";": "up", "arrowup": "up", "/": "down", "arrowdown": "down" };
 addEventListener("keydown", function (e) {
   var k = e.key.toLowerCase(), a = KEYMAP[k];
-  if (a) { e.preventDefault(); held[a] = true; Beeb.wake(); return; }
+  /* Latch it as well as hold it. A turn samples what is held when the
+     turn comes round, so a quick tap that starts and ends between two
+     turns was simply lost - press, nothing happens, press again. The
+     latch survives until a turn has consumed it, so no press is ever
+     dropped however briefly it was made. */
+  if (a) { e.preventDefault(); held[a] = true; tapped[a] = true; Beeb.wake(); return; }
   if (k === " ") {
     e.preventDefault();
     /* the browser repeats a held key for us, which is the hold gesture
@@ -7817,6 +7882,11 @@ addEventListener("keydown", function (e) {
     return;
   }
   if (k === "d") { e.preventDefault(); dbgToggle(); return; }
+  if (k === "b" && (mode === "title" || mode === "play" || mode === "paused")) {
+    /* straight into the editor from anywhere, which is what somebody
+       testing the thing actually wants */
+    e.preventDefault(); edEnter(null); return;
+  }
   if (k === "p") { pause(mode === "play"); return; }
   if (k === "r" && (mode === "play" || mode === "paused")) { restartCellar(); return; }
   if (k === "m") { Beeb.on = !Beeb.on; return; }
@@ -7827,13 +7897,14 @@ addEventListener("keydown", function (e) {
 });
 addEventListener("keyup", function (e) {
   var a = KEYMAP[e.key.toLowerCase()];
-  if (a) held[a] = false;
+  if (a) held[a] = false;      /* tapped stays until a turn has used it */
   if (e.key === " ") { ed.liftN = 0; ed.liftAt = ""; }   /* the pull ended */
 });
-addEventListener("blur", function () { held = {}; if (mode === "play") pause(true); });
+addEventListener("blur", function () { held = {}; tapped = {}; if (mode === "play") pause(true); });
 
 
   /* the editor's buttons */
+  if ($("build")) $("build").addEventListener("click", function () { edEnter(null); });
   var edWire = {
     edSave: edSave, edOpen: edList, edNew: function () { edEnter(null); },
     edUndo: function () { edStepBack(ed.undo, ed.redo); },
@@ -8011,8 +8082,9 @@ function frame() {
     while (edAcc >= 110) {
       edAcc -= 110;
       var walking = false;
-      for (var ei = 0; ei < PRIORITY.length; ei++) if (held[PRIORITY[ei]]) {
+      for (var ei = 0; ei < PRIORITY.length; ei++) if (held[PRIORITY[ei]] || tapped[PRIORITY[ei]]) {
         walking = true;
+        tapped = {};
         var d = { left: [-1, 0], right: [1, 0], up: [0, 1], down: [0, -1] }[PRIORITY[ei]];
         var nc = game.manC + d[0], nr = game.manR + d[1];
         if (game.inField(nc, nr)) {

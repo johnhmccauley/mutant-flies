@@ -57,6 +57,56 @@ function betaEnds(env) {
   return BETA_ENDS;
 }
 function inBeta(env, now) { return now < betaEnds(env); }
+
+/* ------------------------------------------------------------------
+   WHAT YOU ARE GIVEN FOR TURNING UP
+
+   A handful of credits, once, and more of them the earlier you came.
+   Somebody who plays it in September is doing something for the game -
+   finding what is broken in it, telling somebody about it - that
+   somebody arriving the week before it goes paid is not. So the welcome
+   starts generous and tapers, day by day, to what a new player gets
+   after release.
+
+   Day by day rather than in tiers on purpose. Tiers create a cliff, a
+   cliff creates a rush at the edge of it, and somebody always turns up
+   an hour late and feels cheated. A straight line has no edge to be on
+   the wrong side of.
+
+   It does NOT make the beta an unlimited supply. It is one grant, of
+   one size, once - a few lives and a robot at the start, and after that
+   credits come the way they always do: by playing, by other people
+   playing what you built, or by buying them.
+   ------------------------------------------------------------------ */
+const WELCOME_EARLY = 1000;      /* the first day of the beta */
+const WELCOME_AFTER = 100;       /* the standing grant once it is paid for */
+const BETA_STARTS = Date.UTC(2026, 8, 1);        /* 1 September 2026 */
+
+export function welcomeFor(now, env) {
+  const ends = betaEnds(env);
+  const starts = (env && env.BETA_FROM && isFinite(Date.parse(env.BETA_FROM)))
+    ? Date.parse(env.BETA_FROM) : BETA_STARTS;
+  if (now >= ends) return WELCOME_AFTER;
+  if (now <= starts) return WELCOME_EARLY;
+  const through = (now - starts) / (ends - starts);
+  return Math.round(WELCOME_EARLY + (WELCOME_AFTER - WELCOME_EARLY) * through);
+}
+
+/* Given once. The CASE is what makes it once: a wallet row that already
+   exists because somebody was paid a royalty still has welcome at minus
+   one, and this fills it in; a row that has already been welcomed is
+   left exactly as it is. */
+async function welcome(db, playerId, now, env) {
+  const amount = welcomeFor(now, env);
+  await db.prepare(
+    "INSERT INTO wallets (player_id, welcome) VALUES (?, ?)" +
+    " ON CONFLICT(player_id) DO UPDATE SET welcome =" +
+    " CASE WHEN wallets.welcome < 0 THEN excluded.welcome ELSE wallets.welcome END")
+    .bind(playerId, amount).run();
+  const row = await db.prepare("SELECT welcome FROM wallets WHERE player_id = ?")
+    .bind(playerId).first();
+  return (row && row.welcome > 0) ? row.welcome : 0;
+}
 const ROYALTY = 2;                      /* must match src/credits.js */
 const PODIUM = [
   { place: "gold", award: 1000 },
@@ -393,7 +443,7 @@ function lastMonth(now) {
    so following a purchase to a second machine counts it again rather
    than granting it again, and there is nothing to grant twice. */
 async function walletOf(db, playerId) {
-  const w = await db.prepare("SELECT royalties, podium FROM wallets WHERE player_id = ?")
+  const w = await db.prepare("SELECT royalties, podium, welcome FROM wallets WHERE player_id = ?")
     .bind(playerId).first();
   const claim = await db.prepare("SELECT who_key FROM claims WHERE player_id = ?")
     .bind(playerId).first();
@@ -406,7 +456,9 @@ async function walletOf(db, playerId) {
   }
   const royalties = (w && w.royalties) || 0;
   const podium = (w && w.podium) || 0;
-  return { awarded: royalties + podium, royalties, podium, bought, paid: !!claim };
+  const given = (w && w.welcome > 0) ? w.welcome : 0;
+  return { awarded: royalties + podium + given,
+           royalties, podium, welcome: given, bought, paid: !!claim };
 }
 
 /* ------------------------------------------------------------------
@@ -559,6 +611,7 @@ export async function handle(req, env, ctx) {
   /* --- who am I, and what have I got ------------------------------ */
   if (path === "/api/me" && req.method === "POST") {
     const paid = await hasPaid(db, who.id, env, now);
+    const given = await welcome(db, who.id, now, env);
     const called = await authorOf(db, who.id);
     const mine = (await db.prepare(
       "SELECT * FROM levels WHERE owner = ? ORDER BY created DESC LIMIT 200")
@@ -567,6 +620,7 @@ export async function handle(req, env, ctx) {
                   authorId: called ? called.uuid : null,
                   /* said out loud, so the game can say it too */
                   beta: inBeta(env, now), betaUntil: betaEnds(env),
+                  welcome: given, welcomeNow: welcomeFor(now, env),
                   levels: mine.map(publicShape) });
   }
 
@@ -734,6 +788,7 @@ export async function handle(req, env, ctx) {
 
   /* --- what the server says you are owed -------------------------- */
   if (path === "/api/wallet" && req.method === "POST") {
+    await welcome(db, who.id, now, env);
     return json(await walletOf(db, who.id));
   }
 
@@ -896,4 +951,5 @@ export async function storeHook(req, env, provider) {
 /* kept under its old name because that is what the route is called */
 export function stripeHook(req, env) { return storeHook(req, env, "stripe"); }
 
-export const _test = { appKeyOk, betaEnds, inBeta, BETA_ENDS };
+export const _test = { appKeyOk, betaEnds, inBeta, BETA_ENDS,
+                       WELCOME_EARLY, WELCOME_AFTER, BETA_STARTS };
