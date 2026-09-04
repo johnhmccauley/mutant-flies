@@ -257,13 +257,23 @@
   background: linear-gradient(to top, rgba(12,9,7,.98), rgba(12,9,7,.86));
   border-top: 1px solid #3a2e22; padding: 6px 8px 7px;
   font-family: "IBM Plex Mono", ui-monospace, monospace; }
-#edBar .edRow { display: flex; gap: 5px; align-items: center; }
+#edBar .edRow { display: flex; gap: 5px 6px; align-items: center; flex-wrap: wrap; }
 #edBar .edRow + .edRow { margin-top: 5px; }
-/* one row, and it scrolls rather than wrapping the game off the screen */
-#edTools { display: flex; gap: 3px; flex: 1 1 auto; overflow-x: auto;
-  scrollbar-width: thin; padding-bottom: 2px; }
+/* Wrapping, not scrolling: twenty-three tools in one row needed 1674
+   pixels and hid more than half of themselves on any normal screen. */
+#edTools { display: flex; gap: 4px 10px; flex: 1 1 auto; flex-wrap: wrap;
+  align-items: center; max-height: 30vh; overflow-y: auto; overflow-x: hidden; }
+.edGroup { display: flex; gap: 3px; align-items: center; flex-wrap: wrap;
+  padding: 2px 6px 2px 0; border-right: 1px solid #2b2219; }
+.edGroup:last-child { border-right: 0; }
+.edGroupName { font-size: 9px; letter-spacing: .12em; text-transform: uppercase;
+  color: #6b6053; margin-right: 3px; }
+.edGroup.here .edGroupName { color: #b98c3e; }
+/* its own name: edPic was already taken by the level list thumbnail,
+   which is 96x60 and declared later, so it quietly won */
+.edToolPic { width: 18px; height: 18px; border-radius: 2px; display: block; flex: 0 0 auto; }
 .edTool { background: #1d1712; border: 1px solid #372c21; color: #b8ab99;
-  border-radius: 3px; padding: 3px 6px; font: inherit; font-size: 10px;
+  border-radius: 3px; padding: 2px 6px; font: inherit; font-size: 10px;
   line-height: 1.35; cursor: pointer; white-space: nowrap; flex: 0 0 auto;
   display: flex; gap: 4px; align-items: center; }
 .edTool:hover { border-color: #6b5640; color: #efe4d2; }
@@ -280,7 +290,46 @@
   cursor: pointer; white-space: nowrap; flex: 0 0 auto; }
 .edBtn:hover { border-color: #b98c3e; color: #ffe6b8; }
 .edBtn.warm { border-color: #7a5a2a; color: #ffd27a; }
-#edSay { font-size: 10px; color: #9d8f7c; margin-left: auto; text-align: right;
+/* Six different jobs were sitting in one undifferentiated row, with the
+   way out next to the button you press hundreds of times. */
+.edSet { display: flex; gap: 3px; padding-right: 9px; margin-right: 3px;
+  border-right: 1px solid #2b2219; }
+.edBtn.away { margin-left: auto; color: #9d8f7c; }
+/* the sets wrap as units rather than splitting down the middle */
+.edSet { flex: 0 0 auto; }
+/* The message line lives up top now, with the whole width to itself.
+   Squeezed on to the end of the button row it was measured at nought
+   pixels wide against a four-hundred-pixel message - and it is the only
+   thing the editor has to talk with: level faults, what the bot made of
+   it, a browser refusing to save. */
+#edTop { position: fixed; left: 0; right: 0; top: 0; z-index: 40;
+  display: flex; gap: 4px 10px; align-items: baseline; flex-wrap: wrap;
+  padding: 7px 12px 8px;
+  background: linear-gradient(to bottom, rgba(12,9,7,.97), rgba(12,9,7,.80));
+  border-bottom: 1px solid #3a2e22;
+  font-family: "IBM Plex Mono", ui-monospace, monospace; font-size: 11px; }
+#edTop .edWhat { color: #efe4d2; font-weight: 600; max-width: 30ch;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 0 1 auto;
+  min-width: 8ch; }
+#edTop .edDot { width: 7px; height: 7px; border-radius: 50%; background: #b98c3e;
+  flex: 0 0 auto; align-self: center; visibility: hidden; }
+#edTop .edDot.on { visibility: visible; }
+#edTop .edFacts { color: #8e8172; white-space: nowrap; }
+/* A standing instruction, not a message. The one line telling you how
+   the editor works was in the status line, so the first fault or bot
+   result wiped it - and then nothing anywhere said the little figure
+   was the pointer. */
+/* Wraps rather than hides. It was set to disappear below 900px, which
+   is precisely the width where somebody is most likely to be lost and
+   least likely to guess - the instruction has to survive the narrow
+   window, not be the first thing dropped from it. It does stand down
+   once a builder has plainly got the idea. */
+#edTop .edHow { color: #6f6456; }
+#edTop.gotIt .edHow { display: none; }
+/* it takes the rest of the line, and takes a line of its own rather
+   than being crushed when there is not room - it is the only thing the
+   editor has to talk with */
+#edSay { color: #b3a691; flex: 1 1 24ch; text-align: right;
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 #edSay .bad { color: #e0785c; }
 #edSay .good { color: #8fc07a; }
@@ -417,6 +466,20 @@
 
 
 <!-- The editor. Hidden until a cellar deep enough opens it. -->
+<!-- The editor's own header. The game's HUD - score, best, moves,
+     what you are carrying - is about a run, and there is no run here:
+     it read zero, zero, zero and a dash the whole time you were
+     building, which is noise sitting on the most valuable strip of the
+     screen. This says what you are actually working on. -->
+<div id="edTop" hidden>
+  <span class="edWhat" id="edTitle">untitled</span>
+  <span class="edDot" id="edDirty" title="unsaved changes"></span>
+  <span class="edFacts" id="edFacts"></span>
+  <span class="edHow">Click a square to put the tool down &middot; drag to draw &middot;
+    hold on Raise to grow a hill</span>
+  <span id="edSay"></span>
+</div>
+
 <div id="edBar" hidden>
   <div class="edRow">
     <div id="edTools"></div>
@@ -438,7 +501,6 @@
             title="Lay as you walk, instead of pressing space on every square">Paint</button>
     <button class="edBtn" id="edStampBtn" type="button" title="Same as space">Put down</button>
     <button class="edBtn" id="edQuit" type="button">Leave</button>
-    <div id="edSay"></div>
   </div>
 </div>
 
@@ -5875,10 +5937,45 @@ function init3D() {
   scene = new THREE.Scene();
   scene.background = new THREE.Color(0x070605);
   scene.fog = new THREE.FogExp2(0x0d0a07, 0.020);
+  FOG_PLAY = 0.020;
   camera = new THREE.PerspectiveCamera(50, 1, 0.1, 220);
   clock = new THREE.Clock();
 
-  scene.add(new THREE.HemisphereLight(0x342c1d, 0x0d0a08, 0.52));
+  skyLight = new THREE.HemisphereLight(0x342c1d, 0x0d0a08, 0.52);
+  scene.add(skyLight);
+
+  /* A light to build by.
+
+     Playing, the cellar is meant to be dark: thick fog and one lamp
+     following the man, so what is coming at you out of the murk is the
+     whole tension of the game. Building, it is the opposite job - you
+     are looking at a whole 34 by 26 floor from sixty feet up, and at
+     that range the fog swallows about nine tenths of it and the man's
+     lamp does not reach the far wall. It went black the moment the
+     camera pulled back far enough to show everything.
+
+     So the wide editor view lifts the room into a drafting light and
+     thins the fog to almost nothing. It fades back the instant you drop
+     into the close view to see what a corner really looks like - which
+     is what that view is for. */
+  edSun = new THREE.DirectionalLight(0xffe6c4, 0);
+  edSun.position.set(COLS * 0.35, 46, ROWS * 0.8);
+  scene.add(edSun);
+
+  /* The square you are pointing at.
+
+     Clicking a square is no use if you cannot tell which square you are
+     about to hit - from sixty feet up, on a floor of nine hundred
+     identical tiles, a guess is all you would have. The marker sits on
+     the tile's own surface, so on a raised one it stands up with it and
+     you can see the height you are about to change. */
+  edCursor = new THREE.LineSegments(
+    new THREE.EdgesGeometry(new THREE.BoxGeometry(0.98, 0.3, 0.98)),
+    new THREE.LineBasicMaterial({ color: 0xffd27a, transparent: true, opacity: 0.85,
+                                  depthTest: false }));
+  edCursor.renderOrder = 9;
+  edCursor.visible = false;
+  scene.add(edCursor);
   keyLight = new THREE.SpotLight(0xffb163, 3.6, 40, 0.9, 0.5, 1.05);
   keyLight.castShadow = true;
   keyLight.shadow.mapSize.set(1024, 1024);
@@ -6690,6 +6787,7 @@ var mode = "title";          /* title | play | paused | won | over | edit */
    down - so a tap between two turns is not thrown away */
 var tapped = {};
 var edAcc = 0, edPainted = false;
+var skyLight = null, edSun = null, edCursor = null, FOG_PLAY = 0.020, edLit = 0;
 var held = {}, turnAcc = 0;
 var manPos = new THREE.Vector3(), manWant = new THREE.Vector3();
 var manFace = 0, manFaceWant = 0;
@@ -6735,6 +6833,21 @@ function syncEdges() {
     if (wall) placeAt(props.edgeWall, nW++, c, r, 1.7);
     else placeAt(props.edgeLip, nL++, c, r, 0.13);
   }
+  if (game.shape) {
+    /* every square that is not in the level but touches one is a piece
+       of its boundary, wherever that boundary happens to run */
+    for (var r2 = 0; r2 < ROWS; r2++) for (var c2 = 0; c2 < COLS; c2++) {
+      if (game.shape[r2 * COLS + c2]) continue;
+      var touches = false;
+      for (var d = 0; d < 4; d++) {
+        var dd = [[1, 0], [-1, 0], [0, 1], [0, -1]][d];
+        var nc = c2 + dd[0], nr = r2 + dd[1];
+        if (nc < 0 || nr < 0 || nc >= COLS || nr >= ROWS) continue;
+        if (game.shape[nr * COLS + nc]) touches = true;
+      }
+      if (touches) put(c2, r2);
+    }
+  }
   for (var r = 0; r < ROWS; r++) { put(-1, r); put(COLS, r); }
   for (var c = 0; c < COLS; c++) { put(c, ROWS); }
   /* the near edge is the kerb the camera looks over, drawn already */
@@ -6745,6 +6858,9 @@ function syncEdges() {
 function syncTerrain() {
   var n = [0, 0, 0], col = new THREE.Color();
   for (var r = 0; r < ROWS; r++) for (var c = 0; c < COLS; c++) {
+    /* a square that has been cut out of the level has no floor at all,
+       which is how a builder sees the shape they are making */
+    if (game.shape && !game.shape[r * COLS + c]) continue;
     var lvl = game.height[r * COLS + c];
     var h = lvl * STEP, thick = 1 + h;
     var a = hash2(c, r), b = hash2(r + 91, c + 17);
@@ -7467,7 +7583,9 @@ var ed = {
   undo: [], redo: [], painting: false,
   /* how long the current pull has been going on. Not a setting - it is
      reset the moment the key comes up or the cursor moves. */
-  liftN: 0, liftAt: ""
+  liftN: 0, liftAt: "",
+  /* the editor starts looking at the whole room */
+  wide: true
 };
 var UNDO_DEEP = 40;
 
@@ -7501,51 +7619,96 @@ function edButtons() {
   if (pt) pt.setAttribute("aria-pressed", ed.painting ? "true" : "false");
 }
 
+/* ------------------------------------------------------------------
+   THE PALETTE
+
+   Twenty-three tools in one scrolling row needed 1674 pixels: ten of
+   them visible on a laptop, five on a phone, and the rest reachable
+   only by dragging a scrollbar. A tool you cannot see is a tool you do
+   not use, so half the editor did not exist.
+
+   They are grouped now - ground, liquid, kit, monsters, shape - and the
+   row wraps instead of scrolling, so the whole palette is in front of
+   you at any width worth building on. Grouping also does the job the
+   old flat list could not: it tells you what kind of thing each one is
+   before you read its name.
+
+   And the shortcuts have a system at last. The old set was 1-9, then
+   q w e t, then f s b a n, then g + - h c, which is not a scheme, it
+   is a queue. Now: the number keys pick within the group you are in,
+   and the bracket keys walk the groups. Two things to know instead of
+   twenty-three.
+   ------------------------------------------------------------------ */
+var ED_GROUPS = ["Ground", "Liquid", "Kit", "Monsters", "Shape"];
+
 var ED_TOOLS = [
-  { name: "Erase",     key: "1", swatch: "#2a231c", act: "cell", v: 0 },
-  { name: "Brick",     key: "2", swatch: "#b8462e", act: "cell", v: 1 },
-  { name: "Rock",      key: "3", swatch: "#8d8578", act: "cell", v: 8 },
-  { name: "Tree",      key: "4", swatch: "#2f4a24", act: "cell", v: 2 },
-  { name: "Marble",    key: "5", swatch: "#cfd6dd", act: "marble" },
-  { name: "Tar vat",   key: "6", swatch: "#4a2410", act: "cell", v: 4 },
-  { name: "Water vat", key: "7", swatch: "#2a5f7a", act: "cell", v: 5 },
-  { name: "Set tar",   key: "8", swatch: "#14100e", act: "cell", v: 6 },
-  { name: "Chopper",   key: "9", swatch: "#6b6b74", act: "cell", v: 7 },
-  { name: "Boots",     key: "q", swatch: "#a86b32", act: "item", v: 1 },
-  { name: "Frost",     key: "w", swatch: "#7fb6d8", act: "item", v: 2 },
-  { name: "Saw",       key: "e", swatch: "#c8c0a8", act: "item", v: 3 },
-  { name: "Jar",       key: "t", swatch: "#8a7fb0", act: "item", v: 4 },
-  { name: "Fly",       key: "f", swatch: "#3d63c4", act: "mob", v: "fly" },
-  { name: "Spider",    key: "s", swatch: "#6b4a2a", act: "mob", v: "spider" },
-  { name: "Beetle",    key: "b", swatch: "#2c6a3a", act: "mob", v: "beetle" },
-  { name: "Wasp",      key: "a", swatch: "#c8a017", act: "mob", v: "wasp" },
-  { name: "Snake",     key: "n", swatch: "#4c8a2e", act: "mob", v: "snake" },
-  { name: "Start",     key: "g", swatch: "#ffd27a", act: "man" },
-  { name: "Raise",     key: "+", swatch: "#7a6a52", act: "hi", v: 1 },
-  { name: "Lower",     key: "-", swatch: "#4a4034", act: "hi", v: -1 },
-  { name: "Wall/drop", key: "h", swatch: "#574c42", act: "edge" },
-  { name: "Paint floor", key: "c", swatch: "#8a6a3a", act: "tint" }
+  { name: "Erase",     group: 0, swatch: "#2a231c", act: "cell", v: 0 },
+  { name: "Brick",     group: 0, swatch: "#b8462e", act: "cell", v: 1 },
+  { name: "Rock",      group: 0, swatch: "#8d8578", act: "cell", v: 8 },
+  { name: "Tree",      group: 0, swatch: "#2f4a24", act: "cell", v: 2 },
+  { name: "Marble",    group: 0, swatch: "#cfd6dd", act: "marble" },
+  { name: "Tar vat",   group: 1, swatch: "#4a2410", act: "cell", v: 4 },
+  { name: "Water vat", group: 1, swatch: "#2a5f7a", act: "cell", v: 5 },
+  { name: "Set tar",   group: 1, swatch: "#14100e", act: "cell", v: 6 },
+  { name: "Chopper",   group: 0, swatch: "#6b6b74", act: "cell", v: 7 },
+  { name: "Boots",     group: 2, swatch: "#a86b32", act: "item", v: 1 },
+  { name: "Frost",     group: 2, swatch: "#7fb6d8", act: "item", v: 2 },
+  { name: "Saw",       group: 2, swatch: "#c8c0a8", act: "item", v: 3 },
+  { name: "Jar",       group: 2, swatch: "#8a7fb0", act: "item", v: 4 },
+  { name: "Fly",       group: 3, swatch: "#3d63c4", act: "mob", v: "fly" },
+  { name: "Spider",    group: 3, swatch: "#6b4a2a", act: "mob", v: "spider" },
+  { name: "Beetle",    group: 3, swatch: "#2c6a3a", act: "mob", v: "beetle" },
+  { name: "Wasp",      group: 3, swatch: "#c8a017", act: "mob", v: "wasp" },
+  { name: "Snake",     group: 3, swatch: "#4c8a2e", act: "mob", v: "snake" },
+  { name: "Start",     group: 4, swatch: "#ffd27a", act: "man" },
+  { name: "Raise",     group: 4, swatch: "#7a6a52", act: "hi", v: 1 },
+  { name: "Lower",     group: 4, swatch: "#4a4034", act: "hi", v: -1 },
+  { name: "Wall/drop", group: 4, swatch: "#574c42", act: "edge" },
+  { name: "Cut out",   group: 4, swatch: "#0d0b09", act: "shape" },
+  { name: "Paint floor", group: 1, swatch: "#8a6a3a", act: "tint" }
 ];
 
 function edSay(text, cls) {
   $("edSay").innerHTML = cls ? '<span class="' + cls + '">' + text + "</span>" : text;
 }
 
+/* which tools are in a group, in palette order */
+function edGroupTools(g) {
+  var out = [];
+  ED_TOOLS.forEach(function (t, i) { if (t.group === g) out.push(i); });
+  return out;
+}
+
 function edPaint() {
   var box = $("edTools");
-  if (!box.childNodes.length) {
-    ED_TOOLS.forEach(function (t, i) {
+  var group = ED_TOOLS[ed.tool] ? ED_TOOLS[ed.tool].group : 0;
+  box.innerHTML = "";
+
+  ED_GROUPS.forEach(function (title, g) {
+    var wrap = document.createElement("div");
+    wrap.className = "edGroup" + (g === group ? " here" : "");
+    var head = document.createElement("span");
+    head.className = "edGroupName";
+    head.textContent = title;
+    wrap.appendChild(head);
+
+    edGroupTools(g).forEach(function (i, n) {
+      var t = ED_TOOLS[i];
       var b = document.createElement("button");
       b.className = "edTool";
       b.type = "button";
-      b.innerHTML = '<i class="edSwatch" style="background:' + t.swatch + '"></i>' +
-                    t.name + ' <i class="edKey">' + t.key + "</i>";
+      b.setAttribute("aria-pressed", i === ed.tool ? "true" : "false");
+      /* a monster gets its portrait; everything else the colour it is */
+      var pic = (t.act === "mob") ? monsterPortrait(t.v, 64) : null;
+      b.innerHTML = (pic ? '<img class="edToolPic" alt="" src="' + pic + '">'
+                         : '<i class="edSwatch" style="background:' + t.swatch + '"></i>') +
+                    "<span>" + t.name + "</span>" +
+                    (g === group ? ' <i class="edKey">' + (n + 1) + "</i>" : "");
+      b.title = t.name + (g === group ? "  (" + (n + 1) + ")" : "  (" + title + ")");
       b.addEventListener("click", function () { ed.tool = i; edPaint(); });
-      box.appendChild(b);
+      wrap.appendChild(b);
     });
-  }
-  Array.prototype.forEach.call(box.childNodes, function (b, i) {
-    b.setAttribute("aria-pressed", i === ed.tool ? "true" : "false");
+    box.appendChild(wrap);
   });
 }
 
@@ -7553,6 +7716,15 @@ function edPaint() {
 function edStamp(quiet) {
   if (mode !== "edit") return;
   var t = ED_TOOLS[ed.tool], c = game.manC, r = game.manR, i = r * COLS + c;
+
+  /* Nothing goes down outside the cellar. Two tools are about the
+     outside and are the exceptions: cutting a square back in, and
+     saying whether what lies beyond it is stone or a drop. Checked
+     before the undo checkpoint, so a refused stamp does not leave an
+     undo step that undoes nothing. */
+  if (!game.inField(c, r) && t.act !== "shape" && t.act !== "edge")
+    return edSay("that square is not part of the cellar - cut it back in first", "bad");
+
   /* a pull that has moved to another square is a new pull */
   if (ed.liftAt !== c + "," + r) { ed.liftN = 0; ed.liftAt = c + "," + r; }
   if (!quiet) edMark();
@@ -7623,13 +7795,55 @@ function edStamp(quiet) {
        one tool both paints and unpaints */
     game.tint[i] = (game.tint[i] === slot + 1) ? 0 : slot + 1;
     syncTerrain();
+  } else if (t.act === "shape") {
+    /* ------------------------------------------------------------
+       The outline of the cellar.
+
+       A level does not have to be the whole 34 by 26 room, and does not
+       have to be a rectangle - it is whatever squares it says it is.
+       Taking a square out makes it not part of the level at all: the
+       floor stops there, and what is beyond it is a drop until it is
+       told otherwise with Wall/drop.
+       ------------------------------------------------------------ */
+    if (!game.shape) {
+      game.shape = new Uint8Array(COLS * ROWS);
+      game.shape.fill(1);
+    }
+    if (!game.bound) game.bound = new Uint8Array(COLS * ROWS);
+    if (c === ed.startC && r === ed.startR && game.shape[i])
+      return edSay("the player has to start somewhere - move the start first", "bad");
+    game.shape[i] = game.shape[i] ? 0 : 1;
+    if (!game.shape[i]) {
+      /* nothing can be standing on a square that is not there */
+      game.grid[i] = MF.EMPTY;
+      game.item[i] = 0;
+      game.fluid[i] = MF.DRY; game.fvol[i] = 0; game.sealed[i] = 0;
+      game.monsters = game.monsters.filter(function (m) {
+        return !game.isPartOf(m, c, r);
+      });
+      game.marbles = game.marbles.filter(function (m) { return !(m.c === c && m.r === r); });
+      edRigs();
+    }
+    edSay(game.shape[i] ? "put back into the cellar" : "cut out of the cellar");
+    syncTerrain(); syncEdges();
   } else if (t.act === "edge") {
-    /* only means anything on the border, where there IS an edge */
-    var side = (c === 0) ? "W" : (c === COLS - 1) ? "E" : (r === 0) ? "S" : (r === ROWS - 1) ? "N" : null;
-    if (!side) return edSay("stand against a wall to change it", "bad");
-    var at = (side === "W" || side === "E") ? r : c;
-    game.edge[side][at] = game.edge[side][at] === MF.WALL ? MF.DROP : MF.WALL;
-    edSay("that stretch is now " + (game.edge[side][at] === MF.WALL ? "good stone" : "a drop"));
+    /* Only means anything OFF the floor - that is where an edge is. A
+       shaped level has boundaries all over it, not just four sides, so
+       what lies beyond a square is set on the square itself; without a
+       shape it is one of the four sides as before. */
+    if (game.shape || game.bound) {
+      if (!game.bound) game.bound = new Uint8Array(COLS * ROWS);
+      if (game.shape && game.shape[i])
+        return edSay("point at a square outside the cellar to wall it", "bad");
+      game.bound[i] = game.bound[i] === MF.WALL ? MF.DROP : MF.WALL;
+      edSay("beyond there is now " + (game.bound[i] === MF.WALL ? "good stone" : "a drop"));
+    } else {
+      var side = (c === 0) ? "W" : (c === COLS - 1) ? "E" : (r === 0) ? "S" : (r === ROWS - 1) ? "N" : null;
+      if (!side) return edSay("point at a square on the outside wall to change it", "bad");
+      var at = (side === "W" || side === "E") ? r : c;
+      game.edge[side][at] = game.edge[side][at] === MF.WALL ? MF.DROP : MF.WALL;
+      edSay("that stretch is now " + (game.edge[side][at] === MF.WALL ? "good stone" : "a drop"));
+    }
     syncEdges();
   }
   ed.dirty = true;
@@ -7651,12 +7865,135 @@ function edRigs() {
 }
 
 function edCount() {
-  var bricks = 0;
-  for (var i = 0; i < COLS * ROWS; i++) if (game.grid[i] === MF.BRICK) bricks++;
+  var bricks = 0, rocks = 0, painted = 0;
+  for (var i = 0; i < COLS * ROWS; i++) {
+    if (game.grid[i] === MF.BRICK) bricks++;
+    else if (game.grid[i] === MF.ROCK) rocks++;
+    if (game.tint && game.tint[i]) painted++;
+  }
   game.bricks = bricks;
   $("hBricks").textContent = bricks;
   $("hCellar").textContent = game.F;
+
+  /* what a builder actually wants to know, where the score used to be */
+  var name = ($("edName").value || "").trim();
+  $("edTitle").textContent = name || "untitled";
+  $("edDirty").className = "edDot" + (ed.dirty ? " on" : "");
+  $("edDirty").title = ed.dirty ? "unsaved changes" : "saved";
+  var bits = ["cellar " + game.F, bricks + " brick" + (bricks === 1 ? "" : "s")];
+  if (rocks) bits.push(rocks + " rock" + (rocks === 1 ? "" : "s"));
+  var loose = game.monsters.filter(function (m) { return !m.gone; }).length;
+  bits.push(loose + " monster" + (loose === 1 ? "" : "s"));
+  if (painted) bits.push(painted + " painted");
+  if (ed.undo.length) bits.push(ed.undo.length + " to undo");
+  $("edFacts").textContent = "\u00b7 " + bits.join(" \u00b7 ");
 }
+
+/* ====================================================================
+   POINTING AT A SQUARE
+
+   The editor was built on the man being the cursor: walk him there with
+   Z X : / and press space. It is consistent with the game, it works on
+   a phone, and it reuses everything - and it is invisible. Twice now
+   somebody has opened the editor, looked at Raise and Lower and
+   Wall/drop, and not been able to find any way to use them, because
+   nothing anywhere says that the little figure IS the pointer.
+
+   A tool nobody can work out how to use is not a tool. So: click the
+   square. The raycaster is forty lines, it removes the whole problem,
+   and the man stays exactly as he was for the keyboard and for touch -
+   clicking simply walks him there and does what space would have done.
+
+   Picking is done twice: once against the floor at ground level to find
+   out which square is under the pointer, and again at that square's own
+   height, because a raised square is nearer the camera and the first
+   answer is wrong by however high it stands.
+   ==================================================================== */
+var _ray = new THREE.Raycaster();
+var _ndc = new THREE.Vector2();
+var _hit = new THREE.Vector3();
+
+function cellUnder(clientX, clientY) {
+  var el = renderer.domElement, box = el.getBoundingClientRect();
+  _ndc.x = ((clientX - box.left) / box.width) * 2 - 1;
+  _ndc.y = -((clientY - box.top) / box.height) * 2 + 1;
+  _ray.setFromCamera(_ndc, camera);
+
+  var at = null;
+  for (var pass = 0; pass < 2; pass++) {
+    var y = at ? game.height[at[1] * COLS + at[0]] * STEP : 0;
+    var plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), -y);
+    if (!_ray.ray.intersectPlane(plane, _hit)) return at;
+    var c = Math.floor(_hit.x);
+    var r = ROWS - 1 - Math.floor(_hit.z);
+    if (c < 0 || r < 0 || c >= COLS || r >= ROWS) return null;
+    at = [c, r];
+  }
+  return at;
+}
+
+var edHover = null;
+
+/* After half a dozen squares put down by hand the instruction has done
+   its work, and is remembered so it does not greet a returning builder
+   who already knows. */
+/* The man IS the cursor, whether he was walked there with the keys or
+   put there with a click, so the marker simply follows him - which also
+   means it rises and falls with the tile as you raise it. */
+function edShowMark() {
+  if (!edCursor) return;
+  edCursor.visible = (mode === "edit");
+  if (mode !== "edit") return;
+  worldOf(game.manC, game.manR, tmp);
+  edCursor.position.set(tmp.x, tmp.y + 0.15, tmp.z);
+  /* amber on the floor, grey off it, so it is plain before you click
+     that there is nothing there to build on */
+  edCursor.material.color.setHex(game.inField(game.manC, game.manR) ? 0xffd27a : 0x7a7168);
+}
+
+function edGotIt() {
+  var save = MF.save.read() || {};
+  save.edClicks = (save.edClicks || 0) + 1;
+  if (save.edClicks <= 6) MF.save.write(save);   /* stop writing after that */
+  if (save.edClicks >= 6) $("edTop").classList.add("gotIt");
+}
+
+function edPointTo(x, y, andStamp) {
+  if (mode !== "edit") return;
+  if (andStamp) edGotIt();
+  var at = cellUnder(x, y);
+  if (!at) return;
+  edHover = at;
+  game.manC = at[0]; game.manR = at[1];
+  worldOf(game.manC, game.manR, manWant);
+  manPos.copy(manWant);
+  if (andStamp) edStamp(edPainted);
+  edPainted = !!andStamp;
+  drawPlan();
+  syncWorld();
+}
+
+(function () {
+  var el = document.getElementById("gl");
+  if (!el) return;
+  var down = false;
+  el.addEventListener("pointermove", function (e) {
+    if (mode !== "edit") return;
+    /* dragging with the button held paints, which is what anybody who
+       has used any editor will try first */
+    edPointTo(e.clientX, e.clientY, down);
+  });
+  el.addEventListener("pointerdown", function (e) {
+    if (mode !== "edit") return;
+    e.preventDefault();
+    down = true;
+    edPainted = false;
+    edPointTo(e.clientX, e.clientY, true);
+  });
+  ["pointerup", "pointerleave", "pointercancel"].forEach(function (n) {
+    el.addEventListener(n, function () { down = false; edPainted = false; });
+  });
+})();
 
 /* --- opening and leaving ------------------------------------------ */
 function edEnter(rec, back) {
@@ -7666,7 +8003,10 @@ function edEnter(rec, back) {
   $("titleSheet").hidden = true; $("overSheet").hidden = true;
   $("briefSheet").hidden = true; $("pauseSheet").hidden = true;
   $("edBar").hidden = false;
-  $("hud").hidden = false; plan.hidden = false; $("hint").hidden = true;
+  $("edTop").hidden = false;
+  if (((MF.save.read() || {}).edClicks || 0) >= 6) $("edTop").classList.add("gotIt");
+  /* the game's HUD is about a run, and there is no run here */
+  $("hud").hidden = true; plan.hidden = false; $("hint").hidden = true;
 
   game.over = false; game.won = false;
   if (rec) {
@@ -7696,11 +8036,23 @@ function edEnter(rec, back) {
   ed.undo.length = 0; ed.redo.length = 0;
   edPaint(); edButtons(); edRigs(); syncTerrain(); syncEdges(); syncWorld(); drawPlan(); edCount();
   worldOf(game.manC, game.manR, manWant); manPos.copy(manWant);
-  edSay("Walk with Z X : / - space puts down whatever is in your hand.");
+  edSay("");
+}
+
+/* ed.dirty was tracked from the first version of the editor and never
+   once read, while New and Leave both threw the cellar away without a
+   word. A flag that knows and a door that does not ask is worse than
+   neither. */
+function edSureToLose(what) {
+  if (!ed.dirty) return true;
+  return confirm("This cellar has changes you have not saved.\n\n" +
+                 what + " anyway?");
 }
 
 function edLeave() {
+  if (!edSureToLose("Leave")) return;
   $("edBar").hidden = true;
+  $("edTop").hidden = true;
   $("edListSheet").hidden = true;
   $("edCodeSheet").hidden = true;
   enterTitle();
@@ -7724,6 +8076,8 @@ function edTestPlay() {
   if (bad.length) return edSay(bad.join(" &middot; "), "bad");
   ed.rec = rec;
   $("edBar").hidden = true;
+  $("edTop").hidden = true;
+  $("hud").hidden = false;
   MutantLevelFormat.apply(game, rec);
   mode = "play"; turnAcc = 0;
   edSay("");
@@ -7868,7 +8222,10 @@ function edList() {
         " &middot; " + row.state + (row.everPublic ? " &middot; has been public" : "") + "</span></div>";
       var open = document.createElement("button");
       open.className = "edBtn"; open.type = "button"; open.textContent = "Open";
-      open.addEventListener("click", function () { $("edListSheet").hidden = true; edEnter(row); });
+      open.addEventListener("click", function () {
+        if (!edSureToLose("Open another")) return;
+        $("edListSheet").hidden = true; edEnter(row);
+      });
       el.appendChild(open);
       var del = document.createElement("button");
       del.className = "edBtn"; del.type = "button";
@@ -7902,6 +8259,7 @@ function edLoadCode() {
   if (!text) return;
   try {
     var rec = MutantLevelFormat.fromCode(text);
+    if (!edSureToLose("Load this one")) return;
     $("edCodeSheet").hidden = true;
     edEnter(rec);
     ed.id = null;                    /* somebody else's - yours now, as a copy */
@@ -7975,18 +8333,29 @@ addEventListener("keydown", function (e) {
   if (mode === "edit") {
     /* a tool by its letter, and nothing else while building */
     if (document.activeElement && document.activeElement.tagName === "INPUT") return;
-    for (var ti = 0; ti < ED_TOOLS.length; ti++) {
-      if (ED_TOOLS[ti].key === k || (k === "=" && ED_TOOLS[ti].key === "+")) {
-        e.preventDefault(); ed.tool = ti; edPaint(); return;
-      }
+    /* a number picks within the group you are in; the brackets walk
+       the groups. Two things to learn instead of twenty-three. */
+    if (k >= "1" && k <= "9") {
+      var here = ED_TOOLS[ed.tool] ? ED_TOOLS[ed.tool].group : 0;
+      var inGroup = edGroupTools(here);
+      var want = inGroup[parseInt(k, 10) - 1];
+      if (want !== undefined) { e.preventDefault(); ed.tool = want; edPaint(); }
+      return;
     }
     if (k === "z" && (e.ctrlKey || e.metaKey)) {
       e.preventDefault();
       if (e.shiftKey) edStepBack(ed.redo, ed.undo); else edStepBack(ed.undo, ed.redo);
       return;
     }
-    if (k === "[") { e.preventDefault(); ed.tool = (ed.tool + ED_TOOLS.length - 1) % ED_TOOLS.length; edPaint(); return; }
-    if (k === "]") { e.preventDefault(); ed.tool = (ed.tool + 1) % ED_TOOLS.length; edPaint(); return; }
+    if (k === "[" || k === "]") {
+      e.preventDefault();
+      var was = ED_TOOLS[ed.tool] ? ED_TOOLS[ed.tool].group : 0;
+      var to = (was + (k === "]" ? 1 : ED_GROUPS.length - 1)) % ED_GROUPS.length;
+      ed.tool = edGroupTools(to)[0];
+      edPaint();
+      edSay(ED_GROUPS[to]);
+      return;
+    }
     if (k === "escape") { e.preventDefault(); edLeave(); return; }
     return;
   }
@@ -8014,8 +8383,12 @@ addEventListener("blur", function () { held = {}; tapped = {}; if (mode === "pla
 
   /* the editor's buttons */
   if ($("build")) $("build").addEventListener("click", function () { edEnter(null); });
+  if ($("edName")) $("edName").addEventListener("input", function () {
+    ed.dirty = true; edCount();
+  });
   var edWire = {
-    edSave: edSave, edOpen: edList, edNew: function () { edEnter(null); },
+    edSave: edSave, edOpen: edList,
+    edNew: function () { if (edSureToLose("Start a new one")) edEnter(null); },
     edUndo: function () { edStepBack(ed.undo, ed.redo); },
     edRedo: function () { edStepBack(ed.redo, ed.undo); },
     edStampBtn: function () { edStamp(); },
@@ -8301,6 +8674,18 @@ function frame() {
   requestAnimationFrame(frame);
   var dt = Math.min(0.05, clock.getDelta()), now = clock.elapsedTime;
 
+  edShowMark();
+
+  /* fade between playing light and building light (see edSun) */
+  var wantLit = (mode === "edit" && ed.wide) ? 1 : 0;
+  if (edLit !== wantLit) {
+    edLit += (wantLit - edLit) * (1 - Math.pow(0.002, dt));
+    if (Math.abs(wantLit - edLit) < 0.004) edLit = wantLit;
+    if (scene.fog) scene.fog.density = FOG_PLAY * (1 - 0.9 * edLit);
+    if (skyLight) skyLight.intensity = 0.52 + 1.55 * edLit;
+    if (edSun) edSun.intensity = 2.3 * edLit;
+  }
+
   if (mode === "edit") {
     /* the man walks, and nothing else in the cellar moves - an editor
        where the monsters wandered off while you were building would be
@@ -8469,6 +8854,41 @@ function frame() {
     camPos.set(TITLE_AIM.x + Math.sin(a) * 12, 15.5, TITLE_AIM.z + 15.5 + Math.cos(a) * 3.5);
     camera.position.lerp(camPos, 1 - Math.pow(0.05, dt));
     camera.lookAt(TITLE_AIM);
+  } else if (mode === "edit" && ed.wide) {
+    /* ------------------------------------------------------------
+       The editor looks at the ROOM, not over the man's shoulder.
+
+       The play camera is tuned for somebody being chased: close in,
+       following him. Building with it meant seeing about a third of a
+       34x26 cellar on a wide screen and panning constantly, which is
+       no way to judge a composition - the one thing an editor is for.
+       So it pulls back to take the whole floor in, and the man becomes
+       a small figure on it, which is what a cursor should be.
+
+       Held on a key, so a builder can still drop in close to see what
+       a corner actually looks like.
+       ------------------------------------------------------------ */
+    camAim.set(COLS / 2, 0, ROWS / 2);
+    /* Far enough back that the WHOLE room is on screen, worked out from
+       the window that is actually there rather than a distance that
+       happened to look right once. It matters more than it sounds:
+       squares are now clicked, and a square the camera has cropped off
+       cannot be clicked at all. On a tall narrow window the old fixed
+       distance cut off a third of the columns - twelve of thirty-four
+       - and there was no way to reach them.
+
+       The camera sits above and behind at a fixed angle; only the
+       distance is solved for. Across the room it is the full width;
+       into the room the depth is foreshortened by the sine of that
+       angle. Whichever needs more room wins. */
+    var lean = tmp.set(0, 30.5, 15.5);
+    var half = Math.tan(camera.fov * Math.PI / 360);
+    var tilt = Math.atan2(lean.y, lean.z);
+    var forWide = (COLS / 2 + 1.5) / (half * Math.max(0.25, camera.aspect));
+    var forDeep = (ROWS * Math.sin(tilt) / 2 + 1.5) / half;
+    camPos.copy(camAim).add(lean.normalize().multiplyScalar(Math.max(forWide, forDeep)));
+    camera.position.lerp(camPos, 1 - Math.pow(0.004, dt));
+    camera.lookAt(camAim);
   } else {
     camAim.copy(manPos).add(tmp.set(0, 0.9, 0));
     /* Clamping this to keep the camera over the cellar was worse: it

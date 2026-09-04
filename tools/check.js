@@ -108,5 +108,53 @@ console.log("  ok    markup balanced");
   else console.log("  ok    original listing present, 125 lines");
 }
 
+
+/* --- two things with the same name ----------------------------------
+   index.html is one very long script, and a name declared twice at the
+   top level does not complain - the second one silently wins. It has
+   cost real time twice now: a `var edMark` holding a piece of scenery
+   quietly replaced `function edMark()`, the editor's undo checkpoint,
+   so every stamp threw and undo stopped recording; and before that a
+   CSS class was reused for two different pictures. Nothing catches it
+   at parse time and the symptom always shows up somewhere else, so it
+   gets caught here instead.
+
+   Only column-zero declarations count. A `var` inside a function that
+   shadows something is ordinary and deliberate. */
+{
+  const src = read("index.html");
+  const where = new Map();
+  const clash = [];
+  const note = (name, how, line) => {
+    const had = where.get(name);
+    if (had && had.how !== how)
+      clash.push(name + " is a " + had.how + " on line " + had.line +
+                 " and a " + how + " on line " + line);
+    else if (!had) where.set(name, { how, line });
+  };
+  src.split("\n").forEach((raw, i) => {
+    const f = /^function ([A-Za-z_$][\w$]*)\s*\(/.exec(raw);
+    if (f) return note(f[1], "function", i + 1);
+    if (!/^var /.test(raw)) return;
+    /* the names `var a = 1, b, c = 2;` actually declares */
+    const body = raw.slice(4);
+    let depth = 0, name = "", want = true;
+    for (let k = 0; k < body.length; k++) {
+      const ch = body[k];
+      if ("([{".indexOf(ch) >= 0) depth++;
+      else if (")]}".indexOf(ch) >= 0) depth--;
+      if (depth > 0) continue;
+      if (want && /[A-Za-z_$]/.test(ch) && !name) { name = ch; continue; }
+      if (want && name && /[\w$]/.test(ch)) { name += ch; continue; }
+      if (name) { note(name, "variable", i + 1); name = ""; want = false; }
+      if (ch === ",") want = true;
+      else if (ch === "=" || ch === ";") want = false;
+    }
+    if (name) note(name, "variable", i + 1);
+  });
+  if (clash.length) clash.forEach((c) => fail("index.html: " + c));
+  else console.log("  ok    no name declared two different ways");
+}
+
 if (bad) { console.error("\n" + bad + " problem(s)"); process.exit(1); }
 console.log("\nall checks passed");

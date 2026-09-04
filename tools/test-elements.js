@@ -1673,5 +1673,102 @@ function onSlope(what, blocks) {
      [most(R, 1) < most(R, 0), most(R, 0) < most(R, -1), most(R, 0)], [true, true, 2]);
 }
 
+
+/* ================= a cellar that is not a rectangle =============== */
+/* The editor can now cut squares out of the room, and decide square by
+   square whether what lies beyond the new boundary is stone or a drop.
+   The engine has carried a shape and a bound plane for a while, but
+   nothing had ever played on one - so everything a builder can now
+   make gets exercised here. */
+{
+  /* a notch cut out of the middle of the east side */
+  function notched(kind) {
+    const g = bare();
+    g.shape = new Uint8Array(MF.COLS * MF.ROWS); g.shape.fill(1);
+    g.bound = new Uint8Array(MF.COLS * MF.ROWS);
+    for (let r = 8; r <= 12; r++) for (let c = 14; c < MF.COLS; c++) {
+      g.shape[I(c, r)] = 0;
+      g.bound[I(c, r)] = kind;
+    }
+    return g;
+  }
+
+  ok("a square that was cut out is not in the field",
+     [notched(MF.DROP).inField(13, 10), notched(MF.DROP).inField(14, 10),
+      notched(MF.DROP).inField(14, 6)], [true, false, true]);
+
+  {
+    const g = notched(MF.DROP);
+    g.manC = 13; g.manR = 10;
+    g.step("right");
+    ok("the man will not step off into nothing", [g.manC, g.manR], [13, 10]);
+  }
+
+  {
+    const g = notched(MF.DROP);
+    g.manC = 12; g.manR = 10;
+    put(g, 13, 10);
+    const had = g.bricks;
+    g.step("right");
+    ok("a brick pushed over the new edge falls away",
+       [g.grid[I(13, 10)], g.bricks, g.manC], [MF.EMPTY, had - 1, 13]);
+  }
+
+  {
+    const g = notched(MF.WALL);
+    g.manC = 12; g.manR = 10;
+    put(g, 13, 10);
+    const had = g.bricks;
+    g.step("right");
+    ok("against stone the brick holds, and is still a brick",
+       [g.grid[I(13, 10)], g.bricks, g.manC], [MF.BRICK, had, 12]);
+  }
+
+  /* a fly is two squares long, so walling one in against the new
+     boundary takes five bricks and the wall - not four */
+  function pinned(kind) {
+    const g = notched(kind);
+    const m = monster(g, "fly", 13, 10);
+    g.cellsOf(m).forEach(([c, r]) => {
+      [[1, 0], [-1, 0], [0, 1], [0, -1]].forEach(([dc, dr]) => {
+        if (g.inField(c + dc, r + dr) && !g.isPartOf(m, c + dc, r + dr)) put(g, c + dc, r + dr);
+      });
+    });
+    return [g, m];
+  }
+  {
+    const [g, m] = pinned(MF.WALL);
+    ok("a monster boxed against the new wall is caught", g.isBoxed(m), true);
+  }
+  {
+    const [g, m] = pinned(MF.DROP);
+    ok("but a drop is not a side of a trap", g.isBoxed(m), false);
+  }
+
+  /* Nothing is ever pushed over the side: a square that is not in the
+     cellar is not somewhere a monster can retreat to, so a brick driven
+     at one standing against the boundary crushes it where it stands. */
+  {
+    const [g, m] = pinned(MF.DROP);
+    g.grid[I(11, 10)] = MF.EMPTY;       /* one square of room, and the drop */
+    ok("a monster will not retreat over the edge to save itself",
+       [g.canRetreat(m, 99, 99), g.canRetreat(m, 11, 10)], [true, false]);
+  }
+
+  {
+    const g = notched(MF.WALL);
+    g.edge.W[10] = MF.DROP;
+    ok("a shaped level still has its own outside walls",
+       [g.edgeAt(-1, 10), g.edgeAt(14, 10)], [MF.DROP, MF.WALL]);
+  }
+
+  {
+    const g = notched(MF.WALL);
+    g.fluid[I(13, 10)] = MF.TAR; g.fvol[I(13, 10)] = 900;
+    for (let t = 0; t < 30; t++) g.flowFluids({});
+    ok("tar does not spread outside the cellar", g.fvol[I(14, 10)] | 0, 0);
+  }
+}
+
 console.log("\n" + pass + " passed, " + fail + " failed");
 process.exit(fail ? 1 : 0);
