@@ -547,11 +547,15 @@
   margin-left: 8px; cursor: pointer; }
 #freshSays button:hover { background: #6b5230; }
 #edList { display: grid; gap: 6px; max-height: 46vh; overflow: auto; margin: 10px 0; }
-.edItem { display: flex; gap: 10px; align-items: center; text-align: left;
-  background: #191410; border: 1px solid #33291f; border-radius: 6px; padding: 8px 10px; }
+.edItem { display: flex; gap: 10px; align-items: center; text-align: left; width: 100%;
+  background: #191410; border: 1px solid #33291f; border-radius: 6px; padding: 8px 10px;
+  font: inherit; color: inherit; cursor: pointer; }
+.edItem:hover { border-color: #6b5640; }
+.edItem.here { border-color: #b98c3e; background: #241b13; }
+.edItem.here b { color: #ffe6b8; }
+#edShelfActs { gap: 6px; justify-content: flex-start; margin-bottom: 4px; }
 .edItem b { color: #efe4d2; font-weight: 600; }
 .edItem span { color: #8e8172; font-size: 12px; }
-.edItem .edBtn { margin-left: auto; }
 /* the picture of the cellar, drawn as squares rather than smeared */
 .edPic { width: 96px; height: 60px; object-fit: cover; border-radius: 3px;
   border: 1px solid #33291f; flex: 0 0 auto; background: #14110c; }
@@ -883,6 +887,12 @@
     <p class="kicker">Your cellars</p>
     <h1>Build a cellar</h1>
     <div id="edList"></div>
+    <!-- one set of verbs, about whichever cellar is picked above -->
+    <div class="row" id="edShelfActs">
+      <button class="edBtn" id="edShelfOpen" type="button">Open</button>
+      <button class="edBtn" id="edShelfPub" type="button">Publish</button>
+      <button class="edBtn" id="edShelfDel" type="button">Delete</button>
+    </div>
     <div class="row">
       <button class="go" id="edListNew" type="button">New cellar</button>
       <button class="go quiet" id="edListClose" type="button">Back</button>
@@ -11470,59 +11480,96 @@ function edPublishRow(row) {
   });
 }
 
+var edShelf = [];
+
 function edList() {
   if (mode !== "edit") $("titleSheet").hidden = true;
   vaultAll("levels").then(function (rows) {
-    var box = $("edList");
-    box.innerHTML = "";
-    if (!rows.length)
-      box.innerHTML = '<p class="fine">Nothing here yet \u2014 New cellar starts one.</p>';
-    rows.sort(function (a, b) { return (b.edited || 0) - (a.edited || 0) });
-    rows.forEach(function (row) {
-      var el = document.createElement("div");
-      el.className = "edItem";
-      el.innerHTML = (row.thumb ? '<img class="edPic" alt="" src="' + row.thumb + '">' : "") +
-        "<div><b>" + esc(row.name) + "</b><br><span>cellar " + row.cellar +
-        " &middot; " + row.state + (row.everPublic ? " &middot; has been public" : "") + "</span></div>";
-      var open = document.createElement("button");
-      open.className = "edBtn"; open.type = "button"; open.textContent = "Open";
-      open.addEventListener("click", function () {
-        if (!edSureToLose("Open another")) return;
-        $("edListSheet").hidden = true; edEnter(row);
-      });
-      el.appendChild(open);
-      var pub = document.createElement("button");
-      pub.className = "edBtn"; pub.type = "button";
-      /* what is stopping it, said on the button rather than after it */
-      var bad = edRowFaults(row);
-      if (row.state === "public") {
-        pub.textContent = "Public"; pub.disabled = true;
-        pub.title = "other people can already find this one";
-      } else {
-        pub.textContent = "Publish";
-        pub.disabled = !!bad.length;
-        pub.title = bad.length ? "Not yet - " + bad.join("; ")
-                               : "put it in front of other people";
-        pub.addEventListener("click", function () { edPublishRow(row); });
-      }
-      el.appendChild(pub);
-
-      var del = document.createElement("button");
-      del.className = "edBtn"; del.type = "button";
-      del.textContent = "Delete";
-      del.disabled = !!row.everPublic;
-      del.title = row.everPublic
-        ? "a cellar that has been public cannot be deleted - other people have played it"
-        : "";
-      if (!row.everPublic) del.addEventListener("click", function () {
-        vaultDel("levels", row.id).then(edList);
-      });
-      el.appendChild(del);
-      box.appendChild(el);
-    });
+    rows.sort(function (x, y) { return (y.edited || 0) - (x.edited || 0); });
+    edShelf = rows;
+    /* the one you were last in, unless it has gone */
+    if (!edShelf.some(function (r) { return r.id === ed.pick; }))
+      ed.pick = rows.length ? rows[0].id : null;
+    edShelfDraw();
     $("edListSheet").hidden = false;
   });
 }
+
+function edPicked() {
+  for (var i = 0; i < edShelf.length; i++)
+    if (edShelf[i].id === ed.pick) return edShelf[i];
+  return null;
+}
+
+function edShelfDraw() {
+  var box = $("edList");
+  if (!box) return;
+  box.innerHTML = "";
+  if (!edShelf.length) {
+    box.innerHTML = '<p class="fine">Nothing here yet \u2014 New cellar starts one.</p>';
+    return edShelfActs();
+  }
+  edShelf.forEach(function (row) {
+    var el = document.createElement("button");
+    el.type = "button";
+    el.className = "edItem" + (row.id === ed.pick ? " here" : "");
+    el.setAttribute("aria-pressed", row.id === ed.pick ? "true" : "false");
+    el.innerHTML = (row.thumb ? '<img class="edPic" alt="" src="' + row.thumb + '">' : "") +
+      "<div><b>" + esc(row.name) + "</b><br><span>cellar " + row.cellar +
+      " &middot; " + row.state + (row.everPublic ? " &middot; has been public" : "") +
+      "</span></div>";
+    el.addEventListener("click", function () {
+      ed.pick = row.id;
+      edShelfDraw();
+    });
+    el.addEventListener("dblclick", edShelfOpen);
+    box.appendChild(el);
+  });
+  edShelfActs();
+}
+
+/* what the three of them can do to the one that is picked */
+function edShelfActs() {
+  var row = edPicked();
+  var open = $("edShelfOpen"), pub = $("edShelfPub"), del = $("edShelfDel");
+  if (open) {
+    open.disabled = !row;
+    open.title = row ? "open it on the bench" : "pick a cellar first";
+  }
+  if (pub) {
+    var bad = row ? edRowFaults(row) : [];
+    var done = row && row.state === "public";
+    pub.textContent = done ? "Public" : "Publish";
+    pub.disabled = !row || done || !!bad.length;
+    pub.title = !row ? "pick a cellar first"
+              : done ? "other people can already find this one"
+              : bad.length ? "Not yet - " + bad.join("; ")
+              : "put it in front of other people";
+  }
+  if (del) {
+    del.disabled = !row || !!(row && row.everPublic);
+    del.title = !row ? "pick a cellar first"
+              : row.everPublic
+                ? "a cellar that has been public cannot be deleted - other people have played it"
+                : "";
+  }
+}
+
+function edShelfOpen() {
+  var row = edPicked();
+  if (!row) return;
+  if (!edSureToLose("Open another")) return;
+  $("edListSheet").hidden = true;
+  edEnter(row);
+}
+
+function edShelfDelete() {
+  var row = edPicked();
+  if (!row || row.everPublic) return;
+  ed.pick = null;
+  vaultDel("levels", row.id).then(edList);
+}
+
 
 function esc(t) {
   return String(t).replace(/[<>&"]/g, function (c) {
@@ -11961,6 +12008,9 @@ addEventListener("blur", function () { held = {}; tapped = {}; if (mode === "pla
     },
     /* Back means the title screen when that is where you came from,
        and the cellar you were building when it is not */
+    edShelfOpen: edShelfOpen,
+    edShelfPub: function () { var r = edPicked(); if (r) edPublishRow(r); },
+    edShelfDel: edShelfDelete,
     edListClose: function () {
       $("edListSheet").hidden = true;
       if (mode !== "edit") $("titleSheet").hidden = false;
