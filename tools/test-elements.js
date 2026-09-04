@@ -1412,5 +1412,75 @@ function withCoin(c, r, level) {
   ok("and never at all in the 1985 game", ever, false);
 }
 
+
+/* ---- what a shove actually costs ----------------------------------
+   Asserted as an ORDER rather than in absolute step points. What the
+   physics claims is that more blocks is more work and rougher blocks
+   are more work; a test that says "exactly two points" says nothing
+   about whether that still holds and breaks the moment a constant is
+   tuned. So: the fewest step points that will move it. */
+function needsSteps(kinds, level) {
+  for (var s = 0; s <= 3; s++) {
+    var g = bare(level || 12);
+    g.manC = 10; g.manR = 10;
+    kinds.forEach(function (k, i) { g.grid[I(11 + i, 10)] = k; });
+    g.bricks = kinds.length;
+    g.steps = s;
+    if (!g.step("right").strained) return s;
+  }
+  return 99;                     /* more than there is in him */
+}
+const B = MF.BRICK, R = MF.ROCK;
+{
+  const one = needsSteps([B]);
+  const five = needsSteps([B, B, B, B, B]);
+  const eight = needsSteps([B, B, B, B, B, B, B, B]);
+  ok("one brick is a step like any other", one, 0);
+  ok("and more of them is more work", [one <= five, five < eight], [true, true]);
+}
+{
+  ok("a rougher block is more work than smoother ones of the same weight",
+     needsSteps([R]) >= needsSteps([B, B, B, B]), true);
+}
+{
+  ok("two rocks is about the hardest thing a man can shove",
+     [needsSteps([R, R]) > needsSteps([R]), needsSteps([R, R]) <= 3], [true, true]);
+}
+{
+  /* Three rocks is refused before friction is even consulted: weight
+     decides how MANY you can move and friction only how fast, so this
+     is a different refusal from the one above and says so. */
+  const g = bare(12);
+  g.manC = 10; g.manR = 10;
+  [R, R, R].forEach(function (k, i) { g.grid[I(11 + i, 10)] = k; });
+  g.steps = 3;
+  const ev = g.step("right");
+  ok("three of them is not slow, it is more than he can move at all",
+     [!!ev.tooHeavy, ev.blocked, !!ev.strained], [true, true, false]);
+}
+{
+  /* timber is the point of timber: cellar one shoves a wall of it */
+  const g = new MF.Game({ seed: SEED });
+  g.F = 1; g.sheet(); g.grid.fill(MF.EMPTY); g.bricks = 0;
+  g.monsters[0].c = 2; g.monsters[0].r = 2; g.monsters[0].tc = 3; g.monsters[0].tr = 2;
+  g.manC = 5; g.manR = 10;
+  for (let c = 6; c <= 17; c++) put(g, c, 10);
+  g.steps = 1;
+  ok("twelve wooden blocks move on one step, because timber slides",
+     [g.wood, g.step("right").strained], [true, false]);
+}
+{
+  /* and the rough one in the line is what you feel */
+  const g = bare(12);
+  const drag = (kinds) => kinds.reduce((n, k) => n + g.dragOf(k) * g.weightOf(k), 0);
+  ok("rock drags most, brick in the middle, timber least",
+     [g.dragOf(R) > g.dragOf(B), g.dragOf(B) > MF.DRAG_WOOD], [true, true]);
+  const timber = [B, B, B, B];
+  ok("one rock behind a line of blocks drags like the rock",
+     drag(timber.concat([R])) > drag(timber) * 2, true);
+  ok("and the resistance is a sum, so more of them is always more",
+     drag([B, B, B, B, B, B]) > drag([B, B, B]), true);
+}
+
 console.log("\n" + pass + " passed, " + fail + " failed");
 process.exit(fail ? 1 : 0);

@@ -82,19 +82,36 @@
        old records are migrated forward on the way in, in one place,
          rather than sprinkling `if (v < 3)` through the reader
      ------------------------------------------------------------------ */
-  var VERSION = 2;        /* what this writes */
-  var NEEDS = 1;          /* the oldest reader that can still read it */
+  var VERSION = 3;        /* what this writes */
+  var NEEDS = 1;          /* the oldest reader that can read a PLAIN level */
+
+  /* A level that invents its own blocks, or is a shape other than the
+     whole room, or leaves things to be dealt out, cannot be read by an
+     older game AT ALL - not incompletely, but WRONGLY: it would walk
+     through the blocks it does not know, play the full rectangle
+     instead of the shape, and find a cellar with a hundred bricks
+     missing. So those three raise the bar, and an old game says so
+     instead of loading something broken. Adding an item or a monster
+     does not, because skipping one of those leaves a cellar that is
+     merely poorer rather than wrong. */
+  var NEEDS_RICH = 3;
 
   /* Everything a record carries that is not a plane, an edge, or an
      actor. Anything not in here is somebody else's field and is carried
      through untouched. */
   var KNOWN = ["v", "needs", "F", "cols", "rows", "cells", "edge", "man", "bricks",
                "marbleCount", "carry", "CO", "monsters", "marbles", "robots",
-               "sources", "name", "author", "made", "note"];
+               "sources", "name", "author", "made", "note",
+               "blocks", "shape", "bound", "deal"];
 
   /* One step per version, applied in order. A record from v1 goes
      through migrate[2] and comes out current. */
   var MIGRATE = {
+    3: function (rec) {
+      /* v2 had no blocks, no shape and no deal - all three absent, all
+         three meaning "the ordinary room, drawn as it stands" */
+      return rec;
+    },
     2: function (rec) {
       /* v1 had no `needs` and no `coins`; both are absent rather than
          wrong, which is exactly the case this whole scheme is for */
@@ -139,6 +156,16 @@
       return { c: s2.c, r: s2.r, kind: s2.kind, left: s2.left };
     });
 
+    /* the blocks this level invented, the shape it is, and anything it
+       would rather have dealt out than drawn */
+    if (g.blocks && g.blocks.length) rec.blocks = g.blocks.map(cleanBlock);
+    if (g.shape) rec.shape = IO.packArray(g.shape);
+    if (g.bound) rec.bound = IO.packArray(g.bound);
+    if (g.deal && g.deal.length) rec.deal = g.deal.map(function (d) {
+      return { what: String(d.what), count: d.count | 0, how: d.how === "fresh" ? "fresh" : "fixed" };
+    });
+    if (rec.blocks || rec.shape || rec.deal) rec.needs = NEEDS_RICH;
+
     if (about) {
       if (about.name) rec.name = String(about.name).slice(0, 48);
       if (about.author) rec.author = about.author;
@@ -146,6 +173,25 @@
       if (about.note) rec.note = String(about.note).slice(0, 200);
     }
     return rec;
+  }
+
+  /* A block definition, with every number pulled into a range the game
+     can actually run. A weight of nought would be a block with no
+     weight at all, which the push loop would count as free and let you
+     shove a thousand of. */
+  function cleanBlock(b) {
+    var name = String((b && b.name) || "Block").slice(0, 20);
+    var colour = /^#[0-9a-fA-F]{6}$/.test(b && b.colour) ? b.colour : "#8a7a5e";
+    var weight = Number(b && b.weight);
+    var friction = Number(b && b.friction);
+    return {
+      name: name, colour: colour,
+      /* a quarter of a stone - a brick - up to two, which is the most a
+         man can move at all */
+      weight: Math.max(0.25, Math.min(2, isFinite(weight) ? weight : 0.25)),
+      /* ice to tar, roughly */
+      friction: Math.max(0.02, Math.min(1.2, isFinite(friction) ? friction : 0.16))
+    };
   }
 
   /* ---- putting it back ---------------------------------------------- */
@@ -189,6 +235,13 @@
       g.edge[side].set(e);
     }
 
+    /* what the level brought with it, before anything is placed */
+    g.blocks = (rec.blocks || []).slice(0, MF.MAX_MADE - MF.MADE).map(cleanBlock);
+    if (!g.blocks.length) g.blocks = null;
+    g.shape = rec.shape ? IO.unpackArray(rec.shape, N) : null;
+    g.bound = rec.bound ? IO.unpackArray(rec.bound, N) : null;
+    g.deal = rec.deal || null;
+
     g.manC = rec.man[0]; g.manR = rec.man[1];
     g.bricks = rec.bricks | 0;
     g.marbleCount = rec.marbleCount | 0;
@@ -229,6 +282,15 @@
       return { c: s2.c, r: s2.r, kind: s2.kind, left: s2.left };
     });
 
+    /* and now whatever the level asked to have dealt rather than drawn.
+       After the actors, so nothing lands on top of them. */
+    if (g.deal) {
+      g.dealOut(g.deal);
+      var laid = 0;
+      for (var q = 0; q < N; q++) if (g.grid[q] === MF.BRICK) laid++;
+      if (!rec.bricks) g.bricks = laid;
+    }
+
     /* which monsters are walled in is not stored - it is worked out, so
        that a level hand-edited into a winning position cannot claim to
        be one */
@@ -261,8 +323,24 @@
     return out;
   }
 
-  /* ---- the code ------------------------------------------------------ */
-  function toCode(rec) { return IO.seal(JSON.stringify(rec)); }
+  /* ---- the code ------------------------------------------------------
+     A code has to survive being pasted into a chat window, which means
+     surviving being wrapped across lines - so reading one throws away
+     every scrap of whitespace before checking it.
+
+     Which quietly broke every level with a space in its name. The name
+     is inside the code, so stripping whitespace stripped the name's
+     spaces too, and "The Long Drop" arrived as a checksum failure.
+
+     So the code is written with no literal spaces in it at all: they go
+     in as the escape JSON already understands, which JSON.parse turns
+     back into spaces on the way in. Six characters per space in a name
+     and nothing else changes - and now throwing away whitespace is
+     always the right thing to do, because there was never any in it.
+     -------------------------------------------------------------------- */
+  function toCode(rec) {
+    return IO.seal(JSON.stringify(rec).replace(/ /g, "\\u0020"));
+  }
 
   function fromCode(code) {
     var body = IO.unseal(String(code || "").replace(/\s+/g, ""));
@@ -308,7 +386,8 @@
   }
 
   root.MutantLevelFormat = {
-    VERSION: VERSION, NEEDS: NEEDS, PLANES: PLANES, KNOWN: KNOWN, upgrade: upgrade,
+    VERSION: VERSION, NEEDS: NEEDS, NEEDS_RICH: NEEDS_RICH,
+    PLANES: PLANES, KNOWN: KNOWN, upgrade: upgrade, cleanBlock: cleanBlock,
     capture: capture, apply: apply, toCode: toCode, fromCode: fromCode, faults: faults
   };
 })(typeof window !== "undefined" ? window : globalThis);

@@ -23,6 +23,7 @@ function ok(name, got, want) {
   else { fail++; console.log("  FAIL  " + name + "\n          got  " + g + "\n          want " + w); }
 }
 const N = MF.COLS * MF.ROWS;
+const I = (c, r) => r * MF.COLS + c;
 const same = (a, b) => a.length === b.length && Array.from(a).every((v, i) => v === b[i]);
 function mul(a) {
   return function () {
@@ -305,6 +306,184 @@ console.log("\nTelling an author their level is broken\n");
   g.grid[g.manR * MF.COLS + g.manC] = MF.BRICK;
   ok("and a man standing inside a brick",
      LF.faults(LF.capture(g)).some((f) => /inside something/.test(f)), true);
+}
+
+console.log("\nBlocks the level invented\n");
+function madeGame(blocks) {
+  const g = new MF.Game({ seed: 909 });
+  g.F = 12; g.sheet();
+  g.grid.fill(MF.EMPTY);
+  g.item.fill(0); g.fluid.fill(MF.DRY); g.fvol.fill(0); g.sealed.fill(0);
+  g.height.fill(0); g.marbles.length = 0; g.monsters.length = 0; g.coins.length = 0;
+  g.bricks = 0; g.manC = 5; g.manR = 10; g.steps = 3;
+  g.blocks = blocks.map(LF.cleanBlock);
+  return g;
+}
+const ICE   = { name: "Ice",     colour: "#9fd8e8", weight: 0.25, friction: 0.03 };
+const SLATE = { name: "Slate",   colour: "#4a4f57", weight: 1,    friction: 0.5 };
+const LEAD  = { name: "Lead",    colour: "#5b5f66", weight: 2,    friction: 0.9 };
+{
+  const g = madeGame([ICE]);
+  g.grid[I(6, 10)] = MF.MADE;
+  ok("a block the level invented is solid", g.solid(6, 10), true);
+  ok("and weighs what the level said, in bricks",
+     [g.weightOf(MF.MADE), g.weightOf(MF.BRICK), g.weightOf(MF.ROCK)], [1, 1, 4]);
+}
+{
+  /* eight quarter-stone blocks is exactly a man's load; nine is not */
+  const g = madeGame([ICE]);
+  for (let c = 6; c <= 13; c++) g.grid[I(c, 10)] = MF.MADE;
+  const ev = g.step("right");
+  ok("eight light blocks shove", [ev.blocked, ev.pushed], [false, 8]);
+}
+{
+  const g = madeGame([ICE]);
+  for (let c = 6; c <= 14; c++) g.grid[I(c, 10)] = MF.MADE;
+  const ev = g.step("right");
+  ok("nine do not", [ev.blocked, !!ev.tooHeavy], [true, true]);
+}
+{
+  /* a two-stone block is the whole load on its own */
+  const g = madeGame([LEAD]);
+  g.grid[I(6, 10)] = MF.MADE;
+  ok("one two-stone block is all a man has", g.step("right").blocked, false);
+}
+{
+  const g = madeGame([LEAD]);
+  g.grid[I(6, 10)] = MF.MADE; g.grid[I(7, 10)] = MF.MADE;
+  ok("and two of them is more than he has", g.step("right").blocked, true);
+}
+{
+  /* a stone or heavier behaves like stone: tar will not have it */
+  const g = madeGame([SLATE, ICE]);
+  g.grid[I(12, 10)] = MF.MADE;          /* slate */
+  g.grid[I(12, 12)] = MF.MADE + 1;      /* ice   */
+  g.fluid[I(11, 10)] = MF.TAR; g.fvol[I(11, 10)] = 9;
+  g.fluid[I(11, 12)] = MF.TAR; g.fvol[I(11, 12)] = 9;
+  g.manC = 1; g.manR = 1;
+  for (let t = 0; t < 60; t++) { g.fvol[I(11, 10)] = 9; g.fvol[I(11, 12)] = 9; g.step(null); }
+  ok("tar burns through a light block and not a heavy one",
+     [g.grid[I(12, 12)] === MF.MADE + 1, g.grid[I(12, 10)] === MF.MADE], [false, true]);
+}
+{
+  /* friction is the level's, and a marble feels it */
+  const slippy = madeGame([ICE]);
+  const sticky = madeGame([{ name: "Mud", colour: "#5a4a32", weight: 0.25, friction: 1.1 }]);
+  const run = (g) => {
+    for (let c = 6; c <= 20; c++) g.grid[I(c, 10)] = 0;
+    const m = { c: 6, r: 10, dc: 1, dr: 0, v: 3, size: 1 };
+    g.marbles.push(m); g.grid[I(6, 10)] = MF.MARBLE;
+    for (let c = 7; c <= 20; c++) g.grid[I(c, 10)] = MF.EMPTY;
+    /* the floor it rolls over is the invented stuff */
+    for (let t = 0; t < 12 && m.v > 0; t++) g.step(null);
+    return m.c;
+  };
+  ok("a marble carries further over what the level called ice than over mud",
+     run(slippy) >= run(sticky), true);
+}
+{
+  /* and it all survives being written down */
+  const g = madeGame([ICE, SLATE]);
+  g.grid[I(6, 10)] = MF.MADE;
+  g.grid[I(7, 10)] = MF.MADE + 1;
+  const code = LF.toCode(LF.capture(g, { name: "Ice and slate" }));
+  const rec = LF.fromCode(code);
+  ok("a level carries the blocks it invented", rec.blocks.map((b) => b.name), ["Ice", "Slate"]);
+  ok("and says an old game cannot read it", rec.needs, LF.NEEDS_RICH);
+  const back = new MF.Game({ seed: 3 }); back.F = 1; back.sheet();
+  LF.apply(back, rec);
+  ok("and they come back with their weight and friction",
+     [back.blocks[0].weight, back.blocks[1].friction, back.grid[I(7, 10)]],
+     [0.25, 0.5, MF.MADE + 1]);
+}
+{
+  const silly = LF.cleanBlock({ name: "x".repeat(90), colour: "not a colour", weight: 999, friction: -4 });
+  ok("a block with nonsense in it is pulled into a range the game can run",
+     [silly.name.length, silly.colour, silly.weight, silly.friction], [20, "#8a7a5e", 2, 0.02]);
+}
+
+console.log("\nWhat shape the cellar is\n");
+{
+  const g = madeGame([ICE]);
+  g.shape = new Uint8Array(N);
+  /* a ten by eight room in the corner, and nothing else */
+  for (let r = 2; r < 10; r++) for (let c = 2; c < 12; c++) g.shape[I(c, r)] = 1;
+  ok("a level can be a smaller room than the one it is in",
+     [g.inField(5, 5), g.inField(20, 20), g.inField(1, 5)], [true, false, false]);
+}
+{
+  const g = madeGame([ICE]);
+  g.shape = new Uint8Array(N);
+  for (let r = 2; r < 10; r++) for (let c = 2; c < 12; c++) g.shape[I(c, r)] = 1;
+  for (let r = 4; r < 7; r++) for (let c = 5; c < 8; c++) g.shape[I(c, r)] = 0;   /* a hole in it */
+  ok("and it does not have to be a rectangle", [g.inField(6, 5), g.inField(4, 5)], [false, true]);
+  g.bound = new Uint8Array(N);
+  g.bound[I(6, 5)] = MF.WALL;
+  ok("what lies beyond a square is said per square, not per side",
+     [g.edgeAt(6, 5), g.edgeAt(4, 4)], [MF.WALL, MF.DROP]);
+}
+{
+  const g = madeGame([ICE]);
+  g.shape = new Uint8Array(N);
+  for (let r = 2; r < 10; r++) for (let c = 2; c < 12; c++) g.shape[I(c, r)] = 1;
+  g.manC = 3; g.manR = 3;
+  const code = LF.toCode(LF.capture(g, { name: "A smaller room" }));
+  const back = new MF.Game({ seed: 4 }); back.F = 1; back.sheet();
+  LF.apply(back, LF.fromCode(code));
+  ok("the shape travels with the level",
+     [back.inField(5, 5), back.inField(20, 20)], [true, false]);
+}
+{
+  /* an ordinary cellar has no shape at all, and is the whole room */
+  const g = new MF.Game({ seed: 5 }); g.F = 6; g.sheet();
+  ok("a level that is just the room carries no shape and no blocks",
+     [LF.capture(g).shape, LF.capture(g).blocks, LF.capture(g).needs],
+     [undefined, undefined, 1]);
+}
+
+console.log("\nDrawn, dealt, or both\n");
+{
+  const g = madeGame([ICE]);
+  g.grid[I(20, 20)] = MF.BRICK;                 /* one brick drawn by hand */
+  g.deal = [{ what: "brick", count: 40, how: "fixed" }, { what: "fly", count: 1, how: "fixed" }];
+  const code = LF.toCode(LF.capture(g, { name: "Mostly dealt" }));
+  const load = (seed) => {
+    const h = new MF.Game({ seed: 4242 }); h.F = 1; h.sheet();
+    LF.apply(h, LF.fromCode(code));
+    let n = 0;
+    for (let i = 0; i < N; i++) if (h.grid[i] === MF.BRICK) n++;
+    return { bricks: n, mobs: h.monsters.length, drawn: h.grid[I(20, 20)] === MF.BRICK,
+             where: Array.from(h.grid).join("") };
+  };
+  const a = load(), b = load();
+  ok("what was drawn stays drawn and what was dealt gets dealt",
+     [a.drawn, a.bricks, a.mobs], [true, 41, 1]);
+  ok("and a fixed deal gives every player the identical cellar", a.where === b.where, true);
+}
+{
+  const g = madeGame([ICE]);
+  g.deal = [{ what: "brick", count: 30, how: "fresh" }];
+  const code = LF.toCode(LF.capture(g));
+  const load = () => {
+    const h = new MF.Game({ seed: 4242 }); h.F = 1; h.sheet();
+    LF.apply(h, LF.fromCode(code));
+    return Array.from(h.grid).join("");
+  };
+  MF.luck(Math.random);
+  let differed = false;
+  for (let i = 0; i < 6 && !differed; i++) if (load() !== load()) differed = true;
+  MF.luck(MF.mulberry32(20260903));
+  ok("and a fresh deal is a different cellar every time, as the original was",
+     differed, true);
+}
+{
+  const g = madeGame([ICE]);
+  g.deal = [{ what: "unicorn", count: 5, how: "fixed" }, { what: "rock", count: 3, how: "fixed" }];
+  const back = new MF.Game({ seed: 8 }); back.F = 1; back.sheet();
+  LF.apply(back, LF.fromCode(LF.toCode(LF.capture(g))));
+  let rocks = 0;
+  for (let i = 0; i < N; i++) if (back.grid[i] === MF.ROCK) rocks++;
+  ok("something the game has never heard of is skipped, not fatal", rocks, 3);
 }
 
 console.log("\n" + pass + " passed, " + fail + " failed");

@@ -39,6 +39,70 @@
   var EMPTY = 0, BRICK = 1, TREE = 2, MARBLE = 3,
       VAT_TAR = 4, VAT_WATER = 5, COOLED = 6, CHOPPER = 7, ROCK = 8;
 
+  /* ------------------------------------------------------------------
+     BLOCKS SOMEBODY ELSE INVENTED
+
+     Everything above is a kind this game knows about. From MADE upwards
+     the grid holds kinds the LEVEL brought with it: a name, a colour, a
+     weight and a friction, defined by whoever built the cellar and
+     carried in the level itself.
+
+     Weight is in stones, where one stone is a rock - so a brick is a
+     quarter of a stone, and the eight brick-loads in a man's arms are
+     two stones however they are made up. Friction is what a marble
+     loses crossing a square of it.
+
+     One rule falls out of the weight rather than being a separate
+     switch, and it is worth stating: anything a stone or heavier
+     behaves like stone. Tar will not burn through it, a beetle cannot
+     eat it, a marble comes off it. Lighter than a stone and it is
+     brick-like and all three of those can have it. So a builder choosing
+     a weight is choosing durability at the same time, which is one
+     number to think about instead of four checkboxes.
+     ------------------------------------------------------------------ */
+  var MADE = 16, MAX_MADE = 48;
+
+  /* ------------------------------------------------------------------
+     HOW HARD A THING IS TO SHOVE ALONG
+
+     Weight decides HOW MANY you can move. Friction decides HOW FAST, and
+     it is not an average - a line moves at the pace of the worst thing
+     in it. One rock at the far end of eight timber blocks and the whole
+     line drags like the rock, which is exactly how it feels to push a
+     stuck thing: the easy part of the load is not the part you notice.
+
+     Timber slides, brick drags, stone fights you. A level's own blocks
+     bring their own number and slot into the same scale.
+     ------------------------------------------------------------------ */
+  var DRAG = {};
+  DRAG[BRICK] = 0.35;          /* the middle of the scale, and the common case  */
+  DRAG[ROCK] = 0.75;           /* the worst of it: stone does not want to go    */
+  DRAG[COOLED] = 0.55;         /* set tar is rough underneath                   */
+  var DRAG_WOOD = 0.18;        /* timber slides, which is the point of timber   */
+
+  /* What it actually costs to shove a line, worked out the way friction
+     works: the force resisting you is the coefficient times the weight
+     pressing down, summed over everything you are pushing.
+
+         resist = SUM over the line of ( friction of it x weight of it )
+
+     Both of the things you would expect fall straight out of that, and
+     neither had to be written as a special case:
+
+       more blocks means more friction, because every one of them adds
+         its own term to the sum
+       a rough one dominates, because it contributes more per unit of
+         weight than everything around it - one rock at the far end of a
+         line of timber drags like the rock, which is exactly how it
+         feels to push a stuck thing
+
+     Every two units of resistance costs a whole extra turn, capped at
+     two, because a man only has three turns of effort in him and a
+     bottomless cost would just be an unexplained refusal. Which makes
+     two rocks uphill genuinely impossible rather than merely slow, and
+     that is a fact about the cellar worth knowing. */
+  var RESIST_TURN = 2.0, RESIST_CAP = 2;
+
   /* and what can be running across it. The cellars are old and things
      have been sealed up down here for a long time. */
   var DRY = 0, WATER = 1, TAR = 2;
@@ -66,9 +130,10 @@
 
   /* Friction, by what the thing is rolling over. Gravity is the slope;
      this is what decides whether it keeps going. */
-  function frictionOn(what, fluid) {
+  function frictionOn(what, fluid, made) {
     if (fluid === TAR) return 1.10;         /* a square of it and it is done */
     if (fluid === WATER) return 0.42;       /* wading, and it drags          */
+    if (made) return made.friction;         /* whatever the level decided    */
     if (what === COOLED) return 0.30;       /* set tar is rough              */
     return 0.16;                            /* bare stone                    */
   }
@@ -469,6 +534,11 @@
     this.classic = !!(opts && opts.classic);
     this.edge = { W: new Uint8Array(ROWS), E: new Uint8Array(ROWS),
                   S: new Uint8Array(COLS), N: new Uint8Array(COLS) };
+    /* both null unless a level brings them: the blocks it invented, the
+       shape it is, and what lies beyond each square that is outside it */
+    this.blocks = null;
+    this.shape = null;
+    this.bound = null;
     this.HI = 0;
     this.seed = (opts && opts.seed) || ((Math.random() * 0x7FFFFFFF) | 0);
     this.variant = {};          /* bumped by regenerate(), per level */
@@ -490,7 +560,45 @@
   }
 
   Game.prototype.idx = function (c, r) { return r * COLS + c; };
-  Game.prototype.inField = function (c, r) { return c >= 0 && r >= 0 && c < COLS && r < ROWS; };
+  /* What a square is made of, whether this game invented it or the
+     level did. Returns null for the built-in kinds. */
+  Game.prototype.madeOf = function (v) {
+    if (v < MADE || !this.blocks) return null;
+    return this.blocks[v - MADE] || null;
+  };
+  /* in stones: a brick is a quarter, a rock is one */
+  Game.prototype.weightOf = function (v) {
+    if (v === ROCK) return ROCK_WEIGHT;
+    var made = this.madeOf(v);
+    if (made) return Math.max(0.25, made.weight * ROCK_WEIGHT);
+    return 1;
+  };
+  /* how many extra turns that much resistance costs */
+  Game.prototype.dragCost = function (resist) {
+    if (this.classic) return 0;
+    return Math.min(RESIST_CAP, Math.floor(resist / RESIST_TURN));
+  };
+  /* what one square of the line drags like, per unit of weight */
+  Game.prototype.dragOf = function (v) {
+    var made = this.madeOf(v);
+    if (made) return made.friction;
+    if (v === BRICK && this.wood) return DRAG_WOOD;
+    return DRAG[v] === undefined ? 0.35 : DRAG[v];
+  };
+  Game.prototype.tough = function (v) {
+    if (v === ROCK) return true;
+    var made = this.madeOf(v);
+    return !!made && made.weight >= 1;      /* a stone or heavier is stone */
+  };
+
+  /* The floor a level actually has. With no shape it is the whole
+     34x26; with one, the level is whatever squares it says - which is
+     how a cellar gets to be a different size, or a different shape
+     altogether, without a single array changing length. */
+  Game.prototype.inField = function (c, r) {
+    if (c < 0 || r < 0 || c >= COLS || r >= ROWS) return false;
+    return this.shape ? this.shape[r * COLS + c] === 1 : true;
+  };
   Game.prototype.at = function (c, r) { return this.inField(c, r) ? this.grid[this.idx(c, r)] : -1; };
   Game.prototype.h = function (c, r) { return this.inField(c, r) ? this.height[this.idx(c, r)] : 0; };
   Game.prototype.brickAt = function (c, r) { return this.at(c, r) === BRICK; };
@@ -502,7 +610,7 @@
   Game.prototype.solid = function (c, r) {
     var v = this.at(c, r);
     if (this.classic) return v === BRICK;
-    if (v === ROCK) return true;
+    if (v === ROCK || v >= MADE) return true;
     if (v === BRICK || v === TREE || v === VAT_TAR || v === VAT_WATER ||
         v === COOLED || v === CHOPPER) return true;
     if (v === MARBLE) { var m = this.marbleAt(c, r); return !!m && m.v <= 0; }
@@ -566,6 +674,72 @@
      where the marbles have rolled to. So a cellar is a place you can
      learn, and still a different problem each time you go down.
      -------------------------------------------------------------------- */
+  /* ------------------------------------------------------------------
+     DEALING THE REST
+
+     A level says what is where, and it can also just say how MANY. The
+     1985 game did the second: two hundred bricks, thrown anywhere they
+     would fit, different every time you played it. Both are worth
+     having, and a level can use either or both - draw the walls that
+     matter, and let a hundred loose bricks fall where they will.
+
+       "fixed"   dealt from the level's own seed, so every player who
+                 opens it gets the identical cellar - a puzzle
+       "fresh"   dealt anew every time it is played, which is what the
+                 original did and what makes a cellar replayable
+
+     Anything already drawn stays drawn; the deal only fills empty
+     squares, and never the one the man is standing on.
+     ------------------------------------------------------------------ */
+  var DEALABLE = {
+    brick: { cell: BRICK }, rock: { cell: ROCK }, tree: { cell: TREE },
+    marble: { marble: true }, chopper: { cell: CHOPPER }, cooled: { cell: COOLED },
+    tarvat: { cell: VAT_TAR }, watervat: { cell: VAT_WATER },
+    boots: { item: BOOTS }, frost: { item: FROST }, saw: { item: SAW }, jar: { item: JAR },
+    fly: { mob: "fly" }, spider: { mob: "spider" }, beetle: { mob: "beetle" },
+    wasp: { mob: "wasp" }, snake: { mob: "snake" }
+  };
+
+  Game.prototype.dealOut = function (deal) {
+    if (!deal || !deal.length) return 0;
+    var self = this, laid = 0;
+    var fixed = mulberry32(mix(this.seed | 0, this.F, 0x51ed));
+
+    function pick(useFixed) {
+      for (var tries = 0; tries < 900; tries++) {
+        var c = ((useFixed ? fixed() : Math.random()) * COLS) | 0;
+        var r = ((useFixed ? fixed() : Math.random()) * ROWS) | 0;
+        if (!self.inField(c, r)) continue;
+        if (self.grid[self.idx(c, r)] !== EMPTY) continue;
+        if (c === self.manC && r === self.manR) continue;
+        if (self.monsterAt(c, r)) continue;
+        if (self.coinAt && self.coinAt(c, r)) continue;
+        return [c, r];
+      }
+      return null;
+    }
+
+    for (var i = 0; i < deal.length; i++) {
+      var entry = deal[i];
+      var what = DEALABLE[entry.what];
+      if (!what) continue;                       /* a kind we do not know */
+      var useFixed = entry.how !== "fresh";
+      var want = Math.max(0, Math.min(600, entry.count | 0));
+      for (var n = 0; n < want; n++) {
+        var at = pick(useFixed);
+        if (!at) break;                          /* nowhere left to put one */
+        if (what.cell !== undefined) this.grid[this.idx(at[0], at[1])] = what.cell;
+        else if (what.item !== undefined) this.item[this.idx(at[0], at[1])] = what.item;
+        else if (what.marble) {
+          this.grid[this.idx(at[0], at[1])] = MARBLE;
+          this.marbles.push({ c: at[0], r: at[1], dc: 0, dr: 0, v: 0, size: 1 + (n % 3) });
+        } else if (what.mob) this.monsters.push(this.newMonster(what.mob, at[0], at[1]));
+        laid++;
+      }
+    }
+    return laid;
+  };
+
   /* ==================================================================
      LOOSE CREDITS
 
@@ -689,19 +863,23 @@
     if (nc === this.manC && nr === this.manR) return false;
     var here = this.grid[this.idx(nc, nr)];
     if (this.fluid[this.idx(nc, nr)] === TAR) { b.gone = true; ev.robotDied = b; return false; }
-    if (here !== EMPTY && here !== BRICK && here !== ROCK) return false;
+    if (here !== EMPTY && here !== BRICK && here !== ROCK && here < MADE) return false;
 
     if (here === EMPTY) { b.c = nc; b.r = nr; return true; }
 
-    var line = [], cc = nc, rr = nr, weight = 0;
+    var line = [], cc = nc, rr = nr, weight = 0, drag = 0;
     for (;;) {
       var pc = this.at(cc, rr);
-      if (pc !== BRICK && pc !== ROCK) break;
+      if (pc !== BRICK && pc !== ROCK && pc < MADE) break;
       line.push(pc);
-      weight += (pc === ROCK) ? ROCK_WEIGHT : 1;
+      weight += this.weightOf(pc);
+      drag += this.dragOf(pc) * this.weightOf(pc);
       cc += d[0]; rr += d[1];
     }
     if (weight > b.power) return false;
+    /* a robot feels the same resistance - it just has more to give, and
+       pays in charge rather than in turns */
+    b.life -= this.dragCost(drag);
     if (!this.inField(cc, rr)) return false;      /* it will not shove one over */
     if (this.at(cc, rr) !== EMPTY) return false;
     if (this.monsterAt(cc, rr) || this.robotAt(cc, rr)) return false;
@@ -798,6 +976,10 @@
   /* what is just outside the field at (c,r) - only ever asked of a
      square one step off the edge, so a corner never comes up */
   Game.prototype.edgeAt = function (c, r) {
+    /* A level with a shape has a boundary that is not four straight
+       sides, so what lies beyond a square is recorded per square. */
+    if (this.bound && c >= 0 && r >= 0 && c < COLS && r < ROWS)
+      return this.bound[r * COLS + c] === WALL ? WALL : DROP;
     if (c < 0) return this.edge.W[clamp(r, 0, ROWS - 1)];
     if (c >= COLS) return this.edge.E[clamp(r, 0, ROWS - 1)];
     if (r < 0) return this.edge.S[clamp(c, 0, COLS - 1)];
@@ -1533,17 +1715,21 @@
           /* The line can be bricks, rocks, or both, so it is gathered
              rather than counted - and it has to be shifted a square at a
              time, because the pieces are no longer interchangeable. */
-          var line = [], cc = nc, rr = nr, weight = 0;
+          var line = [], cc = nc, rr = nr, weight = 0, drag = 0;
           for (;;) {
             var pc = this.at(cc, rr);
-            if (pc !== BRICK && pc !== ROCK) break;
+            if (pc !== BRICK && pc !== ROCK && pc < MADE) break;
             line.push(pc);
-            weight += (pc === ROCK) ? ROCK_WEIGHT : 1;
+            weight += this.weightOf(pc);
+            /* friction times the weight pressing down, per block, added
+               up - so more of them is harder, and a rough one counts for
+               more than a smooth one of the same weight */
+            drag += this.dragOf(pc) * this.weightOf(pc);
             cc += d[0]; rr += d[1];
           }
           var run = line.length;
           var wading = this.fluid[this.idx(nc, nr)] === WATER;
-          var cost2 = this.stepCost(nc, nr, weight >= 2 || wading);
+          var cost2 = this.stepCost(nc, nr, wading) + this.dragCost(drag);
           if (!this.wood && weight > this.pushPower()) {
             /* more than there is in his arms. He does not even move */
             ev.blocked = true;
@@ -1561,6 +1747,7 @@
               var blocker = this.monsterAt(cc, rr);
               var beyond = this.at(cc, rr);
               var lead = line[line.length - 1];      /* what is at the sharp end */
+              var leadTough = this.tough(lead);
               if (this.robotAt(cc, rr)) {
                 /* it weighs what it weighs and it is not going over any
                    edge on your account */
@@ -1572,7 +1759,7 @@
               }
 
               if (!this.inField(cc, rr)) {
-                if (lead === ROCK) {
+                if (leadTough) {
                   /* it goes over, and it is not coming back either */
                   ev.lostOverEdge = 1;
                   line.pop();
@@ -1591,11 +1778,11 @@
                   ev.moved = false;
                   return false;
                 }
-              } else if (blocker && lead === ROCK) {
+              } else if (blocker && leadTough) {
                 /* nothing eats a rock. Either it has nowhere to go and the
                    rock finishes it, or the rock does not move at all */
                 if (!this.canRetreat(blocker, cc, rr)) {
-                  this.grid[this.idx(cc, rr)] = ROCK;
+                  this.grid[this.idx(cc, rr)] = lead;
                   blocker.gone = true; blocker.trapped = true;
                   blocker.crushed = true; blocker.crushedAt = [cc, rr];
                   ev.squashed.push(blocker);
@@ -1635,7 +1822,7 @@
                   line.pop();
                 }
               } else if (beyond === CHOPPER) {
-                if (lead === ROCK) {
+                if (leadTough) {
                   /* the machinery is not that good */
                   ev.blocked = true;
                   this.manC -= d[0]; this.manR -= d[1];
@@ -1759,7 +1946,14 @@
           else this.bounce(m, 0.4);
           continue;
         }
-        if (what === ROCK) { this.bounce(m, 0.3); continue; }   /* it does not give */
+        if (what === ROCK || (what >= MADE && this.tough(what))) { this.bounce(m, 0.3); continue; }
+        if (what >= MADE) {                    /* lighter than stone: breakable */
+          if (momentum(m) >= 3 * this.weightOf(what)) {
+            this.grid[this.idx(nc, nr)] = EMPTY; ev.smashed++;
+            m.v -= 1.4 / massOf(m); this.place(m, nc, nr);
+          } else this.bounce(m, 0.45);
+          continue;
+        }
         if (what === TREE || what === MARBLE || what === COOLED || what === CHOPPER) { this.bounce(m, 0.35); continue; }
 
         var mon = this.monsterAt(nc, nr);
@@ -1792,7 +1986,8 @@
            going up - then friction for the square it has arrived on. */
         this.place(m, nc, nr);
         m.v += (dh < 0) ? (-dh * 0.55) : (-dh * 0.95);
-        m.v -= frictionOn(this.grid[this.idx(nc, nr)], this.fluid[this.idx(nc, nr)]) * coast(m);
+        m.v -= frictionOn(this.grid[this.idx(nc, nr)], this.fluid[this.idx(nc, nr)],
+                          this.madeOf(this.grid[this.idx(nc, nr)])) * coast(m);
         if (m.v <= 0.05) { m.v = 0; m.dc = 0; m.dr = 0; }
       }
       if (m.v <= 0.05) { m.v = 0; m.dc = 0; m.dr = 0; }
@@ -1835,6 +2030,7 @@
   Game.prototype.blocksFluid = function (c, r, kind) {
     var v = this.at(c, r);
     if (v === -1) return true;
+    if (v >= MADE) return true;
     if (v === BRICK || v === ROCK || v === COOLED || v === VAT_TAR || v === VAT_WATER || v === CHOPPER) return true;
     if (v === TREE) return kind !== TAR;        /* tar takes the tree with it */
     return false;                                /* MARBLE is handled by the caller */
@@ -1885,8 +2081,8 @@
           }
           continue;
         }
-        if (kind === TAR && this.grid[ni] === ROCK) continue;   /* it will not burn */
-        if (kind === TAR && this.grid[ni] === BRICK) {
+        if (kind === TAR && this.tough(this.grid[ni])) continue;   /* it will not burn */
+        if (kind === TAR && (this.grid[ni] === BRICK || this.grid[ni] >= MADE)) {
           /* It burns through rather than going round, but not at once.
              Timber goes in a few turns, brick takes long enough that a
              course of it is worth building, and stone never does - so
@@ -2089,6 +2285,8 @@
     EMPTY: EMPTY, BRICK: BRICK, TREE: TREE, MARBLE: MARBLE,
     VAT_TAR: VAT_TAR, VAT_WATER: VAT_WATER, COOLED: COOLED, CHOPPER: CHOPPER,
     ROCK: ROCK, ROCK_WEIGHT: ROCK_WEIGHT, PUSH_POWER: PUSH_POWER,
+    MADE: MADE, MAX_MADE: MAX_MADE, DEALABLE: DEALABLE,
+    DRAG: DRAG, DRAG_WOOD: DRAG_WOOD, RESIST_TURN: RESIST_TURN,
     DRY: DRY, WATER: WATER, TAR: TAR,
     NOTHING: NOTHING, BOOTS: BOOTS, FROST: FROST, SAW: SAW, JAR: JAR, ITEMS: ITEMS,
     levelOf: levelOf, monstersFor: monstersFor, featuresFor: featuresFor,
