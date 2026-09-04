@@ -322,8 +322,12 @@
 @media (max-width: 620px) { .edEdgePick { width: 150px; } .edEdgePick span { display: none; } }
 
 /* how wide the ground tools work */
-#edBrush { display: flex; gap: 5px; align-items: center; margin-left: 4px;
+#edBrush, #edTints { display: flex; gap: 5px; align-items: center; margin-left: 4px;
   padding-left: 9px; border-left: 1px solid #372c21; }
+.edTint { width: 22px; height: 22px; padding: 0; border-radius: 5px;
+  border: 1px solid #372c21; cursor: pointer; }
+.edTint:hover { border-color: #6b5640; }
+.edTint[aria-pressed="true"] { border-color: #ffe6b8; box-shadow: 0 0 0 1px #b98c3e; }
 
 #edZoom { position: fixed; right: 12px; z-index: 41; display: flex; align-items: center;
   gap: 2px; padding: 3px; border-radius: 9px; border: 1px solid #3a2e22;
@@ -622,6 +626,7 @@
   <div class="edRow">
     <div id="edTools"></div>
     <span id="edBrush" hidden></span>
+    <span id="edTints" hidden></span>
 
   </div>
   <!-- the two kinds of edge, shown rather than named, once a side of the
@@ -629,7 +634,6 @@
   <div class="edRow" id="edEdges" hidden>
   </div>
   <div class="edRow">
-    <input type="color" id="edColour" value="#6b8f4e" title="The colour Paint floor puts down">
   </div>
   <!-- The things you reach for once a session, rather than once a
        minute. They were all in the front row at equal weight, which is
@@ -9609,6 +9613,56 @@ function edEdgeBar() {
   });
 }
 
+/* ====================================================================
+   THE COLOURS THIS CELLAR IS PAINTED IN
+
+   The colour Paint floor puts down was a lone picker sitting in a row
+   of its own at the bottom of the screen, a long way from the tool it
+   belonged to and on show in every view whether or not anything could
+   be painted. It belongs beside the tool.
+
+   And one picker is not enough to paint a floor with. A level keeps up
+   to sixteen colours, and going back to one you have already used meant
+   remembering its six digits and typing them in again - so every colour
+   in the cellar is here, in the order it was first used, and clicking
+   one picks it up again. The picker at the end is for a new one.
+   ==================================================================== */
+function edTintBar() {
+  var el = $("edTints");
+  if (!el) return;
+  var t = ED_TOOLS[ed.tool];
+  if (!t || t.act !== "tint") { el.hidden = true; return; }
+  el.hidden = false;
+  el.innerHTML = '<span class="edBrushName">colour</span>';
+
+  var now = ($("edColour") && $("edColour").value || "#6b8f4e").toLowerCase();
+  (game.floors || []).forEach(function (hex) {
+    var b = document.createElement("button");
+    b.type = "button";
+    b.className = "edTint";
+    b.style.background = hex;
+    b.title = "Paint in " + hex + " again";
+    b.setAttribute("aria-pressed", hex.toLowerCase() === now ? "true" : "false");
+    b.addEventListener("click", function () {
+      $("edColour").value = hex;
+      edTintBar();
+      edSay("painting in " + hex);
+    });
+    el.appendChild(b);
+  });
+
+  var pick = document.createElement("input");
+  pick.type = "color";
+  pick.id = "edColour";
+  pick.value = now;
+  pick.title = "A colour this cellar has not used yet";
+  pick.addEventListener("input", function () { edTintBar(); });
+  /* the old one goes, so there is only ever one #edColour to read */
+  var was = $("edColour");
+  if (was && was.parentNode && was.parentNode !== el) was.parentNode.removeChild(was);
+  el.appendChild(pick);
+}
+
 function edBrushBar() {
   var el = $("edBrush");
   if (!el) return;
@@ -9750,6 +9804,7 @@ function edPaint() {
   });
 
   edBrushBar();
+  edTintBar();
   edEdgeBar();
   edZoomBar();
 }
@@ -9825,7 +9880,11 @@ function edStamp(quiet) {
           (moved ? " (" + moved + " squares moved)" : " (nothing left to move)"));
     syncTerrain(); syncEdges();
   } else if (t.act === "tint") {
-    var want = ($("edColour").value || "#6b8f4e").toLowerCase();
+    /* the picker lives with the tool now, so it is only there while the
+       tool is - and a level opened with a colour already chosen has to
+       fall back to something rather than throwing */
+    var pk = $("edColour");
+    var want = ((pk && pk.value) || "#6b8f4e").toLowerCase();
     if (!game.floors) game.floors = [];
     var slot = game.floors.indexOf(want);
     if (slot < 0) {
@@ -9837,6 +9896,7 @@ function edStamp(quiet) {
        one tool both paints and unpaints */
     game.tint[i] = (game.tint[i] === slot + 1) ? 0 : slot + 1;
     syncTerrain();
+    edTintBar();                 /* a colour used for the first time */
   } else if (t.act === "poly") {
     /* a closed outline is worked on rather than drawn - the pointer
        handles dragging, this is only the keyboard's way in */
