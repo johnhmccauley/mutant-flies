@@ -276,6 +276,20 @@
    which is 96x60 and declared later, so it quietly won */
 .edToolPic { width: 18px; height: 18px; border-radius: 2px; display: block; flex: 0 0 auto; }
 /* the group tabs - what used to be six wrapping rows of everything */
+#edTabs { position: relative; }
+.edBun { display: inline-grid; place-items: center; padding: 3px 7px; }
+.edBun svg { width: 15px; height: 15px; fill: none; stroke: currentColor;
+  stroke-width: 1.5; stroke-linecap: round; }
+.edBunList { position: absolute; right: 4px; top: 100%; z-index: 42; min-width: 132px;
+  background: rgba(14,11,8,.97); border: 1px solid #3a2e22; border-radius: 7px;
+  padding: 4px; display: flex; flex-direction: column; gap: 1px;
+  box-shadow: 0 8px 22px rgba(0,0,0,.55); }
+.edBunItem { background: transparent; border: 0; border-radius: 5px; color: #b8ab99;
+  font: inherit; font-size: 11px; letter-spacing: .1em; text-transform: uppercase;
+  text-align: left; padding: 6px 9px; cursor: pointer; }
+.edBunItem:hover { background: #2a2016; color: #efe4d2; }
+.edBunItem[aria-pressed="true"] { color: #ffe6b8; }
+
 .edTab { background: transparent; border: 0; border-bottom: 2px solid transparent;
   color: #7d7365; font: inherit; font-size: 10px; letter-spacing: .12em;
   text-transform: uppercase; padding: 3px 7px 4px; cursor: pointer; }
@@ -308,8 +322,20 @@
 @media (max-width: 620px) { .edEdgePick { width: 150px; } .edEdgePick span { display: none; } }
 
 /* how wide the ground tools work */
-#edBrush, #edZoom { display: flex; gap: 5px; align-items: center; margin-left: 4px;
+#edBrush { display: flex; gap: 5px; align-items: center; margin-left: 4px;
   padding-left: 9px; border-left: 1px solid #372c21; }
+
+#edZoom { position: fixed; right: 12px; z-index: 41; display: flex; align-items: center;
+  gap: 2px; padding: 3px; border-radius: 9px; border: 1px solid #3a2e22;
+  background: rgba(12,9,7,.86); backdrop-filter: blur(3px);
+  font-family: "IBM Plex Mono", ui-monospace, monospace; }
+#edZoom button { width: 30px; height: 30px; padding: 0; border-radius: 7px;
+  border: 1px solid transparent; background: transparent; color: #cbbfab;
+  font: inherit; font-size: 17px; line-height: 1; cursor: pointer; }
+#edZoom button:hover:not(:disabled) { background: #2a2016; border-color: #6b5640; color: #ffe6b8; }
+#edZoom button:disabled { opacity: .3; cursor: default; }
+#edZoom .edZoomNow { min-width: 4ch; text-align: center; font-size: 12px; color: #efe4d2;
+  cursor: pointer; user-select: none; }
 .edZoomNow { color: #cbbfab; font-size: 11px; min-width: 3ch; text-align: center; }
 .edBrushDot:disabled { opacity: .35; cursor: default; }
 #edBrush .edBrushName { color: #7d7365; font-size: 10px; letter-spacing: .1em;
@@ -363,6 +389,41 @@
   flex: 0 0 auto; align-self: center; visibility: hidden; }
 #edTop .edDot.on { visibility: visible; }
 #edTop .edFacts { color: #8e8172; white-space: nowrap; }
+
+/* The name is typed where it is shown. A box at the bottom of the
+   screen reporting the name back to the top is two places for one
+   thing, and the one you look at is not the one you can change. */
+#edTop input#edName { background: transparent; border: 1px solid transparent;
+  border-radius: 4px; color: #efe4d2; font: inherit; font-weight: 600; font-size: 12px;
+  padding: 3px 5px; flex: 0 1 22ch; min-width: 6ch; }
+#edTop input#edName:hover { border-color: #372c21; }
+#edTop input#edName:focus { outline: none; border-color: #b98c3e; background: #14100c; }
+#edTop input#edName::placeholder { color: #7d7365; font-weight: 400; }
+
+/* Drawn, not typed. A glyph is whatever the font on the machine happens
+   to have - and half of these have no glyph at all in a monospace face,
+   or arrive as a colour emoji sitting among the lettering. These are
+   the shapes everything else uses: a triangle for play, a disk for
+   save, a curved arrow each way for undo and redo, and the cross top
+   right for the way out. */
+#edActs { display: flex; gap: 2px; align-items: center; margin-left: auto; flex: 0 0 auto; }
+.edIcon { width: 28px; height: 28px; padding: 0; border-radius: 6px;
+  border: 1px solid transparent; background: transparent; color: #b8ab99;
+  display: inline-grid; place-items: center; cursor: pointer; }
+.edIcon:hover { background: #2a2016; border-color: #6b5640; color: #ffe6b8; }
+.edIcon[aria-pressed="true"] { background: #503c25; border-color: #b98c3e; color: #ffe6b8; }
+.edIcon svg { width: 16px; height: 16px; display: block;
+  fill: none; stroke: currentColor; stroke-width: 1.5;
+  stroke-linecap: round; stroke-linejoin: round; }
+.edIcon svg .fill { fill: currentColor; stroke: none; }
+.edIcon.play { color: #5fd07a; }
+.edIcon.play:hover { color: #8ce89f; background: #1e3324; border-color: #3f7a51; }
+
+#edHelp, #edInfo { position: fixed; left: 0; right: 0; z-index: 39; padding: 7px 12px 8px;
+  background: rgba(12,9,7,.95); border-bottom: 1px solid #3a2e22; color: #cbbfab;
+  font-family: "IBM Plex Mono", ui-monospace, monospace; font-size: 11px; line-height: 1.5; }
+#edHelp b { color: #efe4d2; font-weight: 600; }
+
 /* A standing instruction, not a message. The one line telling you how
    the editor works was in the status line, so the first fault or bot
    result wiped it - and then nothing anywhere said the little figure
@@ -373,7 +434,8 @@
    talk with: it cut its own sentences off mid-word - "about 6 degrees
    (nothi..." - and the clipped half is always the half that says what
    actually happened. */
-#edSay { color: #b3a691; flex: 1 1 100%; }
+#edSay { color: #b3a691; flex: 1 1 0; min-width: 0;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 #edSay .bad { color: #e0785c; }
 #edSay .good { color: #8fc07a; }
 /* the new-version notice: quiet, but not so quiet nobody sees it */
@@ -514,35 +576,60 @@
      it read zero, zero, zero and a dash the whole time you were
      building, which is noise sitting on the most valuable strip of the
      screen. This says what you are actually working on. -->
+<!-- One row. The name is the name - typed where it is shown, rather
+     than in a box at the bottom of the screen reporting itself back to
+     the top. What you can DO sits at the other end as icons, because
+     six words of button are six words to read every time you look for
+     one of them. And the sentence explaining the tool in your hand is
+     behind the ?, since it is the thing you need on the first day and
+     never again. -->
 <div id="edTop" hidden>
-  <span class="edWhat" id="edTitle">untitled</span>
+  <input type="text" id="edName" maxlength="48" placeholder="untitled" spellcheck="false">
   <span class="edDot" id="edDirty" title="unsaved changes"></span>
-  <span class="edFacts" id="edFacts"></span>
+
   <span id="edSay"></span>
+  <span id="edActs">
+    <button class="edIcon" id="edInfoBtn" type="button" aria-pressed="false"
+            title="What is in this cellar" aria-label="What is in this cellar"><svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6.4"/><path d="M8 7v4.2M8 4.4v1.2"/></svg></button>
+    <button class="edIcon" id="edHelpBtn" type="button" aria-pressed="false"
+            title="What does this tool do?" aria-label="What does this tool do?"><svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6.4"/><path d="M6.1 6.1a1.95 1.95 0 1 1 2.4 2.2c-.4.2-.5.5-.5.9v.4"/><path d="M8 12.1v.05"/></svg></button>
+    <button class="edIcon play" id="edTest" type="button"
+            title="Test play" aria-label="Test play"><svg viewBox="0 0 16 16" aria-hidden="true"><path class="fill" d="M4.6 3.2 12.6 8l-8 4.8z"/></svg></button>
+    <button class="edIcon" id="edSave" type="button"
+            title="Save" aria-label="Save"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2.6 2.6h8.3l2.5 2.5v8.3H2.6z"/><path d="M5.1 2.6h5.2v3.6H5.1z"/><path d="M4.6 9.2h6.8v4.2H4.6z"/></svg></button>
+    <button class="edIcon" id="edUndo" type="button"
+            title="Undo  (Ctrl+Z)" aria-label="Undo"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3.1 7.4h6.1a3.6 3.6 0 0 1 0 7.2H6.4"/><path d="M5.9 4.3 2.7 7.4l3.2 3.1"/></svg></button>
+    <button class="edIcon" id="edRedo" type="button"
+            title="Redo" aria-label="Redo"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M12.9 7.4H6.8a3.6 3.6 0 0 0 0 7.2h2.8"/><path d="M10.1 4.3l3.2 3.1-3.2 3.1"/></svg></button>
+    <button class="edIcon" id="edMore" type="button" aria-pressed="false"
+            title="Everything else" aria-label="Everything else"><svg viewBox="0 0 16 16" aria-hidden="true"><path class="fill" d="M3.6 6.7a1.3 1.3 0 1 1 0 2.6 1.3 1.3 0 0 1 0-2.6zM8 6.7a1.3 1.3 0 1 1 0 2.6 1.3 1.3 0 0 1 0-2.6zM12.4 6.7a1.3 1.3 0 1 1 0 2.6 1.3 1.3 0 0 1 0-2.6z"/></svg></button>
+    <button class="edIcon" id="edQuit" type="button"
+            title="Leave" aria-label="Leave"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8"/></svg></button>
+  </span>
 </div>
+<div id="edHelp" hidden></div>
+<div id="edInfo" hidden></div>
+
+<!-- Zoom belongs to the view, not to the palette. Down in the tool row
+     it read as another thing to put in the cellar, sat a long way from
+     what it changes, and moved about as the row reflowed. Pinned to the
+     top right of the picture it is where every other program keeps it
+     and where your eye already is. -->
+<div id="edZoom" hidden></div>
 
 <div id="edBar" hidden>
   <div class="edRow" id="edTabs"></div>
   <div class="edRow">
     <div id="edTools"></div>
     <span id="edBrush" hidden></span>
-    <span id="edZoom"></span>
+
   </div>
   <!-- the two kinds of edge, shown rather than named, once a side of the
        room has been picked -->
   <div class="edRow" id="edEdges" hidden>
   </div>
   <div class="edRow">
-    <input type="text" id="edName" maxlength="48" placeholder="Name this cellar" spellcheck="false">
     <input type="color" id="edColour" value="#6b8f4e" title="The colour Paint floor puts down">
-
-    <button class="edBtn warm" id="edTest" type="button">Test play</button>
-    <button class="edBtn" id="edSave" type="button">Save</button>
-    <button class="edBtn" id="edUndo" type="button" title="Ctrl+Z">Undo</button>
-    <button class="edBtn" id="edRedo" type="button">Redo</button>
-    <button class="edBtn" id="edMore" type="button" aria-pressed="false"
-            title="Everything else">More</button>
-    <button class="edBtn" id="edQuit" type="button">Leave</button>
   </div>
   <!-- The things you reach for once a session, rather than once a
        minute. They were all in the front row at equal weight, which is
@@ -6442,16 +6529,30 @@ function init3D() {
 function viewBox() {
   var top = 0, bottom = 0;
   if (mode === "edit") {
-    var t = $("edTop"), b = $("edBar");
+    var t = $("edTop"), b = $("edBar"), hp = $("edHelp"), ip = $("edInfo");
     if (t && !t.hidden) top = t.getBoundingClientRect().height;
+    if (hp && !hp.hidden) top += hp.getBoundingClientRect().height;
+    if (ip && !ip.hidden) top += ip.getBoundingClientRect().height;
     if (b && !b.hidden) bottom = b.getBoundingClientRect().height;
   }
   var h = Math.max(120, innerHeight - top - bottom);
   return { top: Math.round(top), h: Math.round(h) };
 }
 
+var reFitting = false;
 function resize() {
   var box = viewBox();
+  var zb = $("edZoom");
+  if (zb) zb.style.top = (box.top + 10) + "px";
+  /* How many tabs fit depends on the width, so it is worked out again
+     when the width changes - but laying them out changes the height of
+     the bar, which the observer notices, which calls this again. The
+     latch breaks that circle; without it the two of them hand the
+     window back and forth for ever. */
+  if (mode === "edit" && !reFitting) {
+    reFitting = true;
+    setTimeout(function () { try { edPaint(); } finally { reFitting = false; } }, 0);
+  }
   var gl = renderer.domElement;
   gl.style.top = box.top + "px";
   gl.style.height = box.h + "px";
@@ -9202,30 +9303,28 @@ function edFrame(v) {
 function edZoomBar() {
   var el = $("edZoom");
   if (!el) return;
-  /* Two buttons and a number, instead of a chip for every step. Seven
-     of those was a row of arithmetic to read before you could look
-     closer at something, and the wheel and a pinch already walk the
-     steps without any of it. */
-  el.innerHTML = '<span class="edBrushName">zoom</span>';
+  el.innerHTML = "";
   function knob(label, by, tip) {
     var b = document.createElement("button");
-    b.className = "edBrushDot";
     b.type = "button";
     b.textContent = label;
     b.title = tip;
-    b.disabled = (ZOOMS.indexOf(ed.zoom) + by < 0) ||
-                 (ZOOMS.indexOf(ed.zoom) + by >= ZOOMS.length);
+    var at = ZOOMS.indexOf(ed.zoom);
+    b.disabled = (at + by < 0) || (at + by >= ZOOMS.length);
     b.addEventListener("click", function () { edZoomStep(by); });
     return b;
   }
-  el.appendChild(knob("−", -1, "Stand back"));
+  el.appendChild(knob("\u2212", -1, "Stand back  (\u2212, or the wheel)"));
   var now = document.createElement("span");
   now.className = "edZoomNow";
-  now.textContent = (ed.zoom === 1) ? "1×"
-                  : (ed.zoom < 1 ? ed.zoom.toFixed(1).replace("0.", ".") : ed.zoom + "") + "×";
-  now.title = "Wheel or pinch does this too";
+  now.textContent = (ed.zoom === 1) ? "1\u00d7"
+                  : (ed.zoom < 1 ? ed.zoom.toFixed(1).replace("0.", ".") : ed.zoom + "") + "\u00d7";
+  now.title = "Back to the whole room  (0)";
+  /* the number is a button too - the way back to 1x without hunting for
+     it in a row of steps */
+  now.addEventListener("click", function () { edZoomTo(1); });
   el.appendChild(now);
-  el.appendChild(knob("+", 1, "Move in"));
+  el.appendChild(knob("+", 1, "Move in  (+, or the wheel)"));
 }
 
 function edZoomTo(z) {
@@ -9298,6 +9397,38 @@ function edViewTools(key) {
     ED_TOOLS.forEach(function (t, i) { if (t.name === name) out.push(i); });
   });
   return out;
+}
+
+/* Move whatever wrapped onto the second line into the hamburger. Done
+   by measuring where each tab actually landed, because how many fit
+   depends on the font, the window and the words - none of which can be
+   counted in advance. */
+function edTabsFit(tabs, bun, menu) {
+  var all = [].slice.call(tabs.querySelectorAll(".edTab:not(.edBun)"));
+  all.forEach(function (b) { b.hidden = false; });
+  menu.innerHTML = "";
+  bun.hidden = true;
+
+  var top = all.length ? all[0].getBoundingClientRect().top : 0;
+  var over = all.filter(function (b) { return b.getBoundingClientRect().top > top + 4; });
+  if (!over.length) return;
+
+  /* the hamburger needs room of its own, so one more comes off the row */
+  bun.hidden = false;
+  var spill = over.slice();
+  var last = all[all.length - 1 - spill.length];
+  if (last) spill.unshift(last);
+
+  spill.forEach(function (b) {
+    b.hidden = true;
+    var item = document.createElement("button");
+    item.type = "button";
+    item.className = "edBunItem";
+    item.textContent = b.textContent;
+    if (b.getAttribute("aria-pressed") === "true") item.setAttribute("aria-pressed", "true");
+    item.addEventListener("click", function (e) { e.stopPropagation(); b.click(); });
+    menu.appendChild(item);
+  });
 }
 
 function edViewNow() {
@@ -9510,8 +9641,21 @@ function edBrushTo(n) {
 }
 
 function edHow() {
-  var t = ED_TOOLS[ed.tool];
-  edSay(t && t.how ? t.how : "");
+  var t = ED_TOOLS[ed.tool], el = $("edHelp");
+  if (!el) return;
+  var v = edViewNow();
+  el.innerHTML = "<b>" + (v ? v.name : "") + "</b> \u2014 " + (v ? v.how : "") +
+                 (t && t.how ? "<br><b>" + t.name + "</b> \u2014 " + t.how : "");
+  edHelpFit();
+}
+
+/* the panel hangs off the bottom of the header, wherever that ends */
+function edHelpFit() {
+  var top = $("edTop");
+  if (!top || top.hidden) return;
+  var y = Math.round(top.getBoundingClientRect().height) + "px";
+  if ($("edHelp")) $("edHelp").style.top = y;
+  if ($("edInfo")) $("edInfo").style.top = y;
 }
 
 function edSay(text, cls) {
@@ -9533,6 +9677,40 @@ function edPaint() {
     b.addEventListener("click", function () { edViewTo(v.key); });
     tabs.appendChild(b);
   });
+
+  /* ------------------------------------------------------------------
+     What does not fit goes behind the hamburger.
+
+     Eight views is more than a narrow window has room for, and a row
+     that wraps to a second line moves everything under it every time it
+     does - so the palette jumps about as you resize, and on a phone the
+     last two or three views are simply off the end with nothing to say
+     they exist. The ones that fit stay on the row; the rest go into a
+     list behind the three lines at the end of it, which is where every
+     other program keeps the ones that did not fit.
+     ------------------------------------------------------------------ */
+  var bun = document.createElement("button");
+  bun.className = "edTab edBun";
+  bun.type = "button";
+  bun.title = "More views";
+  bun.setAttribute("aria-label", "More views");
+  bun.innerHTML = '<svg viewBox="0 0 16 16" aria-hidden="true">' +
+                  '<path d="M2.4 4.2h11.2M2.4 8h11.2M2.4 11.8h11.2"/></svg>';
+  var menu = document.createElement("div");
+  menu.className = "edBunList";
+  menu.hidden = true;
+  bun.addEventListener("click", function (e) {
+    e.stopPropagation();
+    menu.hidden = !menu.hidden;
+    bun.setAttribute("aria-pressed", menu.hidden ? "false" : "true");
+  });
+  addEventListener("click", function () { menu.hidden = true; bun.setAttribute("aria-pressed", "false"); });
+  tabs.appendChild(bun);
+  tabs.appendChild(menu);
+
+  /* measured, not guessed: the row is laid out, then anything that has
+     wrapped past the first line is moved into the list */
+  edTabsFit(tabs, bun, menu);
 
   var box = $("edTools");
   box.innerHTML = "";
@@ -9787,7 +9965,8 @@ function edCount() {
 
   /* what a builder actually wants to know, where the score used to be */
   var name = ($("edName").value || "").trim();
-  $("edTitle").textContent = name || "untitled";
+  /* the name is typed where it is shown now, so there is nothing to
+     copy it into - the placeholder says "untitled" when it is empty */
   $("edDirty").className = "edDot" + (ed.dirty ? " on" : "");
   $("edDirty").title = ed.dirty ? "unsaved changes" : "saved";
   var bx = game.box || (game.reBox && game.reBox());
@@ -9800,7 +9979,8 @@ function edCount() {
   bits.push(loose + " monster" + (loose === 1 ? "" : "s"));
   if (painted) bits.push(painted + " painted");
   if (ed.undo.length) bits.push(ed.undo.length + " to undo");
-  $("edFacts").textContent = "\u00b7 " + bits.join(" \u00b7 ");
+  var info = $("edInfo");
+  if (info) info.textContent = bits.join("  ·  ");
 }
 
 /* ====================================================================
@@ -10243,6 +10423,7 @@ function edEnter(rec, back) {
   $("briefSheet").hidden = true; $("pauseSheet").hidden = true;
   $("edBar").hidden = false;
   $("edTop").hidden = false;
+  $("edZoom").hidden = false;
   /* through edViewTo, so the tool in your hand belongs to the view you
      are looking at. Opening straight onto ED_TOOLS[0] meant the editor
      started with Erase selected while the Blocks view was showing, and
@@ -10754,6 +10935,20 @@ addEventListener("blur", function () { held = {}; tapped = {}; if (mode === "pla
 
   /* the editor's buttons */
   if ($("build")) $("build").addEventListener("click", function () { edEnter(null); });
+  if ($("edInfoBtn")) $("edInfoBtn").addEventListener("click", function () {
+    var el = $("edInfo"), open = el.hidden;
+    el.hidden = !open;
+    $("edInfoBtn").setAttribute("aria-pressed", open ? "true" : "false");
+    if (open) { $("edHelp").hidden = true; $("edHelpBtn").setAttribute("aria-pressed", "false"); }
+    edCount(); edHelpFit(); resize();
+  });
+  if ($("edHelpBtn")) $("edHelpBtn").addEventListener("click", function () {
+    var el = $("edHelp"), open = el.hidden;
+    el.hidden = !open;
+    $("edHelpBtn").setAttribute("aria-pressed", open ? "true" : "false");
+    if (open) { $("edInfo").hidden = true; $("edInfoBtn").setAttribute("aria-pressed", "false"); edHow(); }
+    edHelpFit(); resize();
+  });
   if ($("edMore")) $("edMore").addEventListener("click", function () {
     var rest = $("edRest"), open = rest.hidden;
     rest.hidden = !open;
