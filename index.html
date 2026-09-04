@@ -743,7 +743,7 @@
     <button class="edIcon" id="edMore" type="button" aria-pressed="false"
             title="Zoom" aria-label="Zoom"><svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="7" cy="7" r="4.5"/><path d="M10.4 10.4 13.9 13.9M5.1 7h3.8"/></svg></button>
     <button class="edIcon" id="edPublish" type="button"
-            title="Make it public" aria-label="Make it public"><svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6.3"/><path d="M1.8 8h12.4"/><path d="M8 1.7a10 10 0 0 1 0 12.6 10 10 0 0 1 0-12.6z"/></svg></button>
+            title="Make it public" aria-label="Make it public"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 10.6V1.9"/><path d="M4.7 5.2 8 1.9l3.3 3.3"/><path d="M2.4 9.4v4.2h11.2V9.4"/></svg></button>
     <button class="edIcon" id="edBurger" type="button" aria-pressed="false"
             title="Everything else" aria-label="Everything else"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2.6 4.4h10.8M2.6 8h10.8M2.6 11.6h10.8"/></svg></button>
     <div id="edBurgerList" hidden>
@@ -7797,6 +7797,36 @@ function cornerN(i, j, out) {
   return out.set(-gx, 1, -gz).normalize();
 }
 
+/* The highest point of a square's drawn surface, which is what a thing
+   put on that square has to stand on. Its middle is pinned to the
+   square's own height and its corners are shared with the neighbours,
+   so at the foot of a step the corners are the higher number. */
+function groundTop(c, r) {
+  if (c < 0 || r < 0 || c >= COLS || r >= ROWS) return 0;
+  var h = game.height[r * COLS + c];
+  var a = cornerH(c, r), b = cornerH(c + 1, r);
+  var d = cornerH(c, r + 1), e = cornerH(c + 1, r + 1);
+  if (a > h) h = a;
+  if (b > h) h = b;
+  if (d > h) h = d;
+  if (e > h) h = e;
+  return h * STEP;
+}
+
+/* which way the ground faces in the middle of a square */
+var _sn1 = null, _sn2 = null, _sn3 = null, _sn4 = null;
+function squareN(c, r, out) {
+  if (!_sn1) {
+    _sn1 = new THREE.Vector3(); _sn2 = new THREE.Vector3();
+    _sn3 = new THREE.Vector3(); _sn4 = new THREE.Vector3();
+  }
+  cornerN(c, r, _sn1); cornerN(c + 1, r, _sn2);
+  cornerN(c, r + 1, _sn3); cornerN(c + 1, r + 1, _sn4);
+  return out.set(_sn1.x + _sn2.x + _sn3.x + _sn4.x,
+                 _sn1.y + _sn2.y + _sn3.y + _sn4.y,
+                 _sn1.z + _sn2.z + _sn3.z + _sn4.z).normalize();
+}
+
 function groundAt(c, r) {
   if (c < 0 || r < 0 || c >= COLS || r >= ROWS) return 0;
   return game.height[r * COLS + c] * STEP;
@@ -7811,6 +7841,29 @@ function placeAt(mesh, n, c, r, y, sx, sy, sz, rotY) {
   var d = D();
   d.position.set(c + 0.5, y, (ROWS - 1 - r) + 0.5);
   d.rotation.set(0, rotY || 0, 0);
+  d.scale.set(sx === undefined ? 1 : sx, sy === undefined ? 1 : sy, sz === undefined ? 1 : sz);
+  d.updateMatrix();
+  mesh.setMatrixAt(n, d.matrix);
+}
+
+/* the same, leaning with the hill. The yaw the caller wanted is applied
+   first, about the block's own up, and the lean afterwards - the other
+   way round and turning a block would swing it through the ground. */
+var _UPV = null, _tiltN = null, _tiltQ = null, _tiltY = null;
+function placeTilt(mesh, n, c, r, y, sx, sy, sz, rotY) {
+  if (!_UPV) {
+    _UPV = new THREE.Vector3(0, 1, 0);
+    _tiltN = new THREE.Vector3();
+    _tiltQ = new THREE.Quaternion();
+    _tiltY = new THREE.Quaternion();
+  }
+  var d = D();
+  squareN(c, r, _tiltN);
+  _tiltQ.setFromUnitVectors(_UPV, _tiltN);
+  _tiltY.setFromAxisAngle(_UPV, rotY || 0);
+  d.position.set(c + 0.5, y, (ROWS - 1 - r) + 0.5);
+  d.quaternion.copy(_tiltQ).multiply(_tiltY);
+  d.rotation.setFromQuaternion(d.quaternion);
   d.scale.set(sx === undefined ? 1 : sx, sy === undefined ? 1 : sy, sz === undefined ? 1 : sz);
   d.updateMatrix();
   mesh.setMatrixAt(n, d.matrix);
@@ -8063,15 +8116,15 @@ function syncWorld() {
   var spin = bobT * 7.4;
   var bricks = [];
   for (var r = 0; r < ROWS; r++) for (var c = 0; c < COLS; c++) {
-    var i = r * COLS + c, what = game.grid[i], g0 = game.height[i] * STEP;
+    var i = r * COLS + c, what = game.grid[i], g0 = groundTop(c, r);
 
     if (what === MF.BRICK) bricks.push([c, r]);
     else if (what === MF.TREE) {
       placeAt(props.trunk, counts.trunk++, c, r, g0 + 0.75, 1, 1, 1, (c * 7 + r * 13) % 6);
       placeAt(props.crown, counts.crown++, c, r, g0 + 1.62, 1, 0.9, 1, (c * 3 + r * 5) % 6);
     } else if (what === MF.ROCK) {
-      placeAt(props.rock, counts.rock++, c, r, g0 + 0.42,
-              1, 1, 1, ((c * 5 + r * 11) % 8) * 0.79);
+      placeTilt(props.rock, counts.rock++, c, r, g0 + 0.42,
+                1, 1, 1, ((c * 5 + r * 11) % 8) * 0.79);
     } else if (what === MF.COOLED) {
       placeAt(props.cooled, counts.cooled++, c, r, g0 + 0.17);
     } else if (what === MF.VAT_TAR) {
@@ -8195,10 +8248,8 @@ function paintBricks(cells, level) {
   if (BRICK_MAT.map !== t.map) { BRICK_MAT.map = t.map; BRICK_MAT.bumpMap = t.bump; BRICK_MAT.needsUpdate = true; }
   var n = 0, cap = brickMesh.instanceMatrix.count;
   for (var i = 0; i < cells.length && n < cap; i++) {
-    _m4.makeTranslation(cells[i][0] + 0.5,
-                        groundAt(cells[i][0], cells[i][1]) + 0.33,
-                        (ROWS - 1 - cells[i][1]) + 0.5);
-    brickMesh.setMatrixAt(n++, _m4);
+    placeTilt(brickMesh, n++, cells[i][0], cells[i][1],
+              groundTop(cells[i][0], cells[i][1]) + 0.33);
   }
   brickMesh.count = n;
   brickMesh.instanceMatrix.needsUpdate = true;
@@ -9632,11 +9683,9 @@ function edPanTo(x, z) {
   if (!isFinite(x) || !isFinite(z)) return;
   var see = edSeeing();
   var cx = (COLS - 1) / 2, cz = (ROWS - 1) / 2;
-  var slackX = Math.max(0, (COLS - see.w) / 2);
-  var slackZ = Math.max(0, (ROWS - see.h * 0.9) / 2);
+  var slackX = (COLS - 1) / 2, slackZ = (ROWS - 1) / 2;
   ed.panX = Math.max(cx - slackX, Math.min(cx + slackX, x));
   ed.panZ = Math.max(cz - slackZ, Math.min(cz + slackZ, z));
-  if (!slackX && !slackZ) { ed.panX = null; ed.panZ = null; }   /* it all fits */
 }
 
 function edPanBy(dx, dz) {
