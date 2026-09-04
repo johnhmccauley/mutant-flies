@@ -1482,5 +1482,65 @@ const B = MF.BRICK, R = MF.ROCK;
      drag([B, B, B, B, B, B]) > drag([B, B, B]), true);
 }
 
+
+/* ---- lifting the ground ------------------------------------------- */
+{
+  const g = bare(8);
+  g.height.fill(0);
+  g.terrace(17, 13, 1);
+  ok("lifting one step lifts one square", g.height[I(17, 13)], 1);
+}
+{
+  const g = bare(8);
+  g.height.fill(0);
+  g.terrace(17, 13, 3);
+  ok("lifting to the top brings its neighbours up with it",
+     [g.height[I(17, 13)], g.height[I(18, 13)], g.height[I(19, 13)], g.height[I(20, 13)]],
+     [3, 2, 1, 0]);
+}
+{
+  /* the whole point: no cliffs anywhere, however it was built */
+  const g = bare(8);
+  g.height.fill(0);
+  g.terrace(10, 10, 3); g.terrace(24, 16, 3); g.terrace(11, 11, 2);
+  let steepest = 0;
+  for (let r = 0; r < MF.ROWS; r++) for (let c = 0; c < MF.COLS; c++)
+    for (const d of [[1, 0], [0, 1]]) {
+      const nc = c + d[0], nr = r + d[1];
+      if (nc < MF.COLS && nr < MF.ROWS)
+        steepest = Math.max(steepest, Math.abs(g.height[I(c, r)] - g.height[I(nc, nr)]));
+    }
+  ok("and nowhere in the cellar is steeper than one step", steepest, 1);
+}
+{
+  const g = bare(8);
+  g.height.fill(0);
+  g.terrace(17, 13, 3);
+  g.terrace(17, 13, -3);
+  let steepest = 0;
+  for (let r = 0; r < MF.ROWS; r++) for (let c = 0; c < MF.COLS; c++)
+    for (const d of [[1, 0], [0, 1]]) {
+      const nc = c + d[0], nr = r + d[1];
+      if (nc < MF.COLS && nr < MF.ROWS)
+        steepest = Math.max(steepest, Math.abs(g.height[I(c, r)] - g.height[I(nc, nr)]));
+    }
+  ok("pulling it back down brings the slope down after it",
+     [g.height[I(17, 13)], steepest], [0, 1]);
+}
+{
+  const g = bare(8);
+  g.height.fill(0);
+  ok("the ground stops at the top and at the bottom",
+     [g.terrace(5, 5, -1), (g.height.fill(MF.MAX_H), g.terrace(5, 5, 1))], [0, 0]);
+}
+{
+  /* a lift against the wall does not fall off it */
+  const g = bare(8);
+  g.height.fill(0);
+  g.terrace(0, 0, 3);
+  ok("lifting in a corner spreads inwards and stops at the edge",
+     [g.height[I(0, 0)], g.height[I(1, 0)], g.height[I(2, 0)], g.height[I(3, 0)]], [3, 2, 1, 0]);
+}
+
 console.log("\n" + pass + " passed, " + fail + " failed");
 process.exit(fail ? 1 : 0);

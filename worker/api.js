@@ -31,7 +31,7 @@ const PRIOR = 3.5, PRIOR_WEIGHT = 10;   /* must match src/catalogue.js */
 const NONCE_TTL = 120 * 1000;           /* two minutes to sign and send */
 const MAX_BODY = 8000;                  /* a level packs to ~1.9k; this is slack */
 const MAX_NAME = 48;
-const MAX_THUMB = 20000;                /* a 34x26 picture is nothing like this big */
+const MAX_THUMB = 60000;                /* a 384x240 jpeg of a dark room, with room to spare */
 const PAGE = 50;
 const ROYALTY = 2;                      /* must match src/credits.js */
 const PODIUM = [

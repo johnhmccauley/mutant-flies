@@ -277,8 +277,8 @@
 .edItem span { color: #8e8172; font-size: 12px; }
 .edItem .edBtn { margin-left: auto; }
 /* the picture of the cellar, drawn as squares rather than smeared */
-.edPic { width: 68px; height: 52px; image-rendering: pixelated; border-radius: 3px;
-  border: 1px solid #33291f; flex: 0 0 auto; }
+.edPic { width: 96px; height: 60px; object-fit: cover; border-radius: 3px;
+  border: 1px solid #33291f; flex: 0 0 auto; background: #14110c; }
 #edCode { width: 100%; height: 110px; background: #14100c; color: #c9bba8;
   border: 1px solid #3a2e22; border-radius: 6px; padding: 8px; font-family: inherit;
   font-size: 11px; resize: vertical; }
@@ -407,6 +407,11 @@
     <button class="edBtn warm" id="edBot" type="button">Set the bot on it</button>
     <button class="edBtn" id="edShare" type="button">Code</button>
     <button class="edBtn" id="edPublish" type="button">Publish</button>
+    <button class="edBtn" id="edUndo" type="button" title="Ctrl+Z">Undo</button>
+    <button class="edBtn" id="edRedo" type="button">Redo</button>
+    <button class="edBtn" id="edPaint" type="button" aria-pressed="false"
+            title="Lay as you walk, instead of pressing space on every square">Paint</button>
+    <button class="edBtn" id="edStampBtn" type="button" title="Same as space">Put down</button>
     <button class="edBtn" id="edQuit" type="button">Leave</button>
     <div id="edSay"></div>
   </div>
@@ -1688,6 +1693,62 @@
       }
       if (!changed) break;
     }
+  };
+
+  /* ------------------------------------------------------------------
+     LIFTING THE GROUND
+
+     Raising one square on its own would make a cliff, and a cliff is
+     not a thing this floor has: the steepest the ground gets is one
+     step between neighbours. So lifting a square lifts what is around
+     it too, and the higher it goes the further out that reaches - a
+     cone rather than a pillar, spreading until it runs into the edge
+     of the cellar or into ground already high enough.
+
+     One step is 0.55 of a square, which is about twenty-nine degrees.
+     Two would be forty-eight, which is past the limit, so one step
+     between neighbours is both the rule and the only choice the grid
+     offers.
+
+     Lowering does the same in reverse: pull a square down and anything
+     left standing more than a step above it comes down after it. Which
+     means the ground is always walkable and always renderable - every
+     change of height is a ramp, and there is nothing anywhere that a
+     brick could be pushed off but not onto.
+     ------------------------------------------------------------------ */
+  Game.prototype.terrace = function (c, r, delta) {
+    if (!this.inField(c, r)) return 0;
+    var i = this.idx(c, r);
+    var want = Math.max(0, Math.min(MAX_H, this.height[i] + delta));
+    if (want === this.height[i]) return 0;
+    this.height[i] = want;
+    return this.relax(delta > 0);
+  };
+
+  /* Make every neighbour within one step, either by bringing the low
+     ones up (after a lift) or the high ones down (after a dig). Runs to
+     a fixed point, which cannot take more passes than the ground is
+     tall multiplied by how wide the room is. */
+  Game.prototype.relax = function (raising) {
+    var D = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+    var moved = 0;
+    for (var pass = 0; pass < COLS + ROWS; pass++) {
+      var changed = false;
+      for (var r = 0; r < ROWS; r++) for (var c = 0; c < COLS; c++) {
+        if (!this.inField(c, r)) continue;
+        var i = this.idx(c, r), best = raising ? 0 : MAX_H;
+        for (var d = 0; d < 4; d++) {
+          var nc = c + D[d][0], nr = r + D[d][1];
+          if (!this.inField(nc, nr)) continue;    /* the edge is not a height */
+          var h = this.height[this.idx(nc, nr)];
+          best = raising ? Math.max(best, h) : Math.min(best, h);
+        }
+        if (raising && this.height[i] < best - 1) { this.height[i] = best - 1; changed = true; moved++; }
+        else if (!raising && this.height[i] > best + 1) { this.height[i] = best + 1; changed = true; moved++; }
+      }
+      if (!changed) break;
+    }
+    return moved;
   };
 
   Game.prototype.flatten = function (c, r) {
@@ -5274,7 +5335,14 @@ var monsterRigs = [];
 var terrain, terrains = [], rampMesh = null, props = {}, marbleMeshes = [], cubeCam, cubeT = 0, bobT = 0;
 
 function init3D() {
-  renderer = new THREE.WebGLRenderer({ canvas: $("gl"), antialias: true, powerPreference: "high-performance" });
+  /* preserveDrawingBuffer so a picture can be taken of the cellar. Without
+     it the buffer is thrown away at composite time and anything read from
+     outside the draw loop - a thumbnail taken from a button, which is
+     exactly the case - comes back black. It costs a little memory and
+     nothing else that matters at this size. */
+  renderer = new THREE.WebGLRenderer({ canvas: $("gl"), antialias: true,
+                                       preserveDrawingBuffer: true,
+                                       powerPreference: "high-performance" });
   renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
   renderer.shadowMap.enabled = true;
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
@@ -5458,6 +5526,17 @@ function buildProps() {
   props.cooled = inst(new THREE.BoxGeometry(0.98, 0.34, 0.98), slag, 320, true);
   /* loose credits: a coin on edge, turning, so it catches the torches
      and is visible from across the room - which is the point of it */
+  /* Where the player starts, and which square the cursor is over. The
+     first editor showed neither: the man stood ON the square he was
+     about to stamp, hiding it, and once the start stopped being the
+     cursor there was nothing at all to say where it was. */
+  props.startPad = inst(new THREE.RingGeometry(0.30, 0.46, 24).rotateX(-Math.PI / 2),
+    new THREE.MeshBasicMaterial({ color: 0xffd27a, transparent: true, opacity: 0.85,
+                                  side: THREE.DoubleSide }), 2, false);
+  props.cursorPad = inst(new THREE.RingGeometry(0.42, 0.5, 4).rotateX(-Math.PI / 2),
+    new THREE.MeshBasicMaterial({ color: 0x7fe0ff, transparent: true, opacity: 0.9,
+                                  side: THREE.DoubleSide }), 2, false);
+
   props.coin = inst(new THREE.CylinderGeometry(0.3, 0.3, 0.07, 18).rotateX(Math.PI / 2),
     new THREE.MeshStandardMaterial({ color: 0xe8c04a, roughness: 0.25, metalness: 0.85,
                                      emissive: 0x8a6410, emissiveIntensity: 0.45 }), 8, true);
@@ -6085,7 +6164,7 @@ var FX = {
    ================================================================== */
 var game = new MF.Game();
 var mode = "title";          /* title | play | paused | won | over | edit */
-var edAcc = 0;
+var edAcc = 0, edPainted = false;
 var held = {}, turnAcc = 0;
 var manPos = new THREE.Vector3(), manWant = new THREE.Vector3();
 var manFace = 0, manFaceWant = 0;
@@ -6215,6 +6294,7 @@ function syncTerrain() {
 function syncWorld() {
   var counts = { trunk: 0, crown: 0, cooled: 0, vatT: 0, vatW: 0, water: 0, tar: 0,
                  snakeSeg: 0, snakeHead: 0, snakeEye: 0, rock: 0, coin: 0,
+                 startPad: 0, cursorPad: 0,
                  robot: 0, robotOn: 0, robotTread: 0, robotEye: 0,
                  chopBed: 0, chopBlade: 0, chopBlade2: 0,
                  item1: 0, item2: 0, item3: 0, item4: 0 };
@@ -6257,6 +6337,15 @@ function syncWorld() {
       placeAt(mesh, counts[kk]++, c, r, g0 + depth / 2, 0.99, depth, 0.99);
     }
   }
+  /* the two marks the editor needs and the game does not */
+  if (mode === "edit") {
+    var sg = game.height[ed.startR * COLS + ed.startC] * STEP;
+    placeAt(props.startPad, counts.startPad++, ed.startC, ed.startR, sg + 0.06);
+    var cg = game.height[game.manR * COLS + game.manC] * STEP;
+    placeAt(props.cursorPad, counts.cursorPad++, game.manC, game.manR, cg + 0.05,
+            1, 1, 1, Math.PI / 4);
+  }
+
   /* the coins, on edge and turning. They fade as their time runs out,
      so a player can see one is about to go rather than being surprised
      by it - the tension is meant to be the walk, not the clock. */
@@ -6751,8 +6840,50 @@ function pause(on) {
    quietly nowhere. */
 var ed = {
   tool: 0, rec: null, id: null, state: "private",
-  everPublic: false, dirty: false, backTo: "title"
+  everPublic: false, dirty: false, backTo: "title",
+  /* Where the level STARTS, which is not where the cursor is. The man
+     is the cursor, so without this the starting square was wherever the
+     builder happened to leave him when they stopped building - which
+     was almost never where they meant the player to begin. */
+  startC: 4, startR: 4,
+  /* The single most important thing an editor has, and the first
+     version did not have it: somewhere to put the last forty things you
+     did so you can take one of them back. Whole cellars, because a
+     cellar is two kilobytes and being clever about deltas here would
+     buy nothing and cost correctness. */
+  undo: [], redo: [], painting: false
 };
+var UNDO_DEEP = 40;
+
+function edMark() {
+  try {
+    ed.undo.push({ rec: edAsLevel({}), start: [ed.startC, ed.startR] });
+    if (ed.undo.length > UNDO_DEEP) ed.undo.shift();
+    ed.redo.length = 0;
+    edButtons();
+  } catch (e) { /* never let bookkeeping stop somebody building */ }
+}
+
+function edStepBack(stack, other) {
+  if (!stack.length) return edSay("nothing to undo");
+  try {
+    other.push({ rec: edAsLevel({}), start: [ed.startC, ed.startR] });
+    var was = stack.pop();
+    MutantLevelFormat.apply(game, was.rec);
+    ed.startC = was.start[0]; ed.startR = was.start[1];
+    game.manC = ed.startC; game.manR = ed.startR;
+    edRigs(); syncTerrain(); syncEdges(); syncWorld(); drawPlan(); edCount(); edButtons();
+    worldOf(game.manC, game.manR, manWant); manPos.copy(manWant);
+    edSay("");
+  } catch (e) { edSay("could not go back: " + e.message, "bad"); }
+}
+
+function edButtons() {
+  var u = $("edUndo"), rd = $("edRedo"), pt = $("edPaint");
+  if (u) u.disabled = !ed.undo.length;
+  if (rd) rd.disabled = !ed.redo.length;
+  if (pt) pt.setAttribute("aria-pressed", ed.painting ? "true" : "false");
+}
 
 var ED_TOOLS = [
   { name: "Erase",     key: "1", swatch: "#2a231c", act: "cell", v: 0 },
@@ -6802,9 +6933,10 @@ function edPaint() {
 }
 
 /* --- what goes down when you press space -------------------------- */
-function edStamp() {
+function edStamp(quiet) {
   if (mode !== "edit") return;
   var t = ED_TOOLS[ed.tool], c = game.manC, r = game.manR, i = r * COLS + c;
+  if (!quiet) edMark();
 
   if (t.act === "cell") {
     /* a marble is a grid square AND an object, so erasing one has to
@@ -6832,10 +6964,15 @@ function edStamp() {
     edRigs();
   } else if (t.act === "man") {
     game.grid[i] = MF.EMPTY;
-    game.manC = c; game.manR = r;
-    edSay("this is where you start");
+    ed.startC = c; ed.startR = r;
+    edSay("the player starts here");
   } else if (t.act === "hi") {
-    game.height[i] = Math.max(0, Math.min(MF.MAX_H, game.height[i] + t.v));
+    /* lifting a square lifts what is round it, spreading further the
+       higher it goes, because the ground does not do cliffs */
+    var moved = game.terrace(c, r, t.v);
+    edSay(t.v > 0
+      ? (moved ? "lifted, and " + moved + " squares came up with it" : "lifted")
+      : (moved ? "lowered, and " + moved + " came down after it" : "lowered"));
     syncTerrain(); syncEdges();
   } else if (t.act === "edge") {
     /* only means anything on the border, where there IS an edge */
@@ -6888,6 +7025,7 @@ function edEnter(rec, back) {
     ed.id = rec.id || null;
     ed.state = rec.state || "private";
     ed.everPublic = !!rec.everPublic;
+    ed.startC = game.manC; ed.startR = game.manR;
     $("edName").value = rec.name || "";
   } else {
     /* a bare room to build in, not a generated cellar - somebody who
@@ -6901,11 +7039,13 @@ function edEnter(rec, back) {
     game.marbles.length = 0; game.sources.length = 0; game.coins.length = 0;
     game.monsters.length = 0; game.robots.length = 0;
     game.manC = 4; game.manR = 4;
+    ed.startC = 4; ed.startR = 4;
     ed.id = null; ed.state = "private"; ed.everPublic = false;
     $("edName").value = "";
   }
   ed.dirty = false;
-  edPaint(); edRigs(); syncTerrain(); syncEdges(); syncWorld(); drawPlan(); edCount();
+  ed.undo.length = 0; ed.redo.length = 0;
+  edPaint(); edButtons(); edRigs(); syncTerrain(); syncEdges(); syncWorld(); drawPlan(); edCount();
   worldOf(game.manC, game.manR, manWant); manPos.copy(manWant);
   edSay("Walk with Z X : / - space puts down whatever is in your hand.");
 }
@@ -6917,9 +7057,20 @@ function edLeave() {
   enterTitle();
 }
 
+/* The cellar as the level, rather than as the workbench: the man on the
+   square the player will start on, not the square the cursor is parked
+   on. Everything that leaves the editor goes through here. */
+function edAsLevel(about) {
+  var wasC = game.manC, wasR = game.manR;
+  game.manC = ed.startC; game.manR = ed.startR;
+  var rec = MutantLevelFormat.capture(game, about);
+  game.manC = wasC; game.manR = wasR;
+  return rec;
+}
+
 /* --- testing it --------------------------------------------------- */
 function edTestPlay() {
-  var rec = MutantLevelFormat.capture(game, { name: $("edName").value });
+  var rec = edAsLevel({ name: $("edName").value });
   var bad = MutantLevelFormat.faults(rec);
   if (bad.length) return edSay(bad.join(" &middot; "), "bad");
   ed.rec = rec;
@@ -6934,7 +7085,7 @@ function edTestPlay() {
    one run tells you nothing - a cellar the bot clears once in twenty is
    not a hard cellar, it is a lucky one. */
 function edBotTest() {
-  var rec = MutantLevelFormat.capture(game, { name: $("edName").value });
+  var rec = edAsLevel({ name: $("edName").value });
   var bad = MutantLevelFormat.faults(rec);
   if (bad.length) return edSay(bad.join(" &middot; "), "bad");
   edSay("setting the bot on it...");
@@ -6964,27 +7115,57 @@ function edBotTest() {
 }
 
 /* ------------------------------------------------------------------
-   A picture of the cellar.
+   A picture of the cellar: what the player sees on the first frame.
 
-   drawPlan() already renders the whole thing to a 34x26 canvas every
-   turn, which IS the picture - it just needs to come off the canvas
-   bigger than 34 pixels so it is legible in a list. Drawn with no
-   smoothing, so it comes out as honest squares rather than a smear.
+   Not the map - the view. The camera is put exactly where the game
+   would put it on the opening turn, looking at the square the player
+   starts on, and one frame is drawn and read straight off the canvas.
 
-   A cellar this size is about a kilobyte and a half of PNG, which is
-   the same order as the level it is a picture of.
+   It is taken from the WebGL canvas rather than from the page, which
+   is why there is no score line across the top of it and nothing has
+   to be hidden first: the HUD, the palette and the rest are ordinary
+   DOM sitting over the top, and none of them are in the picture.
+
+   JPEG, because a photograph of a lit room is not what PNG is for -
+   about eight kilobytes rather than eighty.
    ------------------------------------------------------------------ */
+var THUMB_W = 384, THUMB_H = 240;
+
 function edThumb() {
   try {
-    drawPlan();
-    var big = document.createElement("canvas");
-    big.width = COLS * 4; big.height = ROWS * 4;
-    var g2 = big.getContext("2d");
-    g2.imageSmoothingEnabled = false;
+    var wasPos = camera.position.clone(), wasQuat = camera.quaternion.clone();
+    var wasMan = manRig.position.clone(), wasFace = manRig.rotation.y;
+
+    /* the same two lines the play camera uses, with no smoothing - the
+       game lerps towards this, and the first frame is the destination */
+    var here = new THREE.Vector3();
+    worldOf(ed.startC, ed.startR, here);
+    /* and the man where the player will be standing, not where the
+       cursor was left - he is in the picture too */
+    manRig.position.copy(here);
+    manRig.rotation.y = 0;
+    camera.position.set(here.x, 16.5, here.z + 12.8);
+    camera.lookAt(here.x, here.y + 0.9, here.z);
+    renderer.render(scene, camera);
+
+    var gl = renderer.domElement;
+    var out = document.createElement("canvas");
+    out.width = THUMB_W; out.height = THUMB_H;
+    var g2 = out.getContext("2d");
     g2.fillStyle = "#14110c";
-    g2.fillRect(0, 0, big.width, big.height);
-    g2.drawImage(plan, 0, 0, big.width, big.height);
-    return big.toDataURL("image/png");
+    g2.fillRect(0, 0, THUMB_W, THUMB_H);
+    /* cover, so every level's picture is the same shape whatever window
+       it was built in */
+    var k = Math.max(THUMB_W / gl.width, THUMB_H / gl.height);
+    var w = gl.width * k, h = gl.height * k;
+    g2.drawImage(gl, (THUMB_W - w) / 2, (THUMB_H - h) / 2, w, h);
+    var url = out.toDataURL("image/jpeg", 0.74);
+
+    camera.position.copy(wasPos);
+    camera.quaternion.copy(wasQuat);
+    manRig.position.copy(wasMan);
+    manRig.rotation.y = wasFace;
+    return url;
   } catch (e) { return null; }       /* a picture is nice, not required */
 }
 
@@ -7006,7 +7187,7 @@ function edSave() {
   var name = $("edName").value.trim();
   if (!name) { $("edName").focus(); return edSay("give it a name first", "bad"); }
   var id = ed.id || newId();
-  var rec = MutantLevelFormat.capture(game, { name: name, id: id });
+  var rec = edAsLevel({ name: name, id: id });
   var bad = MutantLevelFormat.faults(rec);
   var row = {
     id: id, name: name, body: MutantLevelFormat.toCode(rec),
@@ -7059,7 +7240,7 @@ function esc(t) {
 
 /* --- a level as a string ------------------------------------------ */
 function edShare() {
-  var rec = MutantLevelFormat.capture(game, { name: $("edName").value.trim() });
+  var rec = edAsLevel({ name: $("edName").value.trim() });
   $("edCode").value = MutantLevelFormat.toCode(rec);
   $("edCodeSheet").hidden = false;
 }
@@ -7134,6 +7315,11 @@ addEventListener("keydown", function (e) {
         e.preventDefault(); ed.tool = ti; edPaint(); return;
       }
     }
+    if (k === "z" && (e.ctrlKey || e.metaKey)) {
+      e.preventDefault();
+      if (e.shiftKey) edStepBack(ed.redo, ed.undo); else edStepBack(ed.undo, ed.redo);
+      return;
+    }
     if (k === "[") { e.preventDefault(); ed.tool = (ed.tool + ED_TOOLS.length - 1) % ED_TOOLS.length; edPaint(); return; }
     if (k === "]") { e.preventDefault(); ed.tool = (ed.tool + 1) % ED_TOOLS.length; edPaint(); return; }
     if (k === "escape") { e.preventDefault(); edLeave(); return; }
@@ -7158,6 +7344,11 @@ addEventListener("blur", function () { held = {}; if (mode === "play") pause(tru
   /* the editor's buttons */
   var edWire = {
     edSave: edSave, edOpen: edList, edNew: function () { edEnter(null); },
+    edUndo: function () { edStepBack(ed.undo, ed.redo); },
+    edRedo: function () { edStepBack(ed.redo, ed.undo); },
+    edStampBtn: function () { edStamp(); },
+    edPaint: function () { ed.painting = !ed.painting; edButtons();
+      edSay(ed.painting ? "laying as you walk - press Paint again to stop" : ""); },
     edTest: edTestPlay, edBot: edBotTest, edShare: edShare,
     edPublish: edPublish, edQuit: edLeave,
     edListClose: function () { $("edListSheet").hidden = true; },
@@ -7311,12 +7502,22 @@ function frame() {
     edAcc = (edAcc || 0) + dt * 1000;
     while (edAcc >= 110) {
       edAcc -= 110;
+      var walking = false;
       for (var ei = 0; ei < PRIORITY.length; ei++) if (held[PRIORITY[ei]]) {
+        walking = true;
         var d = { left: [-1, 0], right: [1, 0], up: [0, 1], down: [0, -1] }[PRIORITY[ei]];
         var nc = game.manC + d[0], nr = game.manR + d[1];
-        if (game.inField(nc, nr)) { game.manC = nc; game.manR = nr; drawPlan(); }
+        if (game.inField(nc, nr)) {
+          game.manC = nc; game.manR = nr;
+          /* laying as you walk: one mark for the whole stroke rather
+             than one per square, or undo would be forty presses */
+          if (ed.painting) edStamp(edPainted);
+          edPainted = ed.painting;
+          drawPlan();
+        }
         break;
       }
+      if (!walking) edPainted = false;      /* the stroke ended */
     }
     worldOf(game.manC, game.manR, manWant);
   } else if (mode === "play") {

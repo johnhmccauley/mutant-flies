@@ -1357,6 +1357,62 @@
     }
   };
 
+  /* ------------------------------------------------------------------
+     LIFTING THE GROUND
+
+     Raising one square on its own would make a cliff, and a cliff is
+     not a thing this floor has: the steepest the ground gets is one
+     step between neighbours. So lifting a square lifts what is around
+     it too, and the higher it goes the further out that reaches - a
+     cone rather than a pillar, spreading until it runs into the edge
+     of the cellar or into ground already high enough.
+
+     One step is 0.55 of a square, which is about twenty-nine degrees.
+     Two would be forty-eight, which is past the limit, so one step
+     between neighbours is both the rule and the only choice the grid
+     offers.
+
+     Lowering does the same in reverse: pull a square down and anything
+     left standing more than a step above it comes down after it. Which
+     means the ground is always walkable and always renderable - every
+     change of height is a ramp, and there is nothing anywhere that a
+     brick could be pushed off but not onto.
+     ------------------------------------------------------------------ */
+  Game.prototype.terrace = function (c, r, delta) {
+    if (!this.inField(c, r)) return 0;
+    var i = this.idx(c, r);
+    var want = Math.max(0, Math.min(MAX_H, this.height[i] + delta));
+    if (want === this.height[i]) return 0;
+    this.height[i] = want;
+    return this.relax(delta > 0);
+  };
+
+  /* Make every neighbour within one step, either by bringing the low
+     ones up (after a lift) or the high ones down (after a dig). Runs to
+     a fixed point, which cannot take more passes than the ground is
+     tall multiplied by how wide the room is. */
+  Game.prototype.relax = function (raising) {
+    var D = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+    var moved = 0;
+    for (var pass = 0; pass < COLS + ROWS; pass++) {
+      var changed = false;
+      for (var r = 0; r < ROWS; r++) for (var c = 0; c < COLS; c++) {
+        if (!this.inField(c, r)) continue;
+        var i = this.idx(c, r), best = raising ? 0 : MAX_H;
+        for (var d = 0; d < 4; d++) {
+          var nc = c + D[d][0], nr = r + D[d][1];
+          if (!this.inField(nc, nr)) continue;    /* the edge is not a height */
+          var h = this.height[this.idx(nc, nr)];
+          best = raising ? Math.max(best, h) : Math.min(best, h);
+        }
+        if (raising && this.height[i] < best - 1) { this.height[i] = best - 1; changed = true; moved++; }
+        else if (!raising && this.height[i] > best + 1) { this.height[i] = best + 1; changed = true; moved++; }
+      }
+      if (!changed) break;
+    }
+    return moved;
+  };
+
   Game.prototype.flatten = function (c, r) {
     for (var dr = -1; dr <= 1; dr++) for (var dc = -1; dc <= 1; dc++)
       if (this.inField(c + dc, r + dr)) this.height[this.idx(c + dc, r + dr)] = 0;
