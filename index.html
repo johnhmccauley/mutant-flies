@@ -5996,6 +5996,79 @@ function brickMaps(hue) {
   });
   return { map: tex(col, 1, 1, true), bump: tex(bump, 1, 1) };
 }
+/* --- sawn timber -----------------------------------------------------
+   Boards laid flat and stacked, which is what the walls of the cellar
+   are built of. Nothing here drew planks: brickMaps draws courses of
+   brick whatever colour you hand it, so asking it for wood got a wood
+   coloured BRICK wall, and stoneMaps only reads as timber from a long
+   way off and at a grazing angle.
+
+   A board is a band of the texture with a dark gap under it and the
+   grain running along its length - dozens of long wavering strokes,
+   light and dark, because that is all wood grain is. Every board takes
+   its own tone, since a stack cut all one colour reads as a moulding
+   rather than as timber somebody piled up.
+   -------------------------------------------------------------------- */
+function plankMaps() {
+  var S = 256, boards = 4, h = S / boards;
+
+  function drawGrain(g, by, bh, S2) {
+    for (var k = 0; k < 54; k++) {
+      var gy = by + 2 + Math.random() * (bh - 4);
+      var dark = Math.random() < 0.58;
+      g.strokeStyle = dark
+        ? "rgba(30,16,4," + (0.06 + Math.random() * 0.16) + ")"
+        : "rgba(255,236,198," + (0.03 + Math.random() * 0.08) + ")";
+      g.lineWidth = 0.5 + Math.random() * 1.7;
+      g.beginPath();
+      g.moveTo(-6, gy);
+      for (var t = 1; t <= 7; t++)
+        g.lineTo((S2 + 12) * t / 7 - 6, gy + (Math.random() - 0.5) * 2.6);
+      g.stroke();
+    }
+  }
+
+  var col = noiseCanvas(S, function (g) {
+    g.fillStyle = "#140d06"; g.fillRect(0, 0, S, S);        /* the gap between */
+    for (var r = 0; r < boards; r++) {
+      var by = r * h + 2, bh = h - 5;
+      var lift = 0.80 + Math.random() * 0.40;
+      g.fillStyle = "hsl(" + (30 + Math.random() * 9) + "," +
+                    (36 + Math.random() * 12) + "%," +
+                    Math.min(56, 33 * lift + 8) + "%)";
+      g.fillRect(0, by, S, bh);
+      drawGrain(g, by, bh, S);
+      if (Math.random() < 0.4) {                            /* a knot */
+        var kx = Math.random() * S, ky = by + bh * (0.3 + Math.random() * 0.4);
+        g.fillStyle = "rgba(38,20,6,.42)";
+        g.beginPath(); g.ellipse(kx, ky, 3 + Math.random() * 4, 2 + Math.random() * 2.5, 0, 0, 6.3); g.fill();
+      }
+      g.fillStyle = "rgba(255,240,214,.11)"; g.fillRect(0, by, S, 1.6);
+      g.fillStyle = "rgba(0,0,0,.34)"; g.fillRect(0, by + bh - 2, S, 2);
+    }
+    grain(g, S, 16, true);
+  });
+
+  var bump = noiseCanvas(S, function (g) {
+    g.fillStyle = "#0c0c0c"; g.fillRect(0, 0, S, S);
+    for (var r = 0; r < boards; r++) {
+      var by = r * h + 2, bh = h - 5;
+      g.fillStyle = "#c9c9c9"; g.fillRect(0, by, S, bh);
+      g.strokeStyle = "rgba(255,255,255,.35)";
+      for (var k = 0; k < 26; k++) {
+        g.lineWidth = 0.6 + Math.random() * 1.2;
+        var gy = by + 2 + Math.random() * (bh - 4);
+        g.beginPath(); g.moveTo(-6, gy);
+        for (var t = 1; t <= 7; t++) g.lineTo((S + 12) * t / 7 - 6, gy + (Math.random() - 0.5) * 2.2);
+        g.stroke();
+      }
+    }
+    grain(g, S, 34);
+  });
+
+  return { map: tex(col, 1, 1, true), bump: tex(bump, 1, 1) };
+}
+
 function stoneMaps() {
   var S = 512, rows = 6, h = S / rows;
   var col = noiseCanvas(S, function (g) {
@@ -6136,7 +6209,7 @@ var renderer, scene, camera, clock;
 var brickMesh, floorMesh, manRig, motes, debris = [], torches = [], keyLight;
 var BRICK_MAT, BRICK_TEX = {};
 var monsterRigs = [];
-var SURROUND = null;
+var SURROUND = null, TIMBER = null;
 var terrain, terrains = [], rampMesh = null, floorSkin = null, props = {}, marbleMeshes = [], cubeCam, cubeT = 0, bobT = 0;
 
 function init3D() {
@@ -6607,9 +6680,11 @@ function buildProps() {
      between them, merged into one geometry so it still costs one
      instance per square.
      ------------------------------------------------------------------ */
+  /* the cellar's walls are sawn boards stacked up */
+  TIMBER = TIMBER || plankMaps();
   props.edgeWall = inst(new THREE.BoxGeometry(1.02, 3.4, 1.02),
-    new THREE.MeshStandardMaterial({ map: SURROUND.map, bumpMap: SURROUND.bump,
-                                     bumpScale: 0.11, roughness: 0.95, metalness: 0.03 }),
+    new THREE.MeshStandardMaterial({ map: TIMBER.map, bumpMap: TIMBER.bump,
+                                     bumpScale: 0.09, roughness: 0.9, metalness: 0.02 }),
     COLS * ROWS, true);
   /* the little lip the floor ends in where there is no wall */
   props.edgeLip = inst(new THREE.BoxGeometry(1.02, 0.26, 1.02),
@@ -9753,7 +9828,7 @@ function edTintEdges() {
   if (!_tintC) _tintC = new THREE.Color();
   var lit = (mode === "edit" && ed.view === "walls" && ed.polyShut && ed.segPick >= 0);
 
-  [[props.edgeWall, 0.55, 1.45, 3.60], [props.edgeLip, 1.10, 3.45, 5.90]]
+  [[props.edgeWall, 0.40, 1.10, 4.20], [props.edgeLip, 1.10, 3.45, 5.90]]
   .forEach(function (row) {
     var mesh = row[0];
     if (!mesh.count) return;
