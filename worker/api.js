@@ -31,6 +31,7 @@ const PRIOR = 3.5, PRIOR_WEIGHT = 10;   /* must match src/catalogue.js */
 const NONCE_TTL = 120 * 1000;           /* two minutes to sign and send */
 const MAX_BODY = 8000;                  /* a level packs to ~1.9k; this is slack */
 const MAX_NAME = 48;
+const MAX_THUMB = 20000;                /* a 34x26 picture is nothing like this big */
 const PAGE = 50;
 const ROYALTY = 2;                      /* must match src/credits.js */
 const PODIUM = [
@@ -153,7 +154,9 @@ async function visible(db, lv, playerId) {
 }
 
 const publicShape = (lv) => ({
-  id: lv.id, name: lv.name, author: lv.author_name || null, authorId: lv.owner,
+  id: lv.id, name: lv.name, author: lv.author_name || null,
+  authorId: lv.author_uuid || null,
+  thumb: lv.thumb || null,
   cellar: lv.cellar, state: lv.state, created: lv.created, edited: lv.edited,
   plays: lv.plays,
   stars: lv.rating_count ? lv.rating_sum / lv.rating_count : null,
@@ -161,6 +164,20 @@ const publicShape = (lv) => ({
 });
 
 const today = (now) => new Date(now).toISOString().slice(0, 10);
+
+/* What uniqueness is judged on. Case and runs of space are not what
+   anybody means by a different name, and letting them count would make
+   "The Long Drop" and "the  long  drop" two levels - which fools
+   nobody and helps nobody. */
+function nameKey(name) {
+  return String(name || "").trim().toLowerCase().replace(/\s+/g, " ");
+}
+const OK_NAME = /^[\w .,'!?()&:-]{2,48}$/;
+
+async function authorOf(db, playerId) {
+  return db.prepare("SELECT name, uuid FROM authors WHERE player_id = ?")
+    .bind(playerId).first();
+}
 const thisMonth = (now) => new Date(now).toISOString().slice(0, 7);
 function lastMonth(now) {
   const d = new Date(now);
@@ -337,10 +354,13 @@ export async function handle(req, env, ctx) {
   /* --- who am I, and what have I got ------------------------------ */
   if (path === "/api/me" && req.method === "POST") {
     const paid = await hasPaid(db, who.id);
+    const called = await authorOf(db, who.id);
     const mine = (await db.prepare(
       "SELECT * FROM levels WHERE owner = ? ORDER BY created DESC LIMIT 200")
       .bind(who.id).all()).results || [];
-    return json({ id: who.id, paid, levels: mine.map(publicShape) });
+    return json({ id: who.id, paid, name: called ? called.name : null,
+                  authorId: called ? called.uuid : null,
+                  levels: mine.map(publicShape) });
   }
 
   /* --- put a level up --------------------------------------------- */
@@ -348,15 +368,27 @@ export async function handle(req, env, ctx) {
     if (!await hasPaid(db, who.id)) return oops(402, "the editor is part of the paid game");
     const name = String(body.name || "").trim().slice(0, MAX_NAME);
     const code = String(body.code || "");
-    if (!name) return oops(400, "a level needs a name");
+    if (!OK_NAME.test(name)) return oops(400, "a level needs a name, of two to forty-eight ordinary characters");
     if (!code || code.length > MAX_BODY) return oops(400, "that level is not a size a level comes in");
-    const id = "lv" + b64(crypto.getRandomValues(new Uint8Array(9)));
+    const thumb = String(body.thumb || "").slice(0, MAX_THUMB) || null;
+    if (body.thumb && thumb.indexOf("data:image/") !== 0)
+      return oops(400, "that picture is not a picture");
+    /* the level's own uuid, made where the level was made, so it is the
+       same level here as it is in the vault and in a pasted code */
+    const id = String(body.id || "");
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(id))
+      return oops(400, "a level needs an id");
+    const already = await db.prepare("SELECT owner FROM levels WHERE id = ?").bind(id).first();
+    if (already) return oops(409, "there is already a level with that id");
+    const me = await authorOf(db, who.id);
+
     await db.batch([
-      db.prepare("INSERT INTO levels (id, owner, owner_key, name, author_name, cellar," +
-                 " state, ever_public, created, edited, rank_score)" +
-                 " VALUES (?,?,?,?,?,?,'private',0,?,?,?)")
-        .bind(id, who.id, who.pub, name, String(body.author || "").slice(0, 24) || null,
-              parseInt(body.cellar, 10) || 1, now, now, rankScore(0, 0)),
+      db.prepare("INSERT INTO levels (id, owner, owner_key, name, name_key, author_name," +
+                 " author_uuid, thumb, cellar, state, ever_public, created, edited, rank_score)" +
+                 " VALUES (?,?,?,?,?,?,?,?,?,'private',0,?,?,?)")
+        .bind(id, who.id, who.pub, name, nameKey(name), me ? me.name : null,
+              me ? me.uuid : null, thumb, parseInt(body.cellar, 10) || 1,
+              now, now, rankScore(0, 0)),
       db.prepare("INSERT INTO level_bodies (level_id, body) VALUES (?,?)").bind(id, code)
     ]);
     return json({ id, state: "private" }, 201);
@@ -441,9 +473,12 @@ export async function handle(req, env, ctx) {
     if (!sub && req.method === "POST") {
       if (!await hasPaid(db, who.id)) return oops(402, "the editor is part of the paid game");
       const name = body.name === undefined ? lv.name : String(body.name).trim().slice(0, MAX_NAME);
-      if (!name) return oops(400, "a level needs a name");
-      const work = [db.prepare("UPDATE levels SET name = ?, edited = ? WHERE id = ?")
-        .bind(name, now, lv.id)];
+      if (!OK_NAME.test(name)) return oops(400, "a level needs a name, of two to forty-eight ordinary characters");
+      if (lv.ever_public && nameKey(name) !== lv.name_key)
+        return oops(409, "a level that has been public keeps the name people know it by");
+      const thumb2 = body.thumb === undefined ? lv.thumb : String(body.thumb).slice(0, MAX_THUMB);
+      const work = [db.prepare("UPDATE levels SET name = ?, name_key = ?, thumb = ?, edited = ? WHERE id = ?")
+        .bind(name, nameKey(name), thumb2, now, lv.id)];
       if (body.code !== undefined) {
         const code = String(body.code);
         if (!code || code.length > MAX_BODY) return oops(400, "that level is not a size a level comes in");
@@ -458,6 +493,18 @@ export async function handle(req, env, ctx) {
       const to = String(body.state || "");
       if (!canMove(lv.state, to))
         return oops(409, "a level cannot go from " + lv.state + " to " + to);
+      if (to === "public" && !lv.ever_public) {
+        /* going out in public for the first time: it needs a name
+           nobody else is using, and so do you */
+        const mine = await authorOf(db, who.id);
+        if (!mine) return oops(428, "choose a name for yourself before you publish anything");
+        const clash = await db.prepare(
+          "SELECT id FROM levels WHERE name_key = ? AND ever_public = 1 AND id <> ?")
+          .bind(lv.name_key, lv.id).first();
+        if (clash) return oops(409, "somebody has already published a level called that");
+        await db.prepare("UPDATE levels SET author_name = ?, author_uuid = ? WHERE id = ?")
+          .bind(mine.name, mine.uuid, lv.id).run();
+      }
       await db.prepare(
         "UPDATE levels SET state = ?, ever_public = ?, edited = ? WHERE id = ?")
         .bind(to, to === "public" ? 1 : lv.ever_public, now, lv.id).run();
@@ -491,6 +538,47 @@ export async function handle(req, env, ctx) {
       return oops(409, "that month is not over yet");
     const standings = await settlePodium(db, period, now);
     return json({ period, standings });
+  }
+
+  /* --- what people call themselves -------------------------------- */
+  if (path === "/api/name" && req.method === "POST") {
+    const want = String(body.name || "").trim().slice(0, 24);
+    if (!OK_NAME.test(want) || want.length < 2)
+      return oops(400, "a name of two to twenty-four ordinary characters");
+    const key = nameKey(want);
+    const taken = await db.prepare("SELECT player_id FROM authors WHERE name_key = ?")
+      .bind(key).first();
+    if (taken && taken.player_id !== who.id) return oops(409, "somebody is already called that");
+    /* One name each, changeable. The old row goes FIRST: there is one
+       row per player as well as one per name, so inserting the new name
+       before removing the old one is refused by the index - which is
+       what happened, and is the index doing its job.
+
+       The uuid is made once and kept for ever after. It is what the
+       catalogue points at, so it has to survive the person changing
+       what they are called. */
+    const had = await db.prepare("SELECT uuid FROM authors WHERE player_id = ?")
+      .bind(who.id).first();
+    const uuid = had ? had.uuid : crypto.randomUUID();
+    await db.prepare("DELETE FROM authors WHERE player_id = ?").bind(who.id).run();
+    await db.prepare(
+      "INSERT INTO authors (name_key, name, player_id, uuid, at) VALUES (?,?,?,?,?)" +
+      " ON CONFLICT(name_key) DO UPDATE SET name = excluded.name," +
+      " player_id = excluded.player_id, uuid = excluded.uuid, at = excluded.at")
+      .bind(key, want, who.id, uuid, now).run();
+    /* the levels already out in public follow the new name, because
+       they are still theirs */
+    await db.prepare("UPDATE levels SET author_name = ?, author_uuid = ? WHERE owner = ?")
+      .bind(want, uuid, who.id).run();
+    return json({ name: want, authorId: uuid });
+  }
+
+  if (path === "/api/name/free" && req.method === "POST") {
+    const key = nameKey(body.name);
+    if (!key) return json({ free: false, why: "a name of two characters or more" });
+    const taken = await db.prepare("SELECT player_id FROM authors WHERE name_key = ?")
+      .bind(key).first();
+    return json({ free: !taken || taken.player_id === who.id });
   }
 
   /* --- claim a purchase onto this machine ------------------------- */

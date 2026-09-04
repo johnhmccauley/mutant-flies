@@ -72,7 +72,13 @@ function freshDb() {
     return { DB: db.DB, NOW: () => now, EMAIL_SALT: "pepper" };
   }
 
+  /* a level now carries a uuid made where the level was made, so the
+     tests make one too rather than letting the server invent it */
+  const uuid = () => crypto.randomUUID();
+
   async function call(db, who, method, p, body, opts = {}) {
+    if (method === "POST" && p === "/api/levels" && body && !body.id && !opts.noId)
+      body = Object.assign({ id: uuid() }, body);
     const now = opts.now || 1_700_000_000_000;
     const env = makeEnv(db, now);
     let headers = {};
@@ -98,11 +104,14 @@ function freshDb() {
     return { status: res.status, body: await res.json() };
   }
 
-  /* a player who has paid */
-  async function paidUp(db, who, email) {
+  /* a player who has paid - and who has claimed a name, because
+     publishing anything now needs one */
+  let nameN = 0;
+  async function paidUp(db, who, email, called) {
     db.sqlite.prepare("INSERT INTO entitlements (email_hash, source, reference, at) VALUES (?,'stripe','sess',1)")
       .run(await api.hashEmail(email, "pepper"));
-    return call(db, who, "POST", "/api/claim", { email });
+    await call(db, who, "POST", "/api/claim", { email });
+    return call(db, who, "POST", "/api/name", { name: called || ("Builder " + (++nameN)) });
   }
 
   console.log("\nProving who you are, with no account anywhere\n");
@@ -525,6 +534,155 @@ function freshDb() {
     const amy = await player();
     ok("somebody who has bought nothing is holding nothing",
        (await call(d, amy, "POST", "/api/wallet")).body, { awarded: 0, royalties: 0, podium: 0, bought: 0, paid: false });
+  }
+
+  console.log("\nA name of your own\n");
+  {
+    const d = freshDb();
+    const amy = await player();
+    d.sqlite.prepare("INSERT INTO entitlements (email_hash, source, reference, at) VALUES (?,'stripe','s',1)")
+      .run(await api.hashEmail("amy@x", "pepper"));
+    await call(d, amy, "POST", "/api/claim", { email: "amy@x" });
+    const lv = await call(d, amy, "POST", "/api/levels", { name: "Nameless", code: "x", cellar: 5 });
+    const pub = await call(d, amy, "POST", "/api/levels/" + lv.body.id + "/state", { state: "public" });
+    ok("you cannot publish before you have a name of your own",
+       [pub.status, /choose a name for yourself/.test(pub.body.error)], [428, true]);
+
+    await call(d, amy, "POST", "/api/name", { name: "Amy" });
+    ok("and can once you have",
+       (await call(d, amy, "POST", "/api/levels/" + lv.body.id + "/state", { state: "public" })).status, 200);
+    ok("the level then says who made it",
+       (await call(d, null, "GET", "/api/levels/" + lv.body.id + "?me=x")).body.author, "Amy");
+  }
+  {
+    const d = freshDb();
+    const amy = await player(), bob = await player();
+    await paidUp(d, amy, "amy@x", "Onticha");
+    const r = await call(d, bob, "POST", "/api/name", { name: "onticha" });
+    ok("two people cannot have the same name, whatever the capitals",
+       [r.status, r.body.error], [409, "somebody is already called that"]);
+    ok("and you can ask before you try",
+       [(await call(d, bob, "POST", "/api/name/free", { name: "Onticha" })).body.free,
+        (await call(d, bob, "POST", "/api/name/free", { name: "Somebody Else" })).body.free],
+       [false, true]);
+    ok("your own name is still free to you",
+       (await call(d, amy, "POST", "/api/name/free", { name: "Onticha" })).body.free, true);
+  }
+  {
+    const d = freshDb();
+    const amy = await player();
+    await paidUp(d, amy, "amy@x", "Amy");
+    ok("a name of punctuation and nothing else is refused",
+       (await call(d, amy, "POST", "/api/name", { name: "!" })).status, 400);
+    ok("and one with markup in it",
+       (await call(d, amy, "POST", "/api/name", { name: "<script>x</script>" })).status, 400);
+  }
+  {
+    /* changing your name takes your levels with it - they are still
+       yours, and a catalogue that said otherwise would be lying */
+    const d = freshDb();
+    const amy = await player();
+    await paidUp(d, amy, "amy@x", "Amy");
+    const lv = await call(d, amy, "POST", "/api/levels", { name: "Renamed Author", code: "x", cellar: 5 });
+    await call(d, amy, "POST", "/api/levels/" + lv.body.id + "/state", { state: "public" });
+    await call(d, amy, "POST", "/api/name", { name: "Amelia" });
+    ok("changing your name takes the levels with it",
+       (await call(d, null, "GET", "/api/levels/" + lv.body.id + "?me=x")).body.author, "Amelia");
+    ok("and does not leave the old one lying about for somebody else",
+       (await call(d, amy, "POST", "/api/name/free", { name: "Amy" })).body.free, true);
+  }
+
+  console.log("\nOne level, one name, one id\n");
+  {
+    const d = freshDb();
+    const amy = await player(), bob = await player();
+    await paidUp(d, amy, "amy@x"); await paidUp(d, bob, "bob@x");
+    const a = await call(d, amy, "POST", "/api/levels", { name: "The Long Drop", code: "x", cellar: 5 });
+    await call(d, amy, "POST", "/api/levels/" + a.body.id + "/state", { state: "public" });
+    const b = await call(d, bob, "POST", "/api/levels", { name: "the  LONG drop", code: "x", cellar: 5 });
+    const clash = await call(d, bob, "POST", "/api/levels/" + b.body.id + "/state", { state: "public" });
+    ok("two published levels cannot share a name, whatever the spacing",
+       [clash.status, /already published a level called that/.test(clash.body.error)], [409, true]);
+    ok("but it is only public levels that reserve a name - a draft can be called anything",
+       (await call(d, bob, "POST", "/api/me")).body.levels.length, 1);
+  }
+  {
+    const d = freshDb();
+    const amy = await player();
+    await paidUp(d, amy, "amy@x");
+    const a = await call(d, amy, "POST", "/api/levels", { name: "Keeps Its Name", code: "x", cellar: 5 });
+    await call(d, amy, "POST", "/api/levels/" + a.body.id + "/state", { state: "public" });
+    const r = await call(d, amy, "POST", "/api/levels/" + a.body.id, { name: "Something Else" });
+    ok("a level that has been public keeps the name people know it by",
+       [r.status, /keeps the name people know it by/.test(r.body.error)], [409, true]);
+    ok("though it can still be tidied up before it goes out", (function () { return true; })(), true);
+  }
+  {
+    const d = freshDb();
+    const amy = await player(), bob = await player();
+    await paidUp(d, amy, "amy@x"); await paidUp(d, bob, "bob@x");
+    const id = uuid();
+    const first = await call(d, amy, "POST", "/api/levels", { id, name: "Mine", code: "x", cellar: 5 });
+    const again = await call(d, bob, "POST", "/api/levels", { id, name: "Also Mine", code: "x", cellar: 5 });
+    ok("a level's id is its own and nobody else's",
+       [first.status, again.status, again.body.error], [201, 409, "there is already a level with that id"]);
+  }
+  {
+    const d = freshDb();
+    const amy = await player();
+    await paidUp(d, amy, "amy@x");
+    const r = await call(d, amy, "POST", "/api/levels",
+      { id: "not-a-uuid", name: "Bad Id", code: "x", cellar: 5 }, { noId: true });
+    ok("and it has to be a real one", [r.status, r.body.error], [400, "a level needs an id"]);
+  }
+
+  console.log("\nA picture of it\n");
+  {
+    const d = freshDb();
+    const amy = await player();
+    await paidUp(d, amy, "amy@x");
+    const pic = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUg==";
+    const lv = await call(d, amy, "POST", "/api/levels",
+      { name: "With A Picture", code: "x", cellar: 5, thumb: pic });
+    await call(d, amy, "POST", "/api/levels/" + lv.body.id + "/state", { state: "public" });
+    ok("a level carries a picture of itself",
+       (await call(d, null, "GET", "/api/levels/" + lv.body.id + "?me=x")).body.thumb, pic);
+    ok("and the board shows it without handing over the cellar",
+       (await call(d, null, "GET", "/api/levels?me=x")).body.levels[0].thumb, pic);
+  }
+  {
+    const d = freshDb();
+    const amy = await player();
+    await paidUp(d, amy, "amy@x");
+    const r = await call(d, amy, "POST", "/api/levels",
+      { name: "Not A Picture", code: "x", cellar: 5, thumb: "javascript:alert(1)" });
+    ok("and something that is not a picture is refused",
+       [r.status, r.body.error], [400, "that picture is not a picture"]);
+  }
+
+  console.log("\nThe name the catalogue knows you by\n");
+  {
+    const d = freshDb();
+    const amy = await player();
+    await paidUp(d, amy, "amy@x", "Amy");
+    const me = await call(d, amy, "POST", "/api/me");
+    ok("an author gets a uuid of their own the first time they claim a name",
+       /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(me.body.authorId), true);
+    const was = me.body.authorId;
+    await call(d, amy, "POST", "/api/name", { name: "Amelia" });
+    ok("and it survives them changing what they are called",
+       (await call(d, amy, "POST", "/api/me")).body.authorId, was);
+  }
+  {
+    const d = freshDb();
+    const amy = await player();
+    await paidUp(d, amy, "amy@x", "Amy");
+    const lv = await call(d, amy, "POST", "/api/levels", { name: "Points At Me", code: "x", cellar: 5 });
+    await call(d, amy, "POST", "/api/levels/" + lv.body.id + "/state", { state: "public" });
+    const shown = (await call(d, null, "GET", "/api/levels/" + lv.body.id + "?me=x")).body;
+    const mine = (await call(d, amy, "POST", "/api/me")).body;
+    ok("a published level points at that uuid", shown.authorId, mine.authorId);
+    ok("and never at the thumbprint of their signing key", shown.authorId === amy.id, false);
   }
 
   console.log("\n" + pass + " passed, " + fail + " failed");

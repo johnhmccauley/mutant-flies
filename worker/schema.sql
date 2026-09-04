@@ -25,11 +25,20 @@
 -- =====================================================================
 
 CREATE TABLE IF NOT EXISTS levels (
+  -- a proper uuid, made on the machine that built the level, so a
+  -- cellar has the same name for itself everywhere it ever goes -
+  -- in the vault, in a pasted code, and here
   id          TEXT PRIMARY KEY,
   owner       TEXT NOT NULL,          -- the author's player id (a key thumbprint)
   owner_key   TEXT NOT NULL,          -- their public key, so edits can be checked
   name        TEXT NOT NULL,
-  author_name TEXT,                   -- what they call themselves; no accounts exist
+  -- the name with its case and spacing taken out, which is what
+  -- uniqueness is actually judged on: "The Long Drop" and "the  long
+  -- drop" are the same name to everybody except a database
+  name_key    TEXT NOT NULL,
+  author_name TEXT,                   -- claimed, and unique - see authors
+  author_uuid TEXT,                   -- who made it, as the catalogue says it
+  thumb       TEXT,                   -- a small picture of the cellar
   cellar      INTEGER NOT NULL,       -- which depth it is pitched at
   state       TEXT NOT NULL DEFAULT 'private',   -- private | public | hidden
   ever_public INTEGER NOT NULL DEFAULT 0,        -- latches on, never clears
@@ -106,6 +115,35 @@ CREATE INDEX IF NOT EXISTS levels_by_stars
 CREATE INDEX IF NOT EXISTS levels_by_plays
   ON levels (state, plays DESC, rank_score DESC, created DESC, id);
 CREATE INDEX IF NOT EXISTS levels_by_owner ON levels (owner);
+-- two levels may not share a name. Only levels that have been out in
+-- public are in here, so a private draft can be called anything.
+CREATE UNIQUE INDEX IF NOT EXISTS levels_one_name ON levels (name_key)
+  WHERE ever_public = 1;
+
+-- ---------------------------------------------------------------------
+-- WHAT PEOPLE CALL THEMSELVES
+--
+-- Not an account: there is still no password and nothing to log into.
+-- It is a name claimed by a key, first come first served, and it is
+-- required before anything of yours goes out in public - a catalogue
+-- where every level is by "anonymous" tells a player nothing, and a
+-- catalogue where anybody can be anybody is worse than that.
+-- ---------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS authors (
+  name_key  TEXT PRIMARY KEY,         -- lowercased, spaces squeezed
+  name      TEXT NOT NULL,            -- as they typed it
+  player_id TEXT NOT NULL,            -- the thumbprint of their signing key
+  -- The name the catalogue knows them by, made once and never changed.
+  -- Not the same thing as player_id, deliberately: that is derived from
+  -- their key, so it would change under them if they ever had to
+  -- replace one, and it is the same string they sign with. This is a
+  -- plain uuid that means nothing and gives nothing away, and it is
+  -- what a published level points at.
+  uuid      TEXT NOT NULL,
+  at        INTEGER NOT NULL
+);
+CREATE UNIQUE INDEX IF NOT EXISTS authors_uuid ON authors (uuid);
+CREATE UNIQUE INDEX IF NOT EXISTS authors_one_each ON authors (player_id);
 
 -- ---------------------------------------------------------------------
 -- CREDITS

@@ -101,7 +101,7 @@
      through untouched. */
   var KNOWN = ["v", "needs", "F", "cols", "rows", "cells", "edge", "man", "bricks",
                "marbleCount", "carry", "CO", "monsters", "marbles", "robots",
-               "sources", "name", "author", "made", "note",
+               "sources", "id", "name", "author", "made", "note",
                "blocks", "shape", "bound", "deal"];
 
   /* One step per version, applied in order. A record from v1 goes
@@ -167,6 +167,9 @@
     if (rec.blocks || rec.shape || rec.deal) rec.needs = NEEDS_RICH;
 
     if (about) {
+      /* the level's own id travels inside it, so a cellar pasted into a
+         message arrives as the same level it left as */
+      if (about.id) rec.id = String(about.id).slice(0, 40);
       if (about.name) rec.name = String(about.name).slice(0, 48);
       if (about.author) rec.author = about.author;
       if (about.made) rec.made = about.made;

@@ -276,6 +276,9 @@
 .edItem b { color: #efe4d2; font-weight: 600; }
 .edItem span { color: #8e8172; font-size: 12px; }
 .edItem .edBtn { margin-left: auto; }
+/* the picture of the cellar, drawn as squares rather than smeared */
+.edPic { width: 68px; height: 52px; image-rendering: pixelated; border-radius: 3px;
+  border: 1px solid #33291f; flex: 0 0 auto; }
 #edCode { width: 100%; height: 110px; background: #14100c; color: #c9bba8;
   border: 1px solid #3a2e22; border-radius: 6px; padding: 8px; font-family: inherit;
   font-size: 11px; resize: vertical; }
@@ -3819,7 +3822,7 @@
      through untouched. */
   var KNOWN = ["v", "needs", "F", "cols", "rows", "cells", "edge", "man", "bricks",
                "marbleCount", "carry", "CO", "monsters", "marbles", "robots",
-               "sources", "name", "author", "made", "note",
+               "sources", "id", "name", "author", "made", "note",
                "blocks", "shape", "bound", "deal"];
 
   /* One step per version, applied in order. A record from v1 goes
@@ -3885,6 +3888,9 @@
     if (rec.blocks || rec.shape || rec.deal) rec.needs = NEEDS_RICH;
 
     if (about) {
+      /* the level's own id travels inside it, so a cellar pasted into a
+         message arrives as the same level it left as */
+      if (about.id) rec.id = String(about.id).slice(0, 40);
       if (about.name) rec.name = String(about.name).slice(0, 48);
       if (about.author) rec.author = about.author;
       if (about.made) rec.made = about.made;
@@ -6957,15 +6963,54 @@ function edBotTest() {
   }, 30);
 }
 
+/* ------------------------------------------------------------------
+   A picture of the cellar.
+
+   drawPlan() already renders the whole thing to a 34x26 canvas every
+   turn, which IS the picture - it just needs to come off the canvas
+   bigger than 34 pixels so it is legible in a list. Drawn with no
+   smoothing, so it comes out as honest squares rather than a smear.
+
+   A cellar this size is about a kilobyte and a half of PNG, which is
+   the same order as the level it is a picture of.
+   ------------------------------------------------------------------ */
+function edThumb() {
+  try {
+    drawPlan();
+    var big = document.createElement("canvas");
+    big.width = COLS * 4; big.height = ROWS * 4;
+    var g2 = big.getContext("2d");
+    g2.imageSmoothingEnabled = false;
+    g2.fillStyle = "#14110c";
+    g2.fillRect(0, 0, big.width, big.height);
+    g2.drawImage(plan, 0, 0, big.width, big.height);
+    return big.toDataURL("image/png");
+  } catch (e) { return null; }       /* a picture is nice, not required */
+}
+
+/* A level's own id, made where the level is made and kept for the rest
+   of its life - in the vault, inside a pasted code, and in the
+   catalogue. crypto.randomUUID is not there over plain http on some
+   browsers, so there is a fallback that is still a uuid. */
+function newId() {
+  if (crypto.randomUUID) return crypto.randomUUID();
+  var b = crypto.getRandomValues(new Uint8Array(16));
+  b[6] = (b[6] & 0x0f) | 0x40; b[8] = (b[8] & 0x3f) | 0x80;
+  var h = Array.prototype.map.call(b, function (x) { return ("0" + x.toString(16)).slice(-2); }).join("");
+  return h.slice(0, 8) + "-" + h.slice(8, 12) + "-" + h.slice(12, 16) + "-" +
+         h.slice(16, 20) + "-" + h.slice(20);
+}
+
 /* --- keeping it --------------------------------------------------- */
 function edSave() {
   var name = $("edName").value.trim();
   if (!name) { $("edName").focus(); return edSay("give it a name first", "bad"); }
-  var rec = MutantLevelFormat.capture(game, { name: name });
+  var id = ed.id || newId();
+  var rec = MutantLevelFormat.capture(game, { name: name, id: id });
   var bad = MutantLevelFormat.faults(rec);
-  var id = ed.id || ("lv" + Date.now().toString(36) + Math.floor(Math.random() * 1296).toString(36));
   var row = {
     id: id, name: name, body: MutantLevelFormat.toCode(rec),
+    thumb: edThumb(),
     cellar: game.F, state: ed.state, everPublic: ed.everPublic,
     created: ed.created || Date.now(), edited: Date.now()
   };
@@ -6985,7 +7030,8 @@ function edList() {
     rows.forEach(function (row) {
       var el = document.createElement("div");
       el.className = "edItem";
-      el.innerHTML = "<div><b>" + esc(row.name) + "</b><br><span>cellar " + row.cellar +
+      el.innerHTML = (row.thumb ? '<img class="edPic" alt="" src="' + row.thumb + '">' : "") +
+        "<div><b>" + esc(row.name) + "</b><br><span>cellar " + row.cellar +
         " &middot; " + row.state + (row.everPublic ? " &middot; has been public" : "") + "</span></div>";
       var open = document.createElement("button");
       open.className = "edBtn"; open.type = "button"; open.textContent = "Open";
