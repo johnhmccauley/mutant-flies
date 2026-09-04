@@ -1125,9 +1125,21 @@
        off the end of those tests returns DROP. The sides are found
        against the room's own box now.
        ------------------------------------------------------------------ */
+    /* Off the sheet altogether there is no square to have recorded
+       anything about, so the four sides answer for it even when the
+       level has an outline. A room drawn flush against the edge of the
+       sheet - which the one you start with is, on two of its sides -
+       otherwise had no way to be walled at all: you could choose stone
+       for that side and nothing would happen, because the squares
+       beyond it are not squares. */
+    if (c < 0 || r < 0 || c >= COLS || r >= ROWS) {
+      if (c < 0) return this.edge.W[clamp(r, 0, ROWS - 1)];
+      if (c >= COLS) return this.edge.E[clamp(r, 0, ROWS - 1)];
+      if (r < 0) return this.edge.S[clamp(c, 0, COLS - 1)];
+      return this.edge.N[clamp(c, 0, COLS - 1)];
+    }
     if (this.bound)
-      return (c >= 0 && r >= 0 && c < COLS && r < ROWS &&
-              this.bound[r * COLS + c] === WALL) ? WALL : DROP;
+      return this.bound[r * COLS + c] === WALL ? WALL : DROP;
 
     var b = this.box || this.reBox();
     if (c < b.c0) return this.edge.W[clamp(r, 0, ROWS - 1)];
