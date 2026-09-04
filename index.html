@@ -284,6 +284,18 @@
 
 .edNothing { color: #6f6456; font-size: 11px; padding: 4px 2px; }
 
+#edEdges { display: flex; gap: 10px; align-items: stretch; }
+.edEdgePick { display: flex; flex-direction: column; gap: 3px; width: 240px;
+  background: #1d1712; border: 1px solid #372c21; border-radius: 6px;
+  padding: 6px; color: #b8ab99; font: inherit; text-align: left; cursor: pointer; }
+.edEdgePick:hover { border-color: #6b5640; color: #efe4d2; }
+.edEdgePick.here { border-color: #b98c3e; background: #2a2016; color: #ffe6b8; }
+.edEdgePick img { width: 100%; height: auto; border-radius: 3px; display: block; }
+.edEdgePick b { font-size: 12px; }
+.edEdgePick span { font-size: 10px; line-height: 1.35; color: #8e8172; }
+.edEdgePick.here span { color: #b3a691; }
+@media (max-width: 620px) { .edEdgePick { width: 150px; } .edEdgePick span { display: none; } }
+
 /* how wide the ground tools work */
 #edBrush, #edZoom { display: flex; gap: 5px; align-items: center; margin-left: 4px;
   padding-left: 9px; border-left: 1px solid #372c21; }
@@ -504,6 +516,10 @@
     <div id="edTools"></div>
     <span id="edBrush" hidden></span>
     <span id="edZoom"></span>
+  </div>
+  <!-- the two kinds of edge, shown rather than named, once a side of the
+       room has been picked -->
+  <div class="edRow" id="edEdges" hidden>
   </div>
   <div class="edRow">
     <input type="text" id="edName" maxlength="48" placeholder="Name this cellar" spellcheck="false">
@@ -6153,13 +6169,22 @@ function init3D() {
   scene.add(edCursor);
 
   /* the outline being drawn, laid on the floor */
-  var polyGeo = new THREE.BufferGeometry();
-  polyGeo.setAttribute("position",
-    new THREE.BufferAttribute(new Float32Array((COLS * ROWS + 4) * 3), 3));
-  polyGeo.setAttribute("color",
-    new THREE.BufferAttribute(new Float32Array((COLS * ROWS + 4) * 3), 3));
-  edPolyLine = new THREE.LineSegments(polyGeo,
-    new THREE.LineBasicMaterial({ vertexColors: true, depthTest: false, toneMapped: false }));
+  /* ------------------------------------------------------------------
+     The outline is drawn as boxes, not lines.
+
+     WebGL ignores linewidth - every LineBasicMaterial is one pixel wide
+     whatever you ask for, which at any distance is a hairline you have
+     to hunt for and, over a lit stone floor, half of it disappears. So
+     each side of the room is a long thin box laid flat, which can be as
+     thick as it needs to be and takes a colour of its own.
+
+     Thickness is worked out from the camera the same way the handles
+     are, so the wall of a room is the same weight of line whether you
+     are standing back over the whole sheet or right down in it.
+     ------------------------------------------------------------------ */
+  edPolyLine = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1),
+    new THREE.MeshBasicMaterial({ depthTest: false, toneMapped: false }), 512);
+  edPolyLine.renderOrder = 10;
   edPolyLine.renderOrder = 10;
   edPolyLine.visible = false;
   edPolyLine.frustumCulled = false;
@@ -8141,7 +8166,7 @@ var ED_TOOLS = [
   { name: "Raise",     group: 4, swatch: "#7a6a52", act: "hi", v: 1, how: "Click a square to lift it a step. Hold to keep lifting - the ground around it slopes up to meet it." },
   { name: "Lower",     group: 4, swatch: "#4a4034", act: "hi", v: -1, how: "Click a square to drop it a step. Hold to keep going." },
   { name: "Wall/drop", group: 4, swatch: "#574c42", act: "edge", how: "Click a square OUTSIDE the cellar to switch what lies beyond it between good stone and a drop." },
-  { name: "Outline",   group: 4, swatch: "#ffd27a", act: "poly", how: "Click the corners of the room you want. Click the first corner again - or press Enter - to close it, and the floor becomes that shape. Backspace takes back a corner, Escape gives up on it." },
+  { name: "Outline",   group: 4, swatch: "#ffd27a", act: "poly", how: "Drag a corner to move it. Click one to pick it out, or drag a box round several. Press anywhere along a side to add a corner there; Delete loses one." },
   { name: "Cut out",   group: 4, swatch: "#0d0b09", act: "shape", how: "Click a square to take it out of the cellar - the floor stops there. Click it again to put it back." },
   { name: "Paint floor", group: 1, swatch: "#8a6a3a", act: "tint", how: "Click a square to colour it with the swatch beside the name box." }
 ];
@@ -8325,7 +8350,7 @@ function edPolyDrop() {
    A new stretch is stone, because a room you have just drawn should be
    a room and not a plateau. */
 function edSegs() {
-  while (ed.polyWall.length < ed.poly.length) ed.polyWall.push(1);
+  while (ed.polyWall.length < ed.poly.length) ed.polyWall.push(0);
   ed.polyWall.length = ed.poly.length;
   return ed.polyWall;
 }
@@ -8617,8 +8642,13 @@ function edEdgeAt(c, r) {
 /* the handles, as their own little markers on the floor */
 function edNodesDraw() {
   if (!edNodeMesh) return;
-  var show = (mode === "edit" && ED_TOOLS[ed.tool] && ED_TOOLS[ed.tool].act === "poly" &&
-              ed.poly.length > 0);
+  /* Handles belong to the view where you move corners. In the Walls
+     view you are choosing what a SIDE is, and a handle on each end of
+     it is one more thing sitting on the wall you are trying to look at
+     - the side highlights on its own when you pick it, which is the
+     only thing that needed saying. */
+  var act = ED_TOOLS[ed.tool] && ED_TOOLS[ed.tool].act;
+  var show = (mode === "edit" && act === "poly" && ed.poly.length > 0);
   edNodeMesh.visible = show;
   if (!show) { if (edRingMesh) edRingMesh.visible = false; return; }
   /* ------------------------------------------------------------------
@@ -8678,44 +8708,112 @@ function edNodesDraw() {
 /* the outline as you are drawing it, laid on the floor */
 var edPolyLine = null, edNodeMesh = null, edRingMesh = null, edBandLine = null,
     edSheetMesh = null;
+var _segAt = null;
+
+/* ====================================================================
+   THE SIDES SIT OUTSIDE THE FLOOR, ON IT
+
+   They were laid along the middle of the boundary squares and floated a
+   fifth of a square above the ground - so a side of the room covered the
+   outermost row of floor you were meant to be able to see and use, and
+   hung over it besides. A wall is not a stripe painted on the floor: it
+   is the thing the floor stops at. Each side is pushed half a square
+   outwards, away from the middle of the room, and dropped to the height
+   of the ground it runs along, so it reads as the room's own edge.
+   ==================================================================== */
+function putSeg(n, ax, ay, az, bx, by, bz, thick, cr, cg, cb) {
+  if (!_segAt) _segAt = new THREE.Object3D();
+  var dx = bx - ax, dz = bz - az;
+  var len = Math.sqrt(dx * dx + dz * dz);
+  if (len < 0.001) return false;
+  _segAt.position.set((ax + bx) / 2, (ay + by) / 2 + thick / 2, (az + bz) / 2);
+  _segAt.rotation.set(0, Math.atan2(dx, dz), 0);
+  _segAt.scale.set(thick, thick, len);
+  _segAt.updateMatrix();
+  edPolyLine.setMatrixAt(n, _segAt.matrix);
+  edPolyLine.setColorAt(n, _segCol.setRGB(cr, cg, cb));
+  return true;
+}
+
+var _segCol = new THREE.Color();
+var _segA = null, _segB = null;
 function edPolyDraw() {
   if (!edPolyLine) return;
   var n = ed.poly.length;
   edPolyLine.visible = (mode === "edit" && n > 0);
   if (!edPolyLine.visible) return;
+  if (!_segA) { _segA = new THREE.Vector3(); _segB = new THREE.Vector3(); }
 
-  var pos = edPolyLine.geometry.attributes.position.array;
-  var col = edPolyLine.geometry.attributes.color.array;
-  var put = 0;
-  function point(c, r, cr, cg, cb) {
-    worldOf(c, r, tmp);
-    pos[put * 3] = tmp.x; pos[put * 3 + 1] = tmp.y + 0.22; pos[put * 3 + 2] = tmp.z;
-    col[put * 3] = cr; col[put * 3 + 1] = cg; col[put * 3 + 2] = cb;
-    put++;
+  /* the same reckoning as the handles: how tall the view is in world
+     units where the room is, times the slice of the screen a wall
+     should take up */
+  var lean = Math.tan(camera.fov * Math.PI / 360) * 2;
+  var far = Math.max(1, camera.position.distanceTo(camAim));
+  var thick = 0.011 * far * lean;
+
+  /* ------------------------------------------------------------------
+     The corners are moved out, not the sides.
+
+     Pushing each side outwards along its own perpendicular leaves a gap
+     at every corner, because two sides that meet there go out in two
+     different directions and stop being neighbours. Moving the CORNERS
+     out along the line that splits their angle - the mitre a picture
+     framer cuts - keeps them corners: each side still runs from one to
+     the next, and the wall goes round the room in one piece.
+     ------------------------------------------------------------------ */
+  var wx = [], wz = [], wy = [];
+  for (var q = 0; q < n; q++) {
+    worldOf(ed.poly[q][0], ed.poly[q][1], _segA);
+    wx.push(_segA.x); wz.push(_segA.z); wy.push(_segA.y);
   }
-  function line(a, b, cr, cg, cb) {
-    point(a[0], a[1], cr, cg, cb);
-    point(b[0], b[1], cr, cg, cb);
+  var mx = 0, mz = 0;
+  for (var q2 = 0; q2 < n; q2++) { mx += wx[q2]; mz += wz[q2]; }
+  mx /= n; mz /= n;
+
+  /* the outward normal of the side that starts at corner i */
+  function normOf(i) {
+    var j = (i + 1) % n;
+    var ox = -(wz[j] - wz[i]), oz = (wx[j] - wx[i]);
+    var d = Math.sqrt(ox * ox + oz * oz) || 1;
+    ox /= d; oz /= d;
+    var midX = (wx[i] + wx[j]) / 2, midZ = (wz[i] + wz[j]) / 2;
+    if (ox * (midX - mx) + oz * (midZ - mz) < 0) { ox = -ox; oz = -oz; }
+    return [ox, oz];
+  }
+
+  var push = 0.5, ox2 = [], oz2 = [];
+  for (var i2 = 0; i2 < n; i2++) {
+    var n1 = normOf((i2 - 1 + n) % n), n2 = normOf(i2);
+    var sx = n1[0] + n2[0], sz = n1[1] + n2[1];
+    var dot = n1[0] * n2[0] + n1[1] * n2[1];
+    var k = 1 + dot;
+    if (k < 0.2) { sx = n2[0]; sz = n2[1]; k = 1; }   /* a fold back on itself */
+    ox2.push(wx[i2] + push * sx / k);
+    oz2.push(wz[i2] + push * sz / k);
+  }
+
+  var put = 0;
+  function side(i, j, cr, cg, cb) {
+    if (putSeg(put, ox2[i], wy[i], oz2[i], ox2[j], wy[j], oz2[j], thick, cr, cg, cb)) put++;
   }
 
   if (ed.polyShut) {
-    /* The outline is white, and a stretch that has been opened is the
-       same white turned right down - so it is plain which sides you can
-       fall out of without introducing a second colour to remember. */
     var segs = edSegs();
+    var onEdge = ED_TOOLS[ed.tool] && ED_TOOLS[ed.tool].act === "edge";
     for (var i = 0; i < n; i++) {
-      var lit = segs[i] ? 1.0 : 0.30;
-      line(ed.poly[i], ed.poly[(i + 1) % n], lit, lit, lit);
+      if (onEdge && i === ed.segPick) side(i, (i + 1) % n, 0.25, 0.69, 1.0);
+      else {
+        var lit = segs[i] ? 1.0 : 0.30;
+        side(i, (i + 1) % n, lit, lit, lit);
+      }
     }
   } else {
-    for (var j = 0; j + 1 < n; j++) line(ed.poly[j], ed.poly[j + 1], 1, 1, 1);
-    if (n) line(ed.poly[n - 1], [game.manC, game.manR], 0.55, 0.55, 0.55);
+    for (var j = 0; j + 1 < n; j++) side(j, j + 1, 1, 1, 1);
   }
 
-  edPolyLine.geometry.setDrawRange(0, put);
-  edPolyLine.geometry.attributes.position.needsUpdate = true;
-  edPolyLine.geometry.attributes.color.needsUpdate = true;
-  edPolyLine.geometry.computeBoundingSphere();
+  edPolyLine.count = put;
+  edPolyLine.instanceMatrix.needsUpdate = true;
+  if (edPolyLine.instanceColor) edPolyLine.instanceColor.needsUpdate = true;
 }
 
 /* How wide the ground tool works. Raising one square at a time is a
@@ -8841,9 +8939,13 @@ var ED_VIEWS = [
   { key: "floor", name: "Floor", cam: "plan", show: "floor",
     tools: ["Outline", "Cut out"],
     how: "The floor on its own, with a handle on every corner. Drag one to change the shape of the room; the darker ground round it is room to grow into." },
-  { key: "walls", name: "Walls", cam: "plan", show: "walls",
+  /* Three quarters, not overhead: a wall is the one thing in a cellar
+     with height, and from directly above height is the one thing you
+     cannot see. Stone and a drop look identical in plan and completely
+     different from here, which is the whole question this view asks. */
+  { key: "walls", name: "Walls", cam: "room", show: "walls",
     tools: ["Wall/drop"],
-    how: "Click a square OUTSIDE the floor to switch what lies beyond it between good stone and a drop. Stone counts as a side of a trap; a drop does not." },
+    how: "Click a side of the room to pick it, then click it again to turn it between good stone and a drop. Stone counts as a side of a trap; a drop does not, and anything shoved over one is gone." },
   { key: "terrain", name: "Terrain", cam: "room", show: "floor",
     tools: ["Raise", "Lower", "Paint floor"],
     how: "The lie of the ground, with nothing standing on it. Pick a brush and run it over the floor." },
@@ -8905,10 +9007,11 @@ var edHidden = null;
 
 function edDress() {
   var want = (mode === "edit") ? edViewNow().show : "all";
-  /* the paper shows where the room may grow to, which is only a
-     question in the views that change its shape */
-  if (edSheetMesh)
-    edSheetMesh.visible = (mode === "edit" && (ed.view === "floor" || ed.view === "walls"));
+  /* The paper shows how big a room is allowed to get, which is a
+     question in exactly one place: the view where you change how big it
+     is. In the Walls view the size is settled and the sheet is only
+     something else on screen. */
+  if (edSheetMesh) edSheetMesh.visible = (mode === "edit" && ed.view === "floor");
 
   /* everything back the way it was found first - half of what is hidden
      is hidden for its own reasons (a trapped monster, a piece of kit
@@ -8948,7 +9051,13 @@ function edDress() {
 function edPolySquare() {
   var b = game.reBox ? game.reBox() : { c0: 0, c1: MF.FIELD_C - 1, r0: 0, r1: MF.FIELD_R - 1 };
   ed.poly = [[b.c0, b.r0], [b.c1, b.r0], [b.c1, b.r1], [b.c0, b.r1]];
-  ed.polyWall = [1, 1, 1, 1];
+  /* Open on every side to begin with, the way cellar one is: the floor
+     simply stops and anything shoved over the side is gone. Walls are
+     something you decide to put there, in the Walls view - starting a
+     room boxed in makes the most useful thing about a wall, that it is
+     a side of a trap, into something you are given rather than
+     something you built. */
+  ed.polyWall = [0, 0, 0, 0];
   ed.polyShut = true;
   ed.picked = [];
 }
@@ -8957,7 +9066,7 @@ function edViewTo(key) {
   /* a half-drawn outline is abandoned on the way out of the view; a
      closed one is part of the level and stays */
   if (ed.poly.length && !ed.polyShut) { ed.poly = []; edPolyDraw(); }
-  ed.dragNode = -1; ed.picked = []; ed.band = null;
+  ed.dragNode = -1; ed.picked = []; ed.band = null; ed.segPick = -1;
   ed.view = key;
   edDress();
   /* a view comes with its own tools, so it puts one in your hand - going
@@ -8965,8 +9074,12 @@ function edViewTo(key) {
      riddle, not a choice */
   var mine = edViewTools(key);
   if (mine.length && mine.indexOf(ed.tool) < 0) ed.tool = mine[0];
-  /* the room as it stands, ready to be pulled about */
-  if (key === "floor" && ed.poly.length < 3) edPolySquare();
+  /* The room as it stands, ready to be worked on - in either of the
+     views that works on it. Only the Floor view seeded it before, so
+     going straight to Walls found no outline at all and quietly fell
+     back to the old square-at-a-time code: no handles, no sides to
+     pick, and messages about pointing at squares on the outside wall. */
+  if ((key === "floor" || key === "walls") && ed.poly.length < 3) edPolySquare();
   edPaint();
   edHow();
   resize();
@@ -8994,6 +9107,42 @@ function edViewTo(key) {
    good for here was growing a rectangle about its middle, which is two
    drags without it.
    ==================================================================== */
+
+function edEdgeBar() {
+  var el = $("edEdges");
+  if (!el) return;
+  var t = ED_TOOLS[ed.tool];
+  var on = (mode === "edit" && t && t.act === "edge" && ed.polyShut && ed.segPick >= 0);
+  el.hidden = !on;
+  if (!on) { el.innerHTML = ""; return; }
+
+  var flags = edSegs(), now = flags[ed.segPick] ? 1 : 0;
+  el.innerHTML = "";
+  [[1, "Stone", "A brick shoved at it stops dead, and it counts as a side of a trap - " +
+                "two bricks will hold something in a stone corner where four would be needed."],
+   [0, "A drop", "The floor stops. A brick shoved over it is gone for good, it is no help " +
+                 "at all in walling something in, and so are you if you walk off it."]
+  ].forEach(function (row) {
+    var b = document.createElement("button");
+    b.className = "edEdgePick" + (row[0] === now ? " here" : "");
+    b.type = "button";
+    b.setAttribute("aria-pressed", row[0] === now ? "true" : "false");
+    var pic = edgePortrait(!!row[0], 240, 150);
+    b.innerHTML = (pic ? '<img alt="" src="' + pic + '">' : "") +
+                  "<b>" + row[1] + "</b><span>" + row[2] + "</span>";
+    b.addEventListener("click", function () {
+      var f = edSegs();
+      if (f[ed.segPick] === row[0]) return;
+      edMark();
+      f[ed.segPick] = row[0];
+      edPolyFill(false);
+      edPolyDraw();
+      edEdgeBar();
+      edSay("that side is now " + (row[0] ? "good stone" : "open \u2014 a drop"));
+    });
+    el.appendChild(b);
+  });
+}
 
 function edBrushBar() {
   var el = $("edBrush");
@@ -9077,6 +9226,7 @@ function edPaint() {
   });
 
   edBrushBar();
+  edEdgeBar();
   edZoomBar();
 }
 
@@ -9217,14 +9367,30 @@ function edStamp(quiet) {
     /* With an outline, a wall is a side of the room rather than a
        square of it - so clicking anywhere along a stretch opens or
        closes the whole stretch. */
-    var seg = edEdgeAt(c, r);
-    if (seg < 0)
-      return edSay("click along one of the room's sides to open or close it", "bad");
+    /* ------------------------------------------------------------
+       One side, chosen, then changed.
+
+       Clicking a side used to flip it there and then, which is quick
+       and gives you no way to point at a wall and ask what it is - and
+       on a wall you meant to look at rather than change, no way back
+       except changing it twice. Click picks the side out; clicking the
+       one already picked is what turns it over. Only ever one: a side
+       is a thing you decide about on its own.
+       ------------------------------------------------------------ */
+    var seg = edEdgeNear(c, r);
+    if (seg < 0) {
+      if (ed.segPick >= 0) {
+        ed.segPick = -1; edPolyDraw(); edEdgeBar();
+        return edSay("nothing picked");
+      }
+      return edSay("click along one of the room's sides to pick it", "bad");
+    }
     var flags = edSegs();
-    flags[seg] = flags[seg] ? 0 : 1;
-    edPolyFill(false);
+    ed.segPick = seg;
     edPolyDraw();
-    return edSay("that side is now " + (flags[seg] ? "good stone" : "open \u2014 a drop"));
+    edEdgeBar();
+    return edSay("that side is " + (flags[seg] ? "good stone" : "open \u2014 a drop") +
+                 " \u2014 pick what it should be");
   } else if (t.act === "edge") {
     /* Only means anything OFF the floor - that is where an edge is. A
        shaped level has boundaries all over it, not just four sides, so
@@ -9636,6 +9802,12 @@ function edEnter(rec, back) {
     game.height.fill(0);
     game.marbles.length = 0; game.sources.length = 0; game.coins.length = 0;
     game.monsters.length = 0; game.robots.length = 0;
+    /* and no walls: the floor stops at every side, as it does all the
+       way round cellar one. sheet() dealt this room its four sides on
+       the way past and they are not this level's - a wall is something
+       you decide to put there. */
+    ["W", "E", "S", "N"].forEach(function (side) { game.edge[side].fill(MF.DROP); });
+    game.bound = null;
     game.manC = 4; game.manR = 4;
     ed.startC = 4; ed.startR = 4;
     ed.poly = []; ed.polyShut = false; ed.polyWall = []; ed.picked = [];
@@ -9966,6 +10138,26 @@ var KEYMAP = { "z": "left", "arrowleft": "left", "x": "right", "arrowright": "ri
                ":": "up", ";": "up", "arrowup": "up", "/": "down", "arrowdown": "down" };
 addEventListener("keydown", function (e) {
   var k = e.key.toLowerCase(), a = KEYMAP[k];
+
+  /* ------------------------------------------------------------------
+     Typing beats everything.
+
+     This guard was thirty lines further down, below the movement keys
+     and below space - so while the cursor was in the name box, z and x
+     and / were swallowed as "walk", and SPACE put a brick down in the
+     level you were trying to name. There was no way to call a cellar
+     "The Long Drop": the space stamped, the letters vanished, and the
+     name came out as "TheLongDrop" at best.
+
+     Nothing in here has any business with a keystroke that is going
+     into a text field, so it leaves before it does anything at all.
+     ------------------------------------------------------------------ */
+  var el = document.activeElement;
+  if (el && (el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.isContentEditable)) {
+    if (k === "escape") el.blur();       /* the one way back to the cellar */
+    return;
+  }
+
   /* Latch it as well as hold it. A turn samples what is held when the
      turn comes round, so a quick tap that starts and ends between two
      turns was simply lost - press, nothing happens, press again. The
@@ -9983,8 +10175,6 @@ addEventListener("keydown", function (e) {
     return;
   }
   if (mode === "edit") {
-    /* a tool by its letter, and nothing else while building */
-    if (document.activeElement && document.activeElement.tagName === "INPUT") return;
     /* a number picks within the group you are in; the brackets walk
        the groups. Two things to learn instead of twenty-three. */
     if (k >= "1" && k <= "9") {
@@ -10232,6 +10422,77 @@ function monsterPortrait(kind, px) {
     PORTRAITS[kind] = url;
     return url;
   } catch (e) { return null; }     /* a picture is nice, not required */
+}
+
+/* ====================================================================
+   WHAT THE TWO KINDS OF EDGE LOOK LIKE
+
+   A side of a room is stone or it is a drop, and those two words are
+   doing a lot of work: which one you want depends on what it looks like
+   to walk up to, and on what happens to a brick you shove at it. Told
+   in words it is a setting; shown as the thing itself it is a choice.
+
+   So each kind is photographed the same way the monsters are - a corner
+   of real floor, lit by the same lamps, rendered off to one side and
+   kept. Stone stands up at the end of the floor. A drop is the floor
+   ending, and the dark going on.
+   ==================================================================== */
+var EDGE_PICS = {};
+
+function edgePortrait(stone, w, h) {
+  var key = (stone ? "wall" : "drop") + w + "x" + h;
+  if (EDGE_PICS[key]) return EDGE_PICS[key];
+  try {
+    var sc = new THREE.Scene();
+    /* The cellar's own light, at the cellar's own strength. The first
+       go at this used a point light of twenty-six and everything came
+       out as a white slab: the renderer grades with ACES filmic, so a
+       lamp meant for a room forty squares across, pointed at six
+       squares of floor, has nowhere to go but white. */
+    sc.add(new THREE.HemisphereLight(0x3a3020, 0x0d0a08, 0.7));
+
+    var stoneMat = new THREE.MeshStandardMaterial({ color: 0x9a8f7d, roughness: 0.95 });
+    var floorMat = new THREE.MeshStandardMaterial({ color: 0x6d5f49, roughness: 0.96 });
+    var darkMat  = new THREE.MeshStandardMaterial({ color: 0x4a4133, roughness: 0.96 });
+
+    /* floor running away from you and stopping */
+    for (var r = 0; r < 5; r++) for (var c = -3; c <= 3; c++) {
+      var t = new THREE.Mesh(new THREE.BoxGeometry(0.94, 0.9, 0.94),
+                             (r + c) % 2 ? floorMat : darkMat);
+      t.position.set(c, -0.45, -r);
+      sc.add(t);
+    }
+    if (stone) {
+      /* and standing up where it stops */
+      for (var c2 = -3; c2 <= 3; c2++) {
+        var wsl = new THREE.Mesh(new THREE.BoxGeometry(0.94, 2.0, 0.9), stoneMat);
+        wsl.position.set(c2, 1.0, -5);
+        sc.add(wsl);
+      }
+    }
+    /* a brick, where that edge would leave it */
+    var brick = new THREE.Mesh(new THREE.BoxGeometry(0.82, 0.78, 0.82),
+      new THREE.MeshStandardMaterial({ color: 0xb8462e, roughness: 0.85 }));
+    brick.position.set(0, 0.39, stone ? -4 : -2);
+    sc.add(brick);
+
+    var key2 = new THREE.DirectionalLight(0xffd9a8, 1.5);
+    key2.position.set(2.5, 5, 4);
+    sc.add(key2);
+
+    var cam = new THREE.PerspectiveCamera(40, w / h, 0.1, 60);
+    cam.position.set(0, 3.1, 4.6);
+    cam.lookAt(0, 0.3, -2.2);
+
+    var was = new THREE.Vector2();
+    renderer.getSize(was);
+    renderer.setSize(w, h, false);
+    renderer.render(sc, cam);
+    var url = renderer.domElement.toDataURL("image/jpeg", 0.86);
+    renderer.setSize(was.x, was.y, false);
+    EDGE_PICS[key] = url;
+    return url;
+  } catch (e) { return null; }
 }
 
 /* what you have met, and what is waiting in the next cellar down */
