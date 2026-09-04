@@ -25,6 +25,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # Pinned, and it has to be: tools/test-worker.js runs the catalogue's
+      # real schema against node:sqlite rather than a mock, and that does
+      # not exist before Node 22. Without this step the runner's default
+      # node decides whether the deploy works.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
       - name: Check the pages still parse before publishing them
         run: node tools/check.js
 
