@@ -7917,8 +7917,50 @@ var BRUSH_MIN = 1, BRUSH_MAX = 6;
 var ED_VIEWS = [
   { key: "room",  name: "Room",  how: "Three quarters, the whole floor. Best for building." },
   { key: "plan",  name: "Plan",  how: "Straight down. Best for cutting the shape of the floor." },
-  { key: "close", name: "Close", how: "Down in it, the way the game looks." }
+  { key: "close", name: "Close", how: "Down in it, the way the game looks." },
+  { key: "floor", name: "Floor", how: "The floor and nothing else. Click squares to cut them out of the cellar or put them back." }
 ];
+
+/* ====================================================================
+   THE FLOOR, ON ITS OWN
+
+   Changing the outline of a room means looking at the outline, and in
+   every other view it is the one thing you cannot see: the walls stand
+   up around it, the bricks and the monsters sit on it, the man is in
+   the middle of it. From overhead with all of that cleared away what is
+   left is the shape itself - floor where there is floor, dark where
+   there is not - and cutting it is a matter of clicking the squares you
+   do not want.
+
+   Everything is put back exactly as it was found, because half of what
+   is hidden here is hidden for other reasons at other times: a monster
+   that has been trapped, a tool that is not in this cellar.
+   ==================================================================== */
+var edHidden = null;
+
+function edDress() {
+  var bare = (mode === "edit" && ed.view === "floor");
+
+  if (!bare) {
+    if (edHidden) {
+      edHidden.forEach(function (o) { o[0].visible = o[1]; });
+      edHidden = null;
+    }
+    return;
+  }
+  if (edHidden) return;                    /* already stripped back */
+
+  edHidden = [];
+  scene.traverse(function (o) {
+    if (o === scene || o === floorSkin) return;
+    if (o.isLight || o.isCamera) return;
+    if (terrains.indexOf(o) >= 0) return;  /* the body under the floor */
+    if (o.parent !== scene) return;        /* the top level is enough */
+    if (o.visible === false) return;       /* leave what was already off */
+    edHidden.push([o, o.visible]);
+    o.visible = false;
+  });
+}
 
 function edViewBar() {
   var el = $("edViews");
@@ -7939,6 +7981,16 @@ function edViewBar() {
 function edViewTo(key) {
   ed.view = key;
   edViewBar();
+  edDress();
+  /* the tool that view is for */
+  if (key === "floor") {
+    var cut = -1;
+    ED_TOOLS.forEach(function (t, i) { if (t.act === "shape") cut = i; });
+    if (cut >= 0 && ED_TOOLS[ed.tool].act !== "shape" && ED_TOOLS[ed.tool].act !== "edge") {
+      ed.tool = cut;
+      edPaint();
+    }
+  }
   var v = ED_VIEWS.filter(function (x) { return x.key === key; })[0];
   if (v) edSay(v.how);
 }
@@ -8165,7 +8217,7 @@ function edStamp(quiet) {
       edRigs();
     }
     edSay(game.shape[i] ? "put back into the cellar" : "cut out of the cellar");
-    syncTerrain(); syncEdges();
+    syncTerrain(); syncEdges(); edDress();
   } else if (t.act === "edge") {
     /* Only means anything OFF the floor - that is where an edge is. A
        shaped level has boundaries all over it, not just four sides, so
@@ -8447,6 +8499,7 @@ function edTestPlay() {
   var bad = MutantLevelFormat.faults(rec);
   if (bad.length) return edSay(bad.join(" &middot; "), "bad");
   ed.rec = rec;
+  ed.view = "room"; edDress();      /* a test play looks like the game */
   setTimeout(resize, 0);
   $("edBar").hidden = true;
   $("edTop").hidden = true;
@@ -9247,7 +9300,7 @@ function frame() {
     camPos.set(TITLE_AIM.x + Math.sin(a) * 12, 15.5, TITLE_AIM.z + 15.5 + Math.cos(a) * 3.5);
     camera.position.lerp(camPos, 1 - Math.pow(0.05, dt));
     camera.lookAt(TITLE_AIM);
-  } else if (mode === "edit" && ed.view === "plan") {
+  } else if (mode === "edit" && (ed.view === "plan" || ed.view === "floor")) {
     /* ------------------------------------------------------------
        STRAIGHT DOWN
 
