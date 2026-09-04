@@ -143,10 +143,22 @@
     border-left:0;
     border-radius:2px;padding:9px 11px 10px;
   }
-  /* the stripe is the colour that monster actually is in the cellar and
-     on the plan, so the card teaches you to read the board */
+  /* A picture of the thing, rendered from the same rig that walks
+     about in the cellar - so what you are shown here is what you will
+     actually meet, rather than a coloured bar standing in for it. The
+     stripe stays underneath it, because that is the colour it shows on
+     the plan and the card is teaching you to read the board. */
   .bestiary .chip{
     width:3px;align-self:stretch;border-radius:1px;margin:0;height:auto;min-height:2.4em;
+  }
+  .bestiary .pic{
+    width:52px;height:52px;display:block;border-radius:3px;
+    background:radial-gradient(circle at 50% 45%, rgba(255,190,120,.10), rgba(0,0,0,0) 70%);
+  }
+  .bestiary li{ grid-template-columns:auto auto 1fr; }
+  .bestiary .soon{ opacity:.72; }
+  .bestiary .soon .n::after{
+    content:" · next";letter-spacing:.1em;color:#b98c3e;
   }
   .bestiary .n{
     display:block;font-family:"IBM Plex Mono",ui-monospace,monospace;
@@ -272,6 +284,12 @@
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 #edSay .bad { color: #e0785c; }
 #edSay .good { color: #8fc07a; }
+/* the new-version notice: quiet, but not so quiet nobody sees it */
+#freshSays { color: #ffd27a; }
+#freshSays button { background: #503c25; border: 1px solid #b98c3e; color: #ffe6b8;
+  border-radius: 4px; padding: 3px 10px; font: inherit; font-size: 12px;
+  margin-left: 8px; cursor: pointer; }
+#freshSays button:hover { background: #6b5230; }
 #edList { display: grid; gap: 6px; max-height: 46vh; overflow: auto; margin: 10px 0; }
 .edItem { display: flex; gap: 10px; align-items: center; text-align: left;
   background: #191410; border: 1px solid #33291f; border-radius: 6px; padding: 8px 10px; }
@@ -327,6 +345,7 @@
     </div>
     <p class="fine" id="record"></p>
     <p class="fine" id="betaSays"></p>
+    <p class="fine" id="freshSays" hidden></p>
     <p class="keysline">
       <span class="grp"><kbd>Z</kbd><kbd>X</kbd><kbd>:</kbd><kbd>/</kbd></span> move
       <span class="sep">&middot;</span> bricks shove in whole lines
@@ -7138,6 +7157,7 @@ function enterTitle() {
   var carried = carryBetaSave();
   sayBeta();
   showDoor();
+  fillBestiary();
   if (carried) {
     /* said plainly, once, rather than left for them to notice */
     var el = $("betaSays");
@@ -7217,6 +7237,7 @@ function enterLevel() {
   syncEdges();
   syncBricks();
   makeRigs(game.monsters.map(function (m) { return m.kind; }));
+  metMonsters(game.monsters.map(function (m) { return m.kind; }));
   for (var i = 0; i < game.monsters.length; i++) {
     var m = game.monsters[i], rig = monsterRigs[i];
     if (!rig) continue;
@@ -8055,14 +8076,132 @@ $("giveup").addEventListener("click", function () {
 });
 
 (function () {
-  var ul = $("bestiary");
+  /* filled when the title screen is shown, not at parse time - the
+     renderer it takes the portraits with does not exist yet here */
+})();
+
+/* ====================================================================
+   THE BESTIARY
+
+   Two things it was getting wrong.
+
+   It showed everything, which spoils the game: the snake is the twelfth
+   cellar's surprise and it was sitting on the title screen before
+   anybody had been down one. So it shows what you have MET, plus
+   whatever is waiting in the cellar you are about to walk into - which
+   is the honest amount of warning, and is also the only list that is
+   any use to the person reading it.
+
+   And it was a coloured bar. The game has proper models of all five of
+   these and they were being described in words instead of shown. Each
+   card now carries a picture rendered from the same rig that walks
+   about in the cellar, so what you are shown is what you will meet.
+   ==================================================================== */
+/* Not `var PORTRAITS = {}` used from a function called at parse time:
+   a var assignment does not hoist, only the declaration does, so the
+   first call found it undefined and threw. Made where it is first
+   wanted instead. */
+var PORTRAITS;
+
+/* One monster, lit and photographed against nothing. Its own scene, so
+   the cellar behind the title screen is not disturbed - and the
+   renderer's size is put back before anything else draws. */
+function monsterPortrait(kind, px) {
+  PORTRAITS = PORTRAITS || {};
+  if (PORTRAITS[kind]) return PORTRAITS[kind];
+  try {
+    var sc = new THREE.Scene();
+    /* the colour of the card it will sit on, so it reads as a picture
+       of the thing rather than a black chip stuck to the card. The
+       renderer has no alpha channel, so transparency is not available
+       without rebuilding it, and matching is cheaper than that. */
+    sc.background = new THREE.Color(0x171310);
+    sc.add(new THREE.HemisphereLight(0x9fb0cc, 0x241a12, 1.15));
+    var key = new THREE.DirectionalLight(0xffd9a8, 1.7);
+    key.position.set(2.2, 4, 3.2);
+    sc.add(key);
+
+    var rig, spec = MF.MONSTERS[kind];
+    if (kind === "snake") {
+      /* a snake has no rig - it is drawn from instanced segments,
+         because it changes length - so it gets a short one built here */
+      rig = new THREE.Group();
+      var skin = new THREE.MeshStandardMaterial({ color: spec.colour, roughness: 0.45, metalness: 0.12 });
+      var head = new THREE.MeshStandardMaterial({ color: spec.dark, roughness: 0.5,
+                                                  emissive: spec.eye, emissiveIntensity: 0.3 });
+      for (var i = 0; i < 5; i++) {
+        var seg = new THREE.Mesh(new THREE.SphereGeometry(i ? 0.5 - i * 0.05 : 0.54, 14, 12),
+                                 i ? skin : head);
+        seg.position.set(0.62 - i * 0.5, 0.5 - i * 0.03, i * 0.42 - 0.5);
+        rig.add(seg);
+      }
+    } else {
+      rig = buildMonster(kind);
+    }
+    rig.position.set(0, 0, 0);
+    rig.rotation.y = -0.5;
+    sc.add(rig);
+
+    var cam = new THREE.PerspectiveCamera(36, 1, 0.1, 40);
+    cam.position.set(0.2, 2.4, 3.4);
+    cam.lookAt(0, 0.95, 0);
+
+    var was = new THREE.Vector2();
+    renderer.getSize(was);
+    var hadAlpha = renderer.getClearAlpha();
+    renderer.setSize(px, px, false);
+    renderer.setClearAlpha(0);
+    renderer.render(sc, cam);
+    var url = renderer.domElement.toDataURL("image/png");
+    renderer.setSize(was.x, was.y, false);
+    renderer.setClearAlpha(hadAlpha);
+
+    PORTRAITS[kind] = url;
+    return url;
+  } catch (e) { return null; }     /* a picture is nice, not required */
+}
+
+/* what you have met, and what is waiting in the next cellar down */
+function bestiaryKinds() {
+  var save = MF.save.read() || {};
+  var met = save.met || {};
+  var next = Math.max(1, save.level || 1);
+  var soon = {};
+  try {
+    MF.levelOf(next, false).kinds.forEach(function (k) { soon[k] = 1; });
+  } catch (e) { soon.fly = 1; }
+  var out = [];
   MF.MONSTER_ORDER.forEach(function (k) {
-    var s = MF.MONSTERS[k], li = document.createElement("li");
-    li.innerHTML = '<span class="chip" style="background:' + hex(s.colour) + '"></span>' +
-                   '<span><span class="n">' + s.name + '</span><span class="b">' + s.blurb + "</span></span>";
+    if (met[k] || soon[k]) out.push({ kind: k, soon: !met[k] });
+  });
+  if (!out.length) out.push({ kind: "fly", soon: true });
+  return out;
+}
+
+function fillBestiary() {
+  var ul = $("bestiary");
+  if (!ul) return;
+  ul.innerHTML = "";
+  bestiaryKinds().forEach(function (row) {
+    var spec = MF.MONSTERS[row.kind], li = document.createElement("li");
+    if (row.soon) li.className = "soon";
+    var pic = monsterPortrait(row.kind, 128);
+    li.innerHTML = '<span class="chip" style="background:' + hex(spec.colour) + '"></span>' +
+      (pic ? '<img class="pic" alt="" src="' + pic + '">' : '<span></span>') +
+      '<span><span class="n">' + spec.name + '</span>' +
+      '<span class="b">' + spec.blurb + "</span></span>";
     ul.appendChild(li);
   });
-})();
+}
+
+/* remember what has actually been met, so the list grows with the game */
+function metMonsters(kinds) {
+  var s = MF.save.read() || {};
+  s.met = s.met || {};
+  var fresh = false;
+  kinds.forEach(function (k) { if (!s.met[k]) { s.met[k] = 1; fresh = true; } });
+  if (fresh) MF.save.write(s);
+}
 
 /* ==================================================================
    DEBUG - D
@@ -8355,12 +8494,63 @@ if (!window.THREE) {
 </script>
 
 <script>
-/* Offline. Registered after load so it never delays the first cellar,
-   and wrapped because a page opened straight off the disk has no
-   service workers at all - which must not stop the game running. */
+/* =====================================================================
+   Offline, and knowing when there is a newer one.
+
+   Registered after load so it never delays the first cellar, and
+   wrapped because a page opened straight off the disk has no service
+   workers at all - which must not stop the game running.
+
+   A new build deliberately does NOT take over a page that is already
+   open: swapping the scripts out from under somebody halfway down a
+   cellar is how you lose their descent to a deploy. But that leaves the
+   other half of the problem, which is that they are then playing an old
+   copy and have no way of knowing. During a beta that changes most days
+   that is not a detail - it is somebody reporting a bug that was fixed
+   a week ago, or looking for a button that is not in the build they
+   have.
+
+   So: when a newer one is sitting there waiting, the title screen says
+   so and offers to take it. Their choice, at a moment when nothing is
+   in progress.
+   ===================================================================== */
+function offerUpdate(reg) {
+  var waiting = reg.waiting;
+  if (!waiting) return;
+  var el = document.getElementById("freshSays");
+  if (!el || !el.hidden) return;
+  el.hidden = false;
+  el.textContent = "There is a newer version of the game. ";
+  var go = document.createElement("button");
+  go.type = "button";
+  go.textContent = "Take it";
+  go.addEventListener("click", function () {
+    go.textContent = "one moment...";
+    /* tell it to stop waiting, and reload when it has taken over */
+    navigator.serviceWorker.addEventListener("controllerchange", function () {
+      location.reload();
+    });
+    waiting.postMessage({ mutantFly: "takeOver" });
+    setTimeout(function () { location.reload(); }, 1200);
+  });
+  el.appendChild(go);
+}
+
 if ("serviceWorker" in navigator && location.protocol.indexOf("http") === 0) {
   addEventListener("load", function () {
-    navigator.serviceWorker.register("sw.js").catch(function () {});
+    navigator.serviceWorker.register("sw.js").then(function (reg) {
+      offerUpdate(reg);
+      reg.addEventListener("updatefound", function () {
+        var fresh = reg.installing;
+        if (!fresh) return;
+        fresh.addEventListener("statechange", function () {
+          if (fresh.state === "installed" && navigator.serviceWorker.controller) offerUpdate(reg);
+        });
+      });
+      /* and look again now and then, because a tab left open all day
+         never asks on its own */
+      setInterval(function () { reg.update().catch(function () {}); }, 15 * 60 * 1000);
+    }).catch(function () {});
   });
 }
 </script>

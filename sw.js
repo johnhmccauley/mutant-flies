@@ -19,7 +19,7 @@
    those are network-only: if there is no network there is no catalogue,
    and the game carries on without it.
    ===================================================================== */
-const VERSION = "6ba489f8cd39";
+const VERSION = "ec763e4aab43";
 const CACHE = "mutant-fly-" + VERSION;
 
 const SHELL = [
@@ -56,6 +56,14 @@ self.addEventListener("install", (e) => {
        deploy. The new worker installs, waits, and takes over the next
        time the game is opened. */
   })());
+});
+
+/* The only thing that will make a waiting worker take over early: the
+   player asking for it, from a title screen, with nothing in progress.
+   Never on its own - that is the whole point of not calling
+   skipWaiting() in install. */
+self.addEventListener("message", (e) => {
+  if (e.data && e.data.mutantFly === "takeOver") self.skipWaiting();
 });
 
 self.addEventListener("activate", (e) => {
