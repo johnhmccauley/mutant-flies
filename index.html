@@ -264,8 +264,22 @@
 #edBar .edRow + .edRow { margin-top: 5px; }
 /* Wrapping, not scrolling: twenty-three tools in one row needed 1674
    pixels and hid more than half of themselves on any normal screen. */
-#edTools { display: flex; gap: 4px; flex: 1 1 auto; flex-wrap: wrap;
-  align-items: center; max-height: 30vh; overflow-y: auto; overflow-x: hidden; }
+/* Thirteen cards need somewhere to sit. At thirty per cent of the
+   height the last row was cut through the middle of its labels, with a
+   scrollbar over the top of them - so it reads as a row that is broken
+   rather than a list that continues. Taller, aligned to the top, and
+   with a little air under the last row so nothing is sliced. */
+#edTools { display: flex; gap: 5px; flex: 1 1 auto; flex-wrap: wrap;
+  align-items: flex-start; align-content: flex-start;
+  max-height: 40vh; overflow-y: auto; overflow-x: hidden;
+  padding-bottom: 3px;
+  /* the browser's own is a white slab down the side of a dark room */
+  scrollbar-width: thin; scrollbar-color: #4a3c2c transparent; }
+#edTools::-webkit-scrollbar { width: 9px; }
+#edTools::-webkit-scrollbar-track { background: transparent; }
+#edTools::-webkit-scrollbar-thumb { background: #4a3c2c; border-radius: 5px;
+  border: 2px solid transparent; background-clip: content-box; }
+#edTools::-webkit-scrollbar-thumb:hover { background: #6b5640; background-clip: content-box; }
 .edGroup { display: flex; gap: 3px; align-items: center; flex-wrap: wrap;
   padding: 2px 6px 2px 0; border-right: 1px solid #2b2219; }
 .edGroup:last-child { border-right: 0; }
@@ -276,7 +290,52 @@
    which is 96x60 and declared later, so it quietly won */
 .edToolPic { width: 18px; height: 18px; border-radius: 2px; display: block; flex: 0 0 auto; }
 /* the group tabs - what used to be six wrapping rows of everything */
-#edTabs { position: relative; }
+/* One control, always at the top right of whatever is showing: the
+   palette itself, or - once it is folded and you ask for a set of tools
+   - the window those tools come up in. */
+.edFold, .edShut { position: absolute; top: 5px; right: 7px; z-index: 3; }
+.edShut { display: none; }
+.edAsk { position: absolute; top: 37px; right: 7px; z-index: 3; }
+.edUpDn { position: absolute; right: 7px; z-index: 3; }
+.edUp { top: 71px; }
+.edDn { top: 103px; }
+.edUpDn:disabled { opacity: .25; cursor: default; }
+.edUpDn:disabled:hover { background: transparent; border-color: transparent; color: #b8ab99; }
+#edBar.folded .edUpDn { display: none; }
+#edBar.folded .edAsk { display: none; }
+#edBar.folded.open .edAsk { display: inline-grid; top: auto; bottom: 9px; }
+
+#edSplit { display: flex; gap: 10px; align-items: flex-start; }
+
+/* folded: the four jobs in a row, and nothing else */
+#edBar.folded #edSplit { display: block; }
+#edBar.folded #edRail { flex-direction: row; border-right: 0; padding-right: 34px; }
+#edBar.folded #edWork { display: none; }
+#edBar.folded .edFold svg { transform: rotate(180deg); }
+
+/* ...until one is picked, and its tools float over the cellar */
+#edBar.folded.open #edWork { display: block; position: absolute; left: 8px; right: 8px;
+  bottom: calc(100% + 6px); z-index: 4; padding: 30px 10px 10px;
+  max-height: 58vh; overflow: auto;
+  background: rgba(14,11,8,.97); border: 1px solid #3a2e22; border-radius: 9px;
+  box-shadow: 0 12px 30px rgba(0,0,0,.6); }
+#edBar.folded.open .edShut { display: inline-grid; }
+#edBar.folded.open .edFold { display: none; }
+#edWork { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 5px;
+  padding-right: 40px; }
+#edTools { scroll-behavior: smooth; }
+#edRail { display: flex; flex-direction: column; gap: 3px; flex: 0 0 auto;
+  padding-right: 9px; border-right: 1px solid #2b2219; }
+.edRailBtn { display: grid; grid-template-columns: 20px 1fr; align-items: center; gap: 7px;
+  background: transparent; border: 1px solid transparent; border-radius: 6px;
+  color: #8e8172; font: inherit; font-size: 10px; letter-spacing: .1em;
+  text-transform: uppercase; text-align: left; padding: 6px 9px 6px 6px; cursor: pointer; }
+.edRailBtn svg { width: 18px; height: 18px; fill: none; stroke: currentColor;
+  stroke-width: 1.4; stroke-linecap: round; stroke-linejoin: round; }
+.edRailBtn:hover { color: #cbbfab; background: #1d1712; }
+.edRailBtn[aria-pressed="true"] { color: #ffe6b8; background: #2a2016; border-color: #b98c3e; }
+@media (max-width: 560px) { .edRailBtn span { display: none; }
+  .edRailBtn { grid-template-columns: 20px; padding: 6px; } }
 .edBun { display: inline-grid; place-items: center; padding: 3px 7px; }
 .edBun svg { width: 15px; height: 15px; fill: none; stroke: currentColor;
   stroke-width: 1.5; stroke-linecap: round; }
@@ -300,20 +359,21 @@
 
 #edTools.cards { gap: 6px; }
 .edCard { position: relative; background: #1d1712; border: 1px solid #372c21;
-  border-radius: 6px; padding: 4px 4px 2px; color: #b8ab99; font: inherit;
-  cursor: pointer; width: 92px; }
+  border-radius: 6px; padding: 3px 3px 1px; color: #b8ab99; font: inherit;
+  cursor: pointer; width: 70px; }
 .edCard:hover { border-color: #6b5640; color: #efe4d2; }
 .edCard[aria-pressed="true"] { border-color: #b98c3e; background: #2a2016; color: #ffe6b8; }
 .edCard img { width: 100%; height: auto; display: block; border-radius: 3px; }
-.edCard b { display: block; font-size: 11px; font-weight: 500; padding: 2px 1px 1px; }
+.edCard b { display: block; font-size: 10px; font-weight: 500; padding: 2px 1px 1px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .edCard .edKey { position: absolute; top: 5px; right: 6px; }
 .edCard .edSwatch.big { display: block; width: 100%; height: 58px; border-radius: 3px; }
 
-#edEdges { display: flex; gap: 10px; align-items: stretch; }
 .edEdgePick { display: flex; flex-direction: column; gap: 3px; width: 240px;
   background: #1d1712; border: 1px solid #372c21; border-radius: 6px;
   padding: 6px; color: #b8ab99; font: inherit; text-align: left; cursor: pointer; }
-.edEdgePick:hover { border-color: #6b5640; color: #efe4d2; }
+.edEdgePick:hover:not(:disabled) { border-color: #6b5640; color: #efe4d2; }
+.edEdgePick:disabled { opacity: .38; cursor: default; }
 .edEdgePick.here { border-color: #b98c3e; background: #2a2016; color: #ffe6b8; }
 .edEdgePick img { width: 100%; height: auto; border-radius: 3px; display: block; }
 .edEdgePick b { font-size: 12px; }
@@ -329,10 +389,14 @@
 .edTint:hover { border-color: #6b5640; }
 .edTint[aria-pressed="true"] { border-color: #ffe6b8; box-shadow: 0 0 0 1px #b98c3e; }
 
-#edZoom { position: fixed; right: 12px; z-index: 41; display: flex; align-items: center;
-  gap: 2px; padding: 3px; border-radius: 9px; border: 1px solid #3a2e22;
-  background: rgba(12,9,7,.86); backdrop-filter: blur(3px);
+#edMenu { position: fixed; right: 12px; z-index: 41; display: flex; flex-direction: column;
+  gap: 6px; padding: 6px; border-radius: 9px; border: 1px solid #3a2e22;
+  background: rgba(12,9,7,.96); backdrop-filter: blur(3px);
+  box-shadow: 0 10px 26px rgba(0,0,0,.55);
   font-family: "IBM Plex Mono", ui-monospace, monospace; }
+#edMenu #edRest { display: flex; flex-wrap: wrap; gap: 4px; max-width: 236px;
+  padding-top: 6px; border-top: 1px solid #2b2219; }
+#edZoom { display: flex; align-items: center; justify-content: center; gap: 2px; }
 #edZoom button { width: 30px; height: 30px; padding: 0; border-radius: 7px;
   border: 1px solid transparent; background: transparent; color: #cbbfab;
   font: inherit; font-size: 17px; line-height: 1; cursor: pointer; }
@@ -381,7 +445,7 @@
    thing the editor has to talk with: level faults, what the bot made of
    it, a browser refusing to save. */
 #edTop { position: fixed; left: 0; right: 0; top: 0; z-index: 40;
-  display: flex; gap: 4px 10px; align-items: baseline; flex-wrap: wrap;
+  display: flex; gap: 4px 10px; align-items: center; flex-wrap: nowrap;
   padding: 7px 12px 8px;
   background: linear-gradient(to bottom, rgba(12,9,7,.97), rgba(12,9,7,.80));
   border-bottom: 1px solid #3a2e22;
@@ -399,7 +463,8 @@
    thing, and the one you look at is not the one you can change. */
 #edTop input#edName { background: transparent; border: 1px solid transparent;
   border-radius: 4px; color: #efe4d2; font: inherit; font-weight: 600; font-size: 12px;
-  padding: 3px 5px; flex: 0 1 22ch; min-width: 6ch; }
+  padding: 3px 5px; flex: 0 1 22ch; min-width: 4ch;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 #edTop input#edName:hover { border-color: #372c21; }
 #edTop input#edName:focus { outline: none; border-color: #b98c3e; background: #14100c; }
 #edTop input#edName::placeholder { color: #7d7365; font-weight: 400; }
@@ -410,7 +475,22 @@
    the shapes everything else uses: a triangle for play, a disk for
    save, a curved arrow each way for undo and redo, and the cross top
    right for the way out. */
-#edActs { display: flex; gap: 2px; align-items: center; margin-left: auto; flex: 0 0 auto; }
+#edActs { display: flex; gap: 2px; align-items: center; margin-left: auto; flex: 0 0 auto;
+  position: relative; }
+#edBurger { display: none; }
+#edBurgerList { position: absolute; right: 0; top: 100%; z-index: 43; min-width: 170px;
+  margin-top: 4px; padding: 4px; display: flex; flex-direction: column; gap: 1px;
+  background: rgba(14,11,8,.97); border: 1px solid #3a2e22; border-radius: 7px;
+  box-shadow: 0 8px 22px rgba(0,0,0,.55); }
+#edBurgerList button { background: transparent; border: 0; border-radius: 5px;
+  color: #b8ab99; font: inherit; font-size: 11px; letter-spacing: .08em;
+  text-transform: uppercase; text-align: left; padding: 7px 9px; cursor: pointer; }
+#edBurgerList button:hover { background: #2a2016; color: #efe4d2; }
+/* narrow: the name, the zoom, the menu and the way out */
+@media (max-width: 620px) {
+  #edActs .edSpill { display: none; }
+  #edBurger { display: inline-grid; }
+}
 .edIcon { width: 28px; height: 28px; padding: 0; border-radius: 6px;
   border: 1px solid transparent; background: transparent; color: #b8ab99;
   display: inline-grid; place-items: center; cursor: pointer; }
@@ -420,6 +500,7 @@
   fill: none; stroke: currentColor; stroke-width: 1.5;
   stroke-linecap: round; stroke-linejoin: round; }
 .edIcon svg .fill { fill: currentColor; stroke: none; }
+.edIcon.zoomed { color: #ffe6b8; }
 .edIcon.play { color: #5fd07a; }
 .edIcon.play:hover { color: #8ce89f; background: #1e3324; border-color: #3f7a51; }
 
@@ -593,20 +674,24 @@
 
   <span id="edSay"></span>
   <span id="edActs">
-    <button class="edIcon" id="edInfoBtn" type="button" aria-pressed="false"
+    <button class="edIcon edSpill" id="edInfoBtn" type="button" aria-pressed="false"
             title="What is in this cellar" aria-label="What is in this cellar"><svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6.4"/><path d="M8 7v4.2M8 4.4v1.2"/></svg></button>
-    <button class="edIcon" id="edHelpBtn" type="button" aria-pressed="false"
-            title="What does this tool do?" aria-label="What does this tool do?"><svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6.4"/><path d="M6.1 6.1a1.95 1.95 0 1 1 2.4 2.2c-.4.2-.5.5-.5.9v.4"/><path d="M8 12.1v.05"/></svg></button>
-    <button class="edIcon play" id="edTest" type="button"
+    <button class="edIcon play edSpill" id="edTest" type="button"
             title="Test play" aria-label="Test play"><svg viewBox="0 0 16 16" aria-hidden="true"><path class="fill" d="M4.6 3.2 12.6 8l-8 4.8z"/></svg></button>
-    <button class="edIcon" id="edSave" type="button"
-            title="Save" aria-label="Save"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2.6 2.6h8.3l2.5 2.5v8.3H2.6z"/><path d="M5.1 2.6h5.2v3.6H5.1z"/><path d="M4.6 9.2h6.8v4.2H4.6z"/></svg></button>
-    <button class="edIcon" id="edUndo" type="button"
+    <button class="edIcon edSpill" id="edUndo" type="button"
             title="Undo  (Ctrl+Z)" aria-label="Undo"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3.1 7.4h6.1a3.6 3.6 0 0 1 0 7.2H6.4"/><path d="M5.9 4.3 2.7 7.4l3.2 3.1"/></svg></button>
-    <button class="edIcon" id="edRedo" type="button"
+    <button class="edIcon edSpill" id="edRedo" type="button"
             title="Redo" aria-label="Redo"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M12.9 7.4H6.8a3.6 3.6 0 0 0 0 7.2h2.8"/><path d="M10.1 4.3l3.2 3.1-3.2 3.1"/></svg></button>
     <button class="edIcon" id="edMore" type="button" aria-pressed="false"
-            title="Everything else" aria-label="Everything else"><svg viewBox="0 0 16 16" aria-hidden="true"><path class="fill" d="M3.6 6.7a1.3 1.3 0 1 1 0 2.6 1.3 1.3 0 0 1 0-2.6zM8 6.7a1.3 1.3 0 1 1 0 2.6 1.3 1.3 0 0 1 0-2.6zM12.4 6.7a1.3 1.3 0 1 1 0 2.6 1.3 1.3 0 0 1 0-2.6z"/></svg></button>
+            title="Zoom" aria-label="Zoom"><svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="7" cy="7" r="4.5"/><path d="M10.4 10.4 13.9 13.9M5.1 7h3.8"/></svg></button>
+    <button class="edIcon" id="edBurger" type="button" aria-pressed="false"
+            title="Everything else" aria-label="Everything else"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2.6 4.4h10.8M2.6 8h10.8M2.6 11.6h10.8"/></svg></button>
+    <div id="edBurgerList" hidden>
+      <button type="button" data-does="edInfoBtn">What is in this cellar</button>
+      <button type="button" data-does="edTest">Test play</button>
+      <button type="button" data-does="edUndo">Undo</button>
+      <button type="button" data-does="edRedo">Redo</button>
+    </div>
     <button class="edIcon" id="edQuit" type="button"
             title="Leave" aria-label="Leave"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8"/></svg></button>
   </span>
@@ -616,46 +701,63 @@
 
 <!-- Zoom belongs to the view, not to the palette. Down in the tool row
      it read as another thing to put in the cellar, sat a long way from
-     what it changes, and moved about as the row reflowed. Pinned to the
-     top right of the picture it is where every other program keeps it
-     and where your eye already is. -->
-<div id="edZoom" hidden></div>
+     what it changes, and moved about as the row reflowed.
+
+     It does not want to be on screen the whole time either: a pill
+     floating over the top right corner of the room covers the very part
+     of the room it is there to help you look at. It lives behind the
+     magnifier in the header now and drops down under it when asked -
+     together with the handful of things you reach for once a session,
+     which is what was behind that icon before. -->
+<div id="edMenu" hidden>
+  <div id="edZoom"></div>
+  <div class="edRow" id="edRest">
+        <button class="edBtn" id="edShare" type="button">Code</button>
+        <button class="edBtn" id="edPublish" type="button">Publish</button>
+      </div>
+</div>
 
 <div id="edBar" hidden>
-  <div class="edRow" id="edTabs"></div>
-  <div class="edRow">
-    <div id="edTools"></div>
-    <span id="edBrush" hidden></span>
-    <span id="edTints" hidden></span>
-
-  </div>
-  <!-- the two kinds of edge, shown rather than named, once a side of the
-       room has been picked -->
-  <div class="edRow" id="edEdges" hidden>
-  </div>
-  <div class="edRow">
-  </div>
-  <!-- The things you reach for once a session, rather than once a
-       minute. They were all in the front row at equal weight, which is
-       how Undo ended up buried between Publish and Paint. -->
-  <div class="edRow" id="edRest" hidden>
-    <button class="edBtn" id="edOpen" type="button">Open</button>
-    <button class="edBtn" id="edNew" type="button">New</button>
-    <button class="edBtn warm" id="edBot" type="button">Set the bot on it</button>
-    <button class="edBtn" id="edShare" type="button">Code</button>
-    <button class="edBtn" id="edPublish" type="button">Publish</button>
-    <button class="edBtn" id="edPaint" type="button" aria-pressed="false"
-            title="Lay as you walk, instead of pressing space on every square">Paint</button>
-    <button class="edBtn" id="edStampBtn" type="button" title="Same as space">Put down</button>
+  <!-- Out of the way, and back again. A palette four rows deep is most
+       of a phone; folded to one row of icons it is a strip, and picking
+       one floats the tools over the cellar until you are done with
+       them. -->
+  <button class="edIcon edFold" id="edFold" type="button"
+          title="Collapse" aria-label="Collapse"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3.4 6.4 8 11l4.6-4.6"/></svg></button>
+  <!-- what the tool in your hand does: under the collapse chevron,
+       beside the tools it is talking about, and gone when there are no
+       tools on screen to talk about -->
+  <button class="edIcon edAsk" id="edHelpBtn" type="button" aria-pressed="false"
+          title="What does this tool do?" aria-label="What does this tool do?"><svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6.4"/><path d="M6.1 6.1a1.95 1.95 0 1 1 2.4 2.2c-.4.2-.5.5-.5.9v.4"/><path d="M8 12.1v.05"/></svg></button>
+  <button class="edIcon edUpDn edUp" id="edUp" type="button"
+          title="A row back" aria-label="A row back"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3.4 9.6 8 5l4.6 4.6"/></svg></button>
+  <button class="edIcon edUpDn edDn" id="edDown" type="button"
+          title="A row on" aria-label="A row on"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3.4 6.4 8 11l4.6-4.6"/></svg></button>
+  <div id="edSplit">
+    <!-- The four jobs, down the left as icons. Across the top they were
+         a line of words competing with the tools underneath them for
+         which row you were meant to read first; down the side they are
+         out of the way of the things, and the things get the width. -->
+    <div id="edRail"></div>
+    <div id="edWork">
+      <button class="edIcon edShut" id="edShut" type="button"
+              title="Collapse" aria-label="Collapse"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3.4 6.4 8 11l4.6-4.6"/></svg></button>
+      <div class="edRow">
+        <div id="edTools"></div>
+        <span id="edBrush" hidden></span>
+        <span id="edTints" hidden></span>
+      </div>
+    </div>
   </div>
 </div>
 
 <div class="sheet" id="edListSheet" hidden>
   <div class="card">
     <p class="kicker">Your cellars</p>
-    <h1>Open one</h1>
+    <h1>Build a cellar</h1>
     <div id="edList"></div>
     <div class="row">
+      <button class="go" id="edListNew" type="button">New cellar</button>
       <button class="go quiet" id="edListClose" type="button">Back</button>
     </div>
     <p class="fine">Kept in this browser. A cellar that has been published cannot be deleted - other people have played it - but it can be hidden.</p>
@@ -6546,17 +6648,16 @@ function viewBox() {
 var reFitting = false;
 function resize() {
   var box = viewBox();
-  var zb = $("edZoom");
-  if (zb) zb.style.top = (box.top + 10) + "px";
+  var zb = $("edMenu");
+  if (zb) zb.style.top = (box.top + 6) + "px";
   /* How many tabs fit depends on the width, so it is worked out again
      when the width changes - but laying them out changes the height of
      the bar, which the observer notices, which calls this again. The
      latch breaks that circle; without it the two of them hand the
      window back and forth for ever. */
-  if (mode === "edit" && !reFitting) {
-    reFitting = true;
-    setTimeout(function () { try { edPaint(); } finally { reFitting = false; } }, 0);
-  }
+
+  edRowsSoon();
+
   var gl = renderer.domElement;
   gl.style.top = box.top + "px";
   gl.style.height = box.h + "px";
@@ -6746,6 +6847,107 @@ function buildCellar() {
 /* n baulks stacked to `tall`, with a shadow gap between them, as one
    geometry - so a wall of them is still one instance per square */
 
+/* ====================================================================
+   SMALL THINGS, MADE OF SEVERAL PIECES
+
+   Every item worth picking up was one primitive: boots were a box, the
+   frost jar a cylinder, the saw a stick, the sealed jar another
+   cylinder. At the size they are in the cellar that nearly passes, and
+   in a palette card an inch across it does not - a yellow box is not
+   boots, and nothing about a white stick says saw.
+
+   They are built out of a handful of primitives each instead, merged
+   into one geometry with the colour of each piece baked into its
+   vertices. That keeps them one InstancedMesh apiece, drawn in one
+   call, exactly as before - the cost of a better model here is paid at
+   build time and not per frame.
+   ==================================================================== */
+function partsToGeo(parts) {
+  var geos = parts.map(function (p) {
+    var g = p.geo.toNonIndexed();
+    if (p.rot) g.rotateZ(p.rot);
+    if (p.rotX) g.rotateX(p.rotX);
+    g.translate(p.at[0], p.at[1], p.at[2]);
+    return { g: g, hex: p.hex };
+  });
+
+  var total = 0;
+  geos.forEach(function (o) { total += o.g.attributes.position.count; });
+  var pos = new Float32Array(total * 3), nrm = new Float32Array(total * 3);
+  var uv = new Float32Array(total * 2), col = new Float32Array(total * 3);
+  var v = 0, c = new THREE.Color();
+  geos.forEach(function (o) {
+    var P = o.g.attributes.position.array, N = o.g.attributes.normal.array;
+    var U = o.g.attributes.uv ? o.g.attributes.uv.array : null;
+    c.setHex(o.hex);
+    for (var i = 0; i < o.g.attributes.position.count; i++) {
+      pos[(v + i) * 3] = P[i * 3]; pos[(v + i) * 3 + 1] = P[i * 3 + 1]; pos[(v + i) * 3 + 2] = P[i * 3 + 2];
+      nrm[(v + i) * 3] = N[i * 3]; nrm[(v + i) * 3 + 1] = N[i * 3 + 1]; nrm[(v + i) * 3 + 2] = N[i * 3 + 2];
+      if (U) { uv[(v + i) * 2] = U[i * 2]; uv[(v + i) * 2 + 1] = U[i * 2 + 1]; }
+      col[(v + i) * 3] = c.r; col[(v + i) * 3 + 1] = c.g; col[(v + i) * 3 + 2] = c.b;
+    }
+    v += o.g.attributes.position.count;
+  });
+
+  var out = new THREE.BufferGeometry();
+  out.setAttribute("position", new THREE.BufferAttribute(pos, 3));
+  out.setAttribute("normal", new THREE.BufferAttribute(nrm, 3));
+  out.setAttribute("uv", new THREE.BufferAttribute(uv, 2));
+  out.setAttribute("color", new THREE.BufferAttribute(col, 3));
+  out.computeBoundingSphere();
+  return out;
+}
+
+var BOX = function (w, h, d) { return new THREE.BoxGeometry(w, h, d); };
+var CYL = function (rt, rb, h, seg) { return new THREE.CylinderGeometry(rt, rb, h, seg || 10); };
+
+/* a pair of boots, side by side and pointing the same way */
+function bootsGeo() {
+  var parts = [], LEATHER = 0x6b4a2a, TAN = 0xc8a017, SOLE = 0x2e2119;
+  [-0.10, 0.10].forEach(function (x) {
+    parts.push({ geo: BOX(0.17, 0.05, 0.36), at: [x, 0.025, 0], hex: SOLE });
+    parts.push({ geo: BOX(0.15, 0.15, 0.23), at: [x, 0.125, -0.05], hex: TAN });
+    parts.push({ geo: BOX(0.16, 0.09, 0.13), at: [x, 0.075, 0.12], hex: LEATHER });
+    parts.push({ geo: BOX(0.175, 0.035, 0.20), at: [x, 0.215, -0.06], hex: LEATHER });
+  });
+  return partsToGeo(parts);
+}
+
+/* a stoppered jar with the cold in it */
+function frostGeo() {
+  var ICE = 0x63c8e0, METAL = 0x9aa2a8;
+  return partsToGeo([
+    { geo: CYL(0.135, 0.15, 0.22, 12), at: [0, 0.11, 0], hex: ICE },
+    { geo: CYL(0.075, 0.135, 0.06, 12), at: [0, 0.25, 0], hex: ICE },
+    { geo: CYL(0.07, 0.07, 0.05, 10), at: [0, 0.305, 0], hex: ICE },
+    { geo: CYL(0.095, 0.09, 0.04, 10), at: [0, 0.35, 0], hex: METAL }
+  ]);
+}
+
+/* a saw: a toothed blade with a handle on the end of it */
+function sawGeo() {
+  var STEEL = 0xc2c8ce, WOOD = 0x6b4a2a, parts = [];
+  parts.push({ geo: BOX(0.025, 0.13, 0.40), at: [0, 0.16, 0.06], hex: STEEL });
+  parts.push({ geo: BOX(0.03, 0.05, 0.05), at: [0, 0.16, 0.28], hex: STEEL });
+  /* the teeth, along the underside */
+  for (var i = 0; i < 8; i++)
+    parts.push({ geo: BOX(0.026, 0.05, 0.026), at: [0, 0.085, -0.10 + i * 0.045], hex: STEEL, rot: 0.5 });
+  parts.push({ geo: BOX(0.055, 0.13, 0.10), at: [0, 0.15, -0.17], hex: WOOD });
+  parts.push({ geo: CYL(0.035, 0.035, 0.055, 8), at: [0, 0.15, -0.235], rot: Math.PI / 2, hex: WOOD });
+  return partsToGeo(parts);
+}
+
+/* somebody sealed this one and did not label it */
+function jarGeo() {
+  var GLASS = 0x9a5bc4, CORK = 0x8a6a3a, WAX = 0x7a2430;
+  return partsToGeo([
+    { geo: CYL(0.125, 0.135, 0.20, 12), at: [0, 0.10, 0], hex: GLASS },
+    { geo: CYL(0.07, 0.125, 0.055, 12), at: [0, 0.228, 0], hex: GLASS },
+    { geo: CYL(0.08, 0.08, 0.035, 10), at: [0, 0.272, 0], hex: WAX },
+    { geo: CYL(0.058, 0.062, 0.06, 8), at: [0, 0.315, 0], hex: CORK }
+  ]);
+}
+
 function inst(geo, mat, n, shadow) {
   var m = new THREE.InstancedMesh(geo, mat, n);
   m.castShadow = !!shadow; m.receiveShadow = true; m.count = 0;
@@ -6865,16 +7067,14 @@ function buildProps() {
   }
 
   /* the things worth picking up, one small floating object each */
-  var shapes = {
-    1: new THREE.BoxGeometry(0.3, 0.18, 0.44),           /* boots */
-    2: new THREE.CylinderGeometry(0.16, 0.19, 0.34, 9),  /* frost jar */
-    3: new THREE.BoxGeometry(0.09, 0.5, 0.09),           /* axe */
-    4: new THREE.CylinderGeometry(0.17, 0.17, 0.32, 9)   /* sealed jar */
-  };
+  var shapes = { 1: bootsGeo(), 2: frostGeo(), 3: sawGeo(), 4: jarGeo() };
   for (var k in MF.ITEMS) {
     var spec = MF.ITEMS[k];
-    var mat = new THREE.MeshStandardMaterial({ color: spec.colour, roughness: 0.4, metalness: 0.4,
-                                               emissive: spec.colour, emissiveIntensity: 0.28 });
+    /* the colour is in the vertices now, so the material carries the
+       finish and a little of the item's own glow to pick it out of the
+       gloom, as it always did */
+    var mat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.45, metalness: 0.25,
+                                               emissive: spec.colour, emissiveIntensity: 0.16 });
     props["item" + k] = inst(shapes[k], mat, 8, true);
   }
 }
@@ -8391,13 +8591,33 @@ var ed = {
      reset the moment the key comes up or the cursor moves. */
   liftN: 0, liftAt: "",
   /* the editor starts looking at the whole room */
-  view: "blocks"
+  view: "things"
 };
 var UNDO_DEEP = 40;
+
+/* ====================================================================
+   IT SAVES ITSELF
+
+   Work that only survives if you remember to press a button is work
+   that gets lost, and this is a browser tab: it can be closed by
+   accident, reloaded by a new build, or dropped by the machine going to
+   sleep. A few seconds after the last change it writes itself to the
+   vault, quietly - Save is still there for when you want to be sure,
+   and it says so out loud when you use it.
+   ==================================================================== */
+var edKeepT = null;
+function edKeepSoon() {
+  if (edKeepT) clearTimeout(edKeepT);
+  edKeepT = setTimeout(function () {
+    edKeepT = null;
+    if (mode === "edit" && ed.dirty) edSave(true);
+  }, 2500);
+}
 
 function edMark() {
   try {
     ed.undo.push({ rec: edAsLevel({}), start: [ed.startC, ed.startR] });
+    edKeepSoon();
     if (ed.undo.length > UNDO_DEEP) ed.undo.shift();
     ed.redo.length = 0;
     edButtons();
@@ -8419,10 +8639,9 @@ function edStepBack(stack, other) {
 }
 
 function edButtons() {
-  var u = $("edUndo"), rd = $("edRedo"), pt = $("edPaint");
+  var u = $("edUndo"), rd = $("edRedo");
   if (u) u.disabled = !ed.undo.length;
   if (rd) rd.disabled = !ed.redo.length;
-  if (pt) pt.setAttribute("aria-pressed", ed.painting ? "true" : "false");
 }
 
 /* ------------------------------------------------------------------
@@ -8469,7 +8688,12 @@ var ED_TOOLS = [
   { name: "Start",     group: 4, swatch: "#ffd27a", act: "man", how: "Click a square to say where the player begins." },
   { name: "Raise",     group: 4, swatch: "#7a6a52", act: "hi", v: 1, how: "Click a square to lift it a step. Hold to keep lifting - the ground around it slopes up to meet it." },
   { name: "Lower",     group: 4, swatch: "#4a4034", act: "hi", v: -1, how: "Click a square to drop it a step. Hold to keep going." },
-  { name: "Wall/drop", group: 4, swatch: "#574c42", act: "edge", how: "Click a side of the room to pick it, then choose below whether it is good stone or a drop." },
+  { name: "Stone", group: 4, swatch: "#574c42", act: "edge", v: 1,
+    how: "Press a side of the room to build it in stone. A brick driven at it stops dead, and stone is the only side that counts as a side of a trap - two bricks hold something in a stone corner where four would be needed." },
+  { name: "A lip", group: 4, swatch: "#3b332c", act: "edge", v: MF.DROP,
+    how: "Press a side of the room to leave it a small kerb. Bricks go over it and so do you, but a marble rolling at it comes back slower - unless it is going fast enough to ride over." },
+  { name: "A sheer drop", group: 4, swatch: "#0d0b09", act: "edge", v: MF.SHEER,
+    how: "Press a side of the room to take it away altogether. Everything that reaches it goes over, a marble at any speed included, and none of it comes back." },
   { name: "Outline",   group: 4, swatch: "#ffd27a", act: "poly", how: "Drag a corner to move it. Click one to pick it out, or drag a box round several. Press anywhere along a side to add a corner there; Delete loses one." },
   { name: "Cut out",   group: 4, swatch: "#0d0b09", act: "shape", how: "Click a square to take it out of the cellar - the floor stops there. Click it again to put it back." },
   { name: "Paint floor", group: 1, swatch: "#8a6a3a", act: "tint", how: "Click a square to colour it with the swatch beside the name box." }
@@ -8968,7 +9192,7 @@ function edNodesDraw() {
      - the side highlights on its own when you pick it, which is the
      only thing that needed saying. */
   var act = ED_TOOLS[ed.tool] && ED_TOOLS[ed.tool].act;
-  var show = (mode === "edit" && ed.view === "floor" && act === "poly" && ed.poly.length > 0);
+  var show = (mode === "edit" && act === "poly" && ed.poly.length > 0);
   edNodeMesh.visible = show;
   if (!show) { if (edRingMesh) edRingMesh.visible = false; return; }
   /* ------------------------------------------------------------------
@@ -9064,7 +9288,7 @@ function edPolyDraw() {
      Terrain or Blocks it is a set of bright bars laid over the thing you
      are actually looking at, saying something you are not being asked
      about. */
-  var mine = (ed.view === "floor" || ed.view === "walls");
+  var mine = ((ed.view === "floor" && edAngleNow().cam === "plan") || ed.view === "walls");
   edPolyLine.visible = (mode === "edit" && mine && n > 0);
   if (!edPolyLine.visible) return;
   if (!_segA) { _segA = new THREE.Vector3(); _segB = new THREE.Vector3(); }
@@ -9079,7 +9303,7 @@ function edPolyDraw() {
      wants the weight of a pencil line; in the Walls view it marks a
      side you are meant to press, standing among the walls it belongs
      to, and a pencil line is lost down there. */
-  var thick = (ed.view === "floor" ? 0.004 : 0.011) * far * lean;
+  var thick = (edAngleNow().cam === "plan" ? 0.004 : 0.011) * far * lean;
 
   /* ------------------------------------------------------------------
      The corners are moved out, not the sides.
@@ -9174,7 +9398,9 @@ function edPolyDraw() {
    key down, which is unguessable and cannot be repeated deliberately -
    so it is a number you set, it is on screen while you are holding a
    ground tool, and the cursor grows to show you the footprint. */
-var BRUSH_MIN = 1, BRUSH_MAX = 6;
+/* Three. Six was a row of numbered buttons that all did the same thing
+   slightly harder, and nobody picked the fifth one on purpose. */
+var BRUSH_MIN = 1, BRUSH_MAX = 3;
 
 /* ====================================================================
    ZOOM
@@ -9210,7 +9436,7 @@ var ZOOMS = [0.3, 0.5, 0.7, 1, 1.5, 2, 3];
 function edBox() {
   /* The Floor view is about how big the room may get, so the paper is
      part of what you are working on there. Everywhere else the room is. */
-  if (mode === "edit" && ed.view === "floor")
+  if (mode === "edit" && ed.view === "floor" && edAngleNow().cam === "plan")
     return { c0: 0, c1: COLS - 1, r0: 0, r1: ROWS - 1, w: COLS, h: ROWS };
   return (game.box || (game.reBox ? game.reBox() : null) ||
           { c0: 0, c1: COLS - 1, r0: 0, r1: ROWS - 1, w: COLS, h: ROWS });
@@ -9304,6 +9530,81 @@ function edFrame(v) {
   return v.set(x, 0, z);
 }
 
+/* ====================================================================
+   THREE ROWS, AND A WAY TO THE REST
+
+   Measured, not guessed. The first go read the height of the first card
+   the instant it was made - before its picture had laid out - got 65
+   pixels for a card that ends up 109, and capped the whole list at a
+   single squashed row. So the rows are found from where the cards
+   actually sit: the distinct tops of the wrapped list, which is exact
+   whatever the width, and is asked for again after the browser has had
+   a frame to do the laying out.
+   ==================================================================== */
+var ED_ROWS = 3;
+
+function edRowTops(box) {
+  var tops = [], kids = box.children;
+  for (var i = 0; i < kids.length; i++) {
+    var t = kids[i].offsetTop;
+    if (!tops.length || Math.abs(tops[tops.length - 1] - t) > 3) tops.push(t);
+  }
+  return tops;
+}
+
+function edRowHeight(box) {
+  var tops = edRowTops(box);
+  var h = tops.length > 1 ? tops[1] - tops[0]
+        : (box.children.length ? box.children[0].offsetHeight + 5 : 0);
+  return h > 20 ? h : 109;
+}
+
+function edRows() {
+  var box = $("edTools"), up = $("edUp"), dn = $("edDown");
+  if (!box) return;
+  var none = box.hidden || !box.children.length;
+  if (up) up.hidden = true;
+  if (dn) dn.hidden = true;
+  if (none) { box.style.maxHeight = ""; return; }
+
+  box.style.maxHeight = "";               /* measure the whole list first */
+  var rowH = edRowHeight(box);
+  var rows = edRowTops(box).length;
+  var deep = rows > ED_ROWS;
+  box.style.overflowY = "hidden";
+  box.style.maxHeight = deep ? (rowH * ED_ROWS - 5) + "px" : "";
+  if (!deep) { box.scrollTop = 0; return; }
+
+  if (up) { up.hidden = false; up.disabled = box.scrollTop < 2; }
+  if (dn) {
+    dn.hidden = false;
+    dn.disabled = box.scrollTop >= box.scrollHeight - box.clientHeight - 2;
+  }
+}
+
+/* once the browser has laid the cards out, and once more after the
+   pictures have settled into them */
+function edRowsSoon() {
+  requestAnimationFrame(function () { requestAnimationFrame(edRows); });
+  setTimeout(edRows, 120);
+}
+
+function edRowStep(by) {
+  var box = $("edTools");
+  if (!box || !box.children.length) return;
+  /* to a row, not by a number of pixels - the tops are where the rows
+     actually are, so a step always lands one flush against the top */
+  var tops = edRowTops(box);
+  var at = 0, near = 1e9;
+  for (var i = 0; i < tops.length; i++) {
+    var d = Math.abs((tops[i] - tops[0]) - box.scrollTop);
+    if (d < near) { near = d; at = i; }
+  }
+  var want = Math.max(0, Math.min(Math.max(0, tops.length - ED_ROWS), at + by));
+  box.scrollTop = tops[want] - tops[0];
+  setTimeout(edRows, 300);
+}
+
 function edZoomBar() {
   var el = $("edZoom");
   if (!el) return;
@@ -9329,6 +9630,13 @@ function edZoomBar() {
   now.addEventListener("click", function () { edZoomTo(1); });
   el.appendChild(now);
   el.appendChild(knob("+", 1, "Move in  (+, or the wheel)"));
+  /* the menu is shut most of the time, so the icon carries the answer */
+  var mb = $("edMore");
+  if (mb) {
+    mb.title = "Zoom  (" + now.textContent + ")";
+    if (ed.zoom === 1) mb.classList.remove("zoomed");
+    else mb.classList.add("zoomed");
+  }
 }
 
 function edZoomTo(z) {
@@ -9359,37 +9667,55 @@ function edZoomStep(by) {
    what the game itself looks like.
    ==================================================================== */
 var ED_VIEWS = [
-  { key: "floor", name: "Floor", cam: "plan", show: "floor",
-    tools: ["Outline", "Cut out"],
-    how: "The floor on its own, with a handle on every corner. Drag one to change the shape of the room; the darker ground round it is room to grow into." },
-  /* Three quarters, not overhead: a wall is the one thing in a cellar
-     with height, and from directly above height is the one thing you
-     cannot see. Stone and a drop look identical in plan and completely
-     different from here, which is the whole question this view asks. */
-  { key: "walls", name: "Walls", cam: "low", show: "walls",
-    tools: ["Wall/drop"],
-    how: "Click a side of the room to pick it, then click it again to turn it between good stone and a drop. Stone counts as a side of a trap; a drop does not, and anything shoved over one is gone." },
-  { key: "terrain", name: "Terrain", cam: "room", show: "walls",
-    tools: ["Raise", "Lower", "Paint floor"],
-    how: "The lie of the ground, with nothing standing on it. Pick a brush and run it over the floor." },
-  { key: "blocks", name: "Blocks", cam: "room", show: "all", pics: true,
-    /* Brick first, because the first tool of the first view is the one
-       in your hand when the editor opens, and that should not be Erase */
-    tools: ["Brick", "Rock", "Tree", "Marble", "Chopper", "Erase"],
-    how: "What the player pushes about, and what pushes back." },
-  { key: "liquid", name: "Liquid", cam: "room", show: "all", pics: true,
-    tools: ["Tar vat", "Water vat", "Set tar"],
-    how: "Wall a vat in on all four sides or it runs. Tar burns through wood fast, brick slowly, stone never." },
-  { key: "kit", name: "Kit", cam: "room", show: "all", pics: true,
-    tools: ["Boots", "Frost", "Saw", "Jar"],
-    how: "Things left lying about for the player to pick up." },
+  /* ------------------------------------------------------------------
+     Four jobs.
+
+     The shape of the floor and the lie of it were two tabs, and they are
+     one thing: the ground. What separated them was not the job but the
+     camera - an outline wants to be seen from overhead, where a square
+     is a square, and a slope wants three quarters, where you can see it
+     is a slope. That is a reason for the VIEW to change, not for there
+     to be two of them, so the angle follows the tool in your hand.
+     ------------------------------------------------------------------ */
+  { key: "floor", name: "Floor", cam: "plan", show: "floor", pics: true,
+    icon: '<path d="M8 1.7 14.6 8 8 14.3 1.4 8z"/><path d="M4.7 8 8 4.7 11.3 8 8 11.3z"/>',
+    tools: ["Outline", "Cut out", "Raise", "Lower", "Paint floor"],
+    how: "The ground: what shape the room is, and how it lies. Drag a corner to change the shape; take a brush to the middle to raise or lower it." },
+  { key: "walls", name: "Wall", cam: "low", show: "walls", pics: true,
+    /* a bond of bricks, not the rungs of a ladder */
+    icon: '<path d="M1.6 3.4h12.8v9.2H1.6z"/><path d="M1.6 6.5h12.8M1.6 9.5h12.8"/><path d="M6 3.4v3.1M10.6 3.4v3.1M3.7 6.5v3M8.3 6.5v3M12.9 6.5v3M6 9.5v3.1M10.6 9.5v3.1"/>',
+    tools: ["Stone", "A lip", "A sheer drop"],
+    how: "Pick what a side of the room should be, then press the sides you want it on." },
+  { key: "things", name: "Elements", cam: "room", show: "all", pics: true,
+    icon: '<path d="M8 1.9 14 5.2v5.6L8 14.1 2 10.8V5.2z"/><path d="M2 5.2 8 8.5l6-3.3M8 8.5v5.6"/>',
+    tools: ["Erase", "Brick", "Rock", "Tree", "Marble", "Chopper",
+            "Tar vat", "Water vat", "Set tar",
+            "Boots", "Frost", "Saw", "Jar"],
+    /* Erase leads the list, because taking something off a square is
+       the other half of putting one on it and you reach for it as
+       often. It is not what you are HANDED, though - an editor that
+       opens with the rubber in your hand is an editor that rubs out the
+       first thing you click on. */
+    first: "Brick",
+    how: "Everything that stands on a square. Click one to put it down; click it again to take it away. Where the player comes in is the marked square - drag it to move it." },
   { key: "life", name: "Monsters", cam: "room", show: "all", pics: true,
-    tools: ["Fly", "Spider", "Beetle", "Wasp", "Snake", "Start"],
-    how: "Who is down here, and where the player comes in. Four bricks is the least that will hold one monster." },
-  { key: "look", name: "Look", cam: "close", show: "all",
-    tools: [],
-    how: "Down in it at head height, the way the game looks. Nothing to click - this one is for judging what you have made." }
+    icon: '<ellipse cx="8" cy="8.6" rx="3.1" ry="4.2"/><path d="M4.9 6 2 4.2M11.1 6 14 4.2M4.6 9H1.7M11.4 9h2.9M5 11.6 2.6 13.4M11 11.6l2.4 1.8"/><path d="M6.6 4.2 5.6 1.9M9.4 4.2l1-2.3"/>',
+    tools: ["Fly", "Spider", "Beetle", "Wasp", "Snake"],
+    how: "Who is down here. Four bricks is the least that will hold one monster." }
 ];
+
+/* Within the Floor view the tool decides where you stand: overhead for
+   the outline, where the shape you are cutting is the shape you see;
+   three quarters and dressed in its walls for the ground, where a slope
+   only reads as a slope if you can see along it. */
+function edAngleNow() {
+  var v = edViewNow(), t = ED_TOOLS[ed.tool];
+  if (v.key !== "floor" || !t) return { cam: v.cam, show: v.show };
+  var ground = (t.act === "hi" || t.act === "tint");
+  return ground ? { cam: "room", show: "walls" } : { cam: "plan", show: "floor" };
+}
+
+
 
 /* the tools a view works with, by index into ED_TOOLS */
 function edViewTools(key) {
@@ -9403,36 +9729,14 @@ function edViewTools(key) {
   return out;
 }
 
-/* Move whatever wrapped onto the second line into the hamburger. Done
-   by measuring where each tab actually landed, because how many fit
-   depends on the font, the window and the words - none of which can be
-   counted in advance. */
-function edTabsFit(tabs, bun, menu) {
-  var all = [].slice.call(tabs.querySelectorAll(".edTab:not(.edBun)"));
-  all.forEach(function (b) { b.hidden = false; });
-  menu.innerHTML = "";
-  bun.hidden = true;
 
-  var top = all.length ? all[0].getBoundingClientRect().top : 0;
-  var over = all.filter(function (b) { return b.getBoundingClientRect().top > top + 4; });
-  if (!over.length) return;
-
-  /* the hamburger needs room of its own, so one more comes off the row */
-  bun.hidden = false;
-  var spill = over.slice();
-  var last = all[all.length - 1 - spill.length];
-  if (last) spill.unshift(last);
-
-  spill.forEach(function (b) {
-    b.hidden = true;
-    var item = document.createElement("button");
-    item.type = "button";
-    item.className = "edBunItem";
-    item.textContent = b.textContent;
-    if (b.getAttribute("aria-pressed") === "true") item.setAttribute("aria-pressed", "true");
-    item.addEventListener("click", function (e) { e.stopPropagation(); b.click(); });
-    menu.appendChild(item);
-  });
+/* the bar's two states, and the floating panel that is the second one */
+function edFoldBar() {
+  var bar = $("edBar");
+  if (!bar) return;
+  bar.className = ed.folded ? (ed.opened ? "folded open" : "folded") : "";
+  $("edFold").title = ed.folded ? "Bring the palette back" : "Fold the palette away";
+  resize();
 }
 
 function edViewNow() {
@@ -9461,17 +9765,22 @@ function edViewNow() {
 var edHidden = null;
 
 function edDress() {
-  var want = (mode === "edit") ? edViewNow().show : "all";
+  var want = (mode === "edit") ? edAngleNow().show : "all";
 
   /* the pit and its torches belong to playing, not to building - except
      in Look, which is the view that exists to show what it will be like */
-  var setting = (mode !== "edit" || ed.view === "look");
+  /* Look is gone - Test play is what it was for, and it is the real
+     thing rather than an impression of it. So the pit is put away for
+     the whole of the editor. */
+  var setting = (mode !== "edit");
   SCENERY.forEach(function (o) { o.visible = setting; });
   /* The paper shows how big a room is allowed to get, which is a
      question in exactly one place: the view where you change how big it
      is. In the Walls view the size is settled and the sheet is only
      something else on screen. */
-  if (edSheetMesh) edSheetMesh.visible = (mode === "edit" && ed.view === "floor");
+  if (edSheetMesh)
+    edSheetMesh.visible = (mode === "edit" && ed.view === "floor" &&
+                           edAngleNow().cam === "plan");
 
   /* everything back the way it was found first - half of what is hidden
      is hidden for its own reasons (a trapped monster, a piece of kit
@@ -9532,8 +9841,13 @@ function edViewTo(key) {
   /* a view comes with its own tools, so it puts one in your hand - going
      to Floor and finding the brick tool still selected would be a
      riddle, not a choice */
-  var mine = edViewTools(key);
-  if (mine.length && mine.indexOf(ed.tool) < 0) ed.tool = mine[0];
+  var mine = edViewTools(key), v0 = null;
+  ED_VIEWS.forEach(function (x) { if (x.key === key) v0 = x; });
+  if (mine.length && mine.indexOf(ed.tool) < 0) {
+    var want = -1;
+    if (v0 && v0.first) ED_TOOLS.forEach(function (t, i) { if (t.name === v0.first) want = i; });
+    ed.tool = (want >= 0) ? want : mine[0];
+  }
   /* The room as it stands, ready to be worked on - in either of the
      views that works on it. Only the Floor view seeded it before, so
      going straight to Walls found no outline at all and quietly fell
@@ -9567,51 +9881,6 @@ function edViewTo(key) {
    good for here was growing a rectangle about its middle, which is two
    drags without it.
    ==================================================================== */
-
-function edSideName(v) {
-  return v === 1 ? "good stone" : v === MF.SHEER ? "a sheer drop" : "a lip";
-}
-
-function edEdgeBar() {
-  var el = $("edEdges");
-  if (!el) return;
-  var t = ED_TOOLS[ed.tool];
-  var on = (mode === "edit" && t && t.act === "edge" && ed.polyShut && ed.segPick >= 0);
-  el.hidden = !on;
-  if (!on) { el.innerHTML = ""; return; }
-
-  var flags = edSegs(), now = flags[ed.segPick] | 0;
-  el.innerHTML = "";
-  [[1, "wall", "Stone",
-    "A brick driven at it stops dead. Stone is the only side that counts as a side of a " +
-    "trap, so two bricks will hold something in a stone corner where four would be needed."],
-   [0, "lip", "A lip",
-    "The floor ends in a small kerb. Bricks still go over it and so do you - but a marble " +
-    "rolling at it comes back slower, unless it is going fast enough to ride over."],
-   [MF.SHEER, "sheer", "A sheer drop",
-    "Nothing at all at the edge. Everything that reaches it goes over, a marble at any " +
-    "speed included, and none of it comes back."]
-  ].forEach(function (row) {
-    var b = document.createElement("button");
-    b.className = "edEdgePick" + (row[0] === now ? " here" : "");
-    b.type = "button";
-    b.setAttribute("aria-pressed", row[0] === now ? "true" : "false");
-    var pic = edgePortrait(row[1], 240, 150);
-    b.innerHTML = (pic ? '<img alt="" src="' + pic + '">' : "") +
-                  "<b>" + row[2] + "</b><span>" + row[3] + "</span>";
-    b.addEventListener("click", function () {
-      var f = edSegs();
-      if (f[ed.segPick] === row[0]) return;
-      edMark();
-      f[ed.segPick] = row[0];
-      edPolyFill(false);
-      edPolyDraw();
-      edEdgeBar();
-      edSay("that side is now " + row[2].toLowerCase());
-    });
-    el.appendChild(b);
-  });
-}
 
 /* ====================================================================
    THE COLOURS THIS CELLAR IS PAINTED IN
@@ -9719,52 +9988,26 @@ function edSay(text, cls) {
 function edPaint() {
   var view = edViewNow();
 
-  var tabs = $("edTabs");
-  tabs.innerHTML = "";
+  var rail = $("edRail");
+  rail.innerHTML = "";
   ED_VIEWS.forEach(function (v) {
     var b = document.createElement("button");
-    b.className = "edTab";
+    b.className = "edRailBtn";
     b.type = "button";
     b.setAttribute("aria-pressed", v.key === ed.view ? "true" : "false");
-    b.textContent = v.name;
-    b.title = v.how;
-    b.addEventListener("click", function () { edViewTo(v.key); });
-    tabs.appendChild(b);
+    b.title = v.name + " \u2014 " + v.how;
+    b.setAttribute("aria-label", v.name);
+    b.innerHTML = '<svg viewBox="0 0 16 16" aria-hidden="true">' + (v.icon || "") + "</svg>" +
+                  "<span>" + v.name + "</span>";
+    b.addEventListener("click", function () {
+      /* folded, the rail is a way of asking for a set of tools - so
+         asking for the one already showing puts it away again */
+      if (ed.folded) ed.opened = !(ed.opened && v.key === ed.view);
+      edViewTo(v.key);
+      edFoldBar();
+    });
+    rail.appendChild(b);
   });
-
-  /* ------------------------------------------------------------------
-     What does not fit goes behind the hamburger.
-
-     Eight views is more than a narrow window has room for, and a row
-     that wraps to a second line moves everything under it every time it
-     does - so the palette jumps about as you resize, and on a phone the
-     last two or three views are simply off the end with nothing to say
-     they exist. The ones that fit stay on the row; the rest go into a
-     list behind the three lines at the end of it, which is where every
-     other program keeps the ones that did not fit.
-     ------------------------------------------------------------------ */
-  var bun = document.createElement("button");
-  bun.className = "edTab edBun";
-  bun.type = "button";
-  bun.title = "More views";
-  bun.setAttribute("aria-label", "More views");
-  bun.innerHTML = '<svg viewBox="0 0 16 16" aria-hidden="true">' +
-                  '<path d="M2.4 4.2h11.2M2.4 8h11.2M2.4 11.8h11.2"/></svg>';
-  var menu = document.createElement("div");
-  menu.className = "edBunList";
-  menu.hidden = true;
-  bun.addEventListener("click", function (e) {
-    e.stopPropagation();
-    menu.hidden = !menu.hidden;
-    bun.setAttribute("aria-pressed", menu.hidden ? "false" : "true");
-  });
-  addEventListener("click", function () { menu.hidden = true; bun.setAttribute("aria-pressed", "false"); });
-  tabs.appendChild(bun);
-  tabs.appendChild(menu);
-
-  /* measured, not guessed: the row is laid out, then anything that has
-     wrapped past the first line is moved into the list */
-  edTabsFit(tabs, bun, menu);
 
   var box = $("edTools");
   box.innerHTML = "";
@@ -9778,7 +10021,15 @@ function edPaint() {
   var asCards = !!view.pics;
   if (asCards) box.classList.add("cards"); else box.classList.remove("cards");
 
-  mine.forEach(function (i, n) {
+  /* One tool is not a choice. The Wall view has exactly one, so its chip
+     was a button that was always pressed, sitting where a row of
+     alternatives would be and inviting you to wonder what the other ones
+     were - there are none. In a view like that the view IS the tool, and
+     what you pick in it is a side of the room and one of the three kinds
+     of edge. */
+  box.hidden = (mine.length === 1);
+
+  if (!box.hidden) mine.forEach(function (i, n) {
     var t = ED_TOOLS[i];
     var b = document.createElement("button");
     b.type = "button";
@@ -9788,12 +10039,15 @@ function edPaint() {
 
     if (asCards) {
       /* a picture of the thing, not a square of its colour */
-      var big = (t.act === "mob") ? monsterPortrait(t.v, 128)
-                                  : thingPortrait(t.name, 132, 96);
+      var big = (t.act === "mob") ? monsterPortrait(t.v, 112)
+              : (t.act === "edge") ? edgePortrait(
+                    t.v === 1 ? "wall" : t.v === MF.SHEER ? "sheer" : "lip", 112, 84)
+              : (view.key === "floor") ? groundPortrait(t.name, 112, 84)
+                                       : thingPortrait(t.name, 112, 84);
       b.className = "edCard";
       b.innerHTML = (big ? '<img alt="" src="' + big + '">'
                          : '<i class="edSwatch big" style="background:' + t.swatch + '"></i>') +
-                    "<b>" + t.name + "</b><i class=\"edKey\">" + (n + 1) + "</i>";
+                    "<b>" + t.name + "</b>";
     } else {
       b.className = "edTool";
       b.innerHTML = '<i class="edSwatch" style="background:' + t.swatch + '"></i>' +
@@ -9805,8 +10059,8 @@ function edPaint() {
 
   edBrushBar();
   edTintBar();
-  edEdgeBar();
   edZoomBar();
+  edRowsSoon();
 }
 
 /* --- what goes down when you press space -------------------------- */
@@ -9924,7 +10178,7 @@ function edStamp(quiet) {
        have to be a rectangle - it is whatever squares it says it is.
        Taking a square out makes it not part of the level at all: the
        floor stops there, and what is beyond it is a drop until it is
-       told otherwise with Wall/drop.
+       told otherwise in the Wall view.
        ------------------------------------------------------------ */
     if (!game.shape) {
       game.shape = new Uint8Array(COLS * ROWS);
@@ -9951,29 +10205,21 @@ function edStamp(quiet) {
     /* With an outline, a wall is a side of the room rather than a
        square of it - so clicking anywhere along a stretch opens or
        closes the whole stretch. */
-    /* ------------------------------------------------------------
-       One side, chosen, then changed.
-
-       Clicking a side used to flip it there and then, which is quick
-       and gives you no way to point at a wall and ask what it is - and
-       on a wall you meant to look at rather than change, no way back
-       except changing it twice. Click picks the side out; clicking the
-       one already picked is what turns it over. Only ever one: a side
-       is a thing you decide about on its own.
-       ------------------------------------------------------------ */
+    /* The kind is already in your hand - the card you picked - so
+       pressing a side is the whole gesture. It stays lit afterwards so
+       you can see which one you just did. */
     var seg = edEdgeNear(c, r);
     if (seg < 0) {
-      if (ed.segPick >= 0) {
-        ed.segPick = -1; edPolyDraw(); edEdgeBar();
-        return edSay("nothing picked");
-      }
-      return edSay("click along one of the room's sides to pick it", "bad");
+      if (ed.segPick >= 0) { ed.segPick = -1; edPolyDraw(); }
+      return edSay("press along one of the room's sides", "bad");
     }
     var flags = edSegs();
     ed.segPick = seg;
+    if (flags[seg] === (t.v | 0)) { edPolyDraw(); return edSay("that side is already " + t.name.toLowerCase()); }
+    flags[seg] = t.v | 0;
+    edPolyFill(false);
     edPolyDraw();
-    edEdgeBar();
-    return edSay("that side is " + edSideName(flags[seg]) + " \u2014 pick what it should be");
+    return edSay("that side is now " + t.name.toLowerCase());
   } else if (t.act === "edge") {
     /* Only means anything OFF the floor - that is where an edge is. A
        shaped level has boundaries all over it, not just four sides, so
@@ -10031,8 +10277,7 @@ function edCount() {
   $("edDirty").title = ed.dirty ? "unsaved changes" : "saved";
   var bx = game.box || (game.reBox && game.reBox());
   var bits = ["cellar " + game.F];
-  if (bx) bits.push(bx.w + "\u00d7" + bx.h +
-                    (ed.view === "floor" ? " of " + COLS + "\u00d7" + ROWS : ""));
+  if (bx) bits.push(bx.w + "\u00d7" + bx.h + " of " + COLS + "\u00d7" + ROWS);
   bits.push(bricks + " brick" + (bricks === 1 ? "" : "s"));
   if (rocks) bits.push(rocks + " rock" + (rocks === 1 ? "" : "s"));
   var loose = game.monsters.filter(function (m) { return !m.gone; }).length;
@@ -10050,7 +10295,7 @@ function edCount() {
    Z X : / and press space. It is consistent with the game, it works on
    a phone, and it reuses everything - and it is invisible. Twice now
    somebody has opened the editor, looked at Raise and Lower and
-   Wall/drop, and not been able to find any way to use them, because
+   the Wall view, and not been able to find any way to use them, because
    nothing anywhere says that the little figure IS the pointer.
 
    A tool nobody can work out how to use is not a tool. So: click the
@@ -10246,6 +10491,11 @@ function edPointTo(x, y, andStamp) {
      on the way to zooming out.
      ------------------------------------------------------------------ */
   var touches = {}, pinchFrom = 0, panFrom = null, spaceDown = false;
+  /* the right button is the pan gesture here, so it must not also be
+     the browser's menu */
+  el.addEventListener("contextmenu", function (e) {
+    if (mode === "edit") e.preventDefault();
+  });
   addEventListener("keydown", function (e) { if (e.key === " ") spaceDown = true; });
   addEventListener("keyup", function (e) { if (e.key === " ") spaceDown = false; });
   function pinchGap() {
@@ -10286,8 +10536,28 @@ function edPointTo(x, y, andStamp) {
       }
       return;
     }
+    if (panFrom) {
+      var kp = worldPerPixel();
+      edPanBy(-(e.clientX - panFrom.x) * kp, -(e.clientY - panFrom.y) * kp / 0.9);
+      panFrom = { x: e.clientX, y: e.clientY };
+      return;
+    }
     lastX = e.clientX; lastY = e.clientY;
 
+    if (ed.dragStart) {
+      var st = cellUnder(e.clientX, e.clientY);
+      if (!st) return;
+      var si = st[1] * COLS + st[0];
+      /* it may only stand where the player could */
+      if (!game.inField(st[0], st[1]) || game.grid[si] !== MF.EMPTY ||
+          game.fluid[si] !== MF.DRY || game.monsterAt(st[0], st[1])) return;
+      if (st[0] === ed.startC && st[1] === ed.startR) return;
+      ed.startC = st[0]; ed.startR = st[1];
+      game.manC = st[0]; game.manR = st[1];
+      ed.dirty = true;
+      edRigs();
+      return;
+    }
     if (ed.band) {
       var bt = cellUnder(e.clientX, e.clientY);
       if (bt) { ed.band.c1 = bt[0]; ed.band.r1 = bt[1]; game.manC = bt[0]; game.manR = bt[1]; }
@@ -10338,6 +10608,11 @@ function edPointTo(x, y, andStamp) {
      hill along with you. */
   var again = null;
   function stop() {
+    if (ed.dragStart) {
+      ed.dragStart = false;
+      edSay("the player comes in there");
+      edCount();
+    }
     down = false; edPainted = false;
     if (again) { clearInterval(again); again = null; }
     if (ed.band) edBandTake(ed.band.add);
@@ -10379,9 +10654,10 @@ function edPointTo(x, y, andStamp) {
       stop();
       return;
     }
-    if (spaceDown || e.button === 1) {
-      /* space and drag, or the middle button */
+    if (spaceDown || e.button === 1 || e.button === 2) {
+      /* space and drag, the middle button, or the right one */
       panFrom = { x: e.clientX, y: e.clientY };
+      el.style.cursor = "grabbing";
       return;
     }
     if (el.setPointerCapture) { try { el.setPointerCapture(e.pointerId); } catch (err) {} }
@@ -10394,6 +10670,24 @@ function edPointTo(x, y, andStamp) {
        corner there and takes hold of that, so pulling on the middle of a
        straight wall bends it - which is how anybody who has used a
        vector tool expects to make a room more interesting. */
+    /* ------------------------------------------------------------
+       Where the player comes in is not a tool.
+
+       It was a chip in the palette you selected and then clicked a
+       square with - one of fourteen things to choose from, for a thing
+       there is exactly one of and which is already on the floor in
+       front of you. It is a marker: press it and drag it where you want
+       it, like everything else in the room that has one position.
+       ------------------------------------------------------------ */
+    if (ed.view === "things") {
+      var atCell = cellUnder(e.clientX, e.clientY);
+      if (atCell && atCell[0] === ed.startC && atCell[1] === ed.startR) {
+        ed.dragStart = true;
+        edSay("drag it to where the player should come in");
+        return;
+      }
+    }
+
     var t0 = ED_TOOLS[ed.tool];
     if (t0 && t0.act === "edge" && ed.polyShut) {
       /* the stonework answers before the floor does */
@@ -10461,7 +10755,9 @@ function edPointTo(x, y, andStamp) {
   ["pointerup", "pointerleave", "pointercancel"].forEach(function (n) {
     el.addEventListener(n, function (e) {
       if (e && e.pointerId !== undefined) delete touches[e.pointerId];
-      if (Object.keys(touches).length < 2) { pinchFrom = 0; panFrom = null; }
+      if (Object.keys(touches).length < 2) {
+        pinchFrom = 0; panFrom = null; el.style.cursor = "";
+      }
       stop();
     });
   });
@@ -10483,7 +10779,7 @@ function edEnter(rec, back) {
   $("briefSheet").hidden = true; $("pauseSheet").hidden = true;
   $("edBar").hidden = false;
   $("edTop").hidden = false;
-  $("edZoom").hidden = false;
+  $("edMenu").hidden = true;
   /* through edViewTo, so the tool in your hand belongs to the view you
      are looking at. Opening straight onto ED_TOOLS[0] meant the editor
      started with Erase selected while the Blocks view was showing, and
@@ -10530,7 +10826,15 @@ function edEnter(rec, back) {
     ed.poly = []; ed.polyShut = false; ed.polyWall = []; ed.picked = [];
     if (game._extra) { delete game._extra.outline; delete game._extra.outlineWall; }
     ed.id = null; ed.state = "private"; ed.everPublic = false;
-    $("edName").value = "";
+    $("edName").value = edPickName([]);
+    /* and once the vault has answered, a name nothing else is using */
+    vaultAll("levels").then(function (rows) {
+      if (ed.id || ($("edName").value || "").trim() !== $("edName").defaultName) return;
+      var fresh = edPickName((rows || []).map(function (r) { return r.name; }));
+      $("edName").value = fresh;
+      $("edName").defaultName = fresh;
+    }).catch(function () {});
+    $("edName").defaultName = $("edName").value;
   }
   ed.dirty = false;
   ed.undo.length = 0; ed.redo.length = 0;
@@ -10561,7 +10865,34 @@ function edLeave() {
 /* The cellar as the level, rather than as the workbench: the man on the
    square the player will start on, not the square the cursor is parked
    on. Everything that leaves the editor goes through here. */
+/* Where the player comes in does not need deciding. A start is only
+   ever wrong in one way - something is standing on it - and when that
+   happens the honest thing is to move it to the nearest square that is
+   free, not to refuse to save until somebody finds it and moves it by
+   hand. The tool is still there for saying "start THERE"; it is no
+   longer something you have to remember. */
+function edFixStart() {
+  var i = ed.startR * COLS + ed.startC;
+  if (game.inField(ed.startC, ed.startR) &&
+      game.grid[i] === MF.EMPTY && !game.monsterAt(ed.startC, ed.startR) &&
+      game.fluid[i] === MF.DRY) return false;
+
+  var best = -1, near = 1e9;
+  for (var k = 0; k < COLS * ROWS; k++) {
+    var c = k % COLS, r = (k / COLS) | 0;
+    if (!game.inField(c, r)) continue;
+    if (game.grid[k] !== MF.EMPTY || game.fluid[k] !== MF.DRY) continue;
+    if (game.monsterAt(c, r)) continue;
+    var d = (c - ed.startC) * (c - ed.startC) + (r - ed.startR) * (r - ed.startR);
+    if (d < near) { near = d; best = k; }
+  }
+  if (best < 0) return false;
+  ed.startC = best % COLS; ed.startR = (best / COLS) | 0;
+  return true;
+}
+
 function edAsLevel(about) {
+  edFixStart();
   var wasC = game.manC, wasR = game.manR;
   game.manC = ed.startC; game.manR = ed.startR;
   var rec = MutantLevelFormat.capture(game, about);
@@ -10597,7 +10928,7 @@ function edTestPlay() {
      ================================================================== */
   ed.rec = rec;
   ed.testing = true;
-  ed.view = "blocks"; edDress();    /* a test play looks like the game */
+  ed.view = "things"; edDress();    /* a test play looks like the game */
   setTimeout(resize, 0);
   $("edBar").hidden = true;
   $("edTop").hidden = true;
@@ -10623,39 +10954,6 @@ function edStopTest(how, why) {
   }
   edSay(why, how);
   return true;
-}
-
-/* The bot, run flat out with no drawing, several times over, because
-   one run tells you nothing - a cellar the bot clears once in twenty is
-   not a hard cellar, it is a lucky one. */
-function edBotTest() {
-  var rec = edAsLevel({ name: $("edName").value });
-  var bad = MutantLevelFormat.faults(rec);
-  if (bad.length) return edSay(bad.join(" &middot; "), "bad");
-  edSay("setting the bot on it...");
-  setTimeout(function () {
-    var RUNS = 12, LIMIT = 900, won = 0, caught = 0, stuck = 0, turns = [];
-    for (var i = 0; i < RUNS; i++) {
-      var g = new MF.Game({ seed: 1 + i });
-      g.F = rec.F; g.sheet();
-      MutantLevelFormat.apply(g, rec);
-      for (var t = 0; t < LIMIT; t++) {
-        var evv = g.step(MutantBot.play(g, null));
-        if (evv.won) { won++; turns.push(g.CO); break; }
-        if (evv.lost) { caught++; break; }
-        if (evv.stuck) { stuck++; break; }
-      }
-    }
-    var verdict;
-    if (!won) verdict = ["the bot never finished it in " + RUNS + " goes - it may not be finishable at all", "bad"];
-    else if (won === RUNS) verdict = ["the bot cleared it every time, in about " +
-      Math.round(turns.reduce(function (a, b) { return a + b; }, 0) / turns.length) +
-      " moves - this may be too kind", ""];
-    else verdict = ["the bot cleared it " + won + " times in " + RUNS +
-      (turns.length ? ", median " + turns.sort(function (a, b) { return a - b; })[turns.length >> 1] + " moves" : "") +
-      (stuck ? " (" + stuck + " ran out of bricks)" : ""), "good"];
-    edSay(verdict[0], verdict[1]);
-  }, 30);
 }
 
 /* ------------------------------------------------------------------
@@ -10727,9 +11025,60 @@ function newId() {
 }
 
 /* --- keeping it --------------------------------------------------- */
-function edSave() {
+/* ====================================================================
+   A HUNDRED NAMES, SO NOTHING IS EVER CALLED "UNTITLED"
+
+   A level starts named. Left to type one in, most levels are saved as
+   whatever the placeholder said - and a catalogue of things called
+   untitled is a catalogue nobody can find anything in. One of these is
+   picked at random, and if it is taken another is tried; if the whole
+   hundred are taken it gets a number after it. The name is only a
+   starting point - it is typed over in the header the moment it is
+   wrong.
+
+   They are the cellar's own vocabulary: dark, damp, brick, drops, and
+   the things that live down there.
+   ==================================================================== */
+var LEVEL_NAMES = [
+  "The Long Drop", "Low Water", "The Coal Hole", "Bad Footing", "Nine Bricks",
+  "The Wet Corner", "Under the Stairs", "Cold Storage", "The Dry Room", "Deep End",
+  "The Back Passage", "Old Timber", "The Sump", "Two Ways Out", "The Larder",
+  "Tar and Feathers", "The Narrow Way", "Standing Water", "The Coal Chute", "Broken Ground",
+  "The Slow Corner", "Damp Course", "The Cistern", "Hard Left", "The Boiler Room",
+  "Loose Footing", "The Dead End", "Second Thoughts", "The Culvert", "Bricked Up",
+  "The Drying Room", "Six Feet Down", "The Cold Store", "Slack Water", "The Bottleneck",
+  "Rising Damp", "The Wine Cellar", "Three Corners", "The Bulkhead", "Foul Air",
+  "The Coal Cellar", "Short Measure", "The Shaft", "Wet Feet", "The Undercroft",
+  "Close Quarters", "The Cutting", "Blind Corner", "The Root Cellar", "Ten to One",
+  "The Trap", "Heavy Going", "The Chalk Pit", "Last Orders", "The Hollow",
+  "Bad Air", "The Deep Store", "Four Walls", "The Overflow", "Slow Going",
+  "The Ice House", "Narrow Escape", "The Long Room", "Off the Edge", "The Sluice",
+  "Dead Weight", "The Cold Room", "Two Bricks Short", "The Reservoir", "Tight Corner",
+  "The Vaults", "Full Fathom", "The Store Room", "Give and Take", "The Dark Half",
+  "Hard Standing", "The Tunnel", "Bare Boards", "The Pumping Room", "Down and Out",
+  "The Old Kiln", "Water Table", "The Catacomb", "Room to Swing", "The Slipway",
+  "Uneven Ground", "The Cool Room", "One Way Down", "The Gantry", "Odd Corners",
+  "The Coal Face", "Dead Reckoning", "The Salt Store", "Thin Ice", "The Ledge",
+  "Fair Warning", "The Drain", "Hard Won", "The Bottom Step", "Nothing Doing"
+];
+
+/* one that is not taken, or one with a number after it */
+function edPickName(taken) {
+  var used = {};
+  (taken || []).forEach(function (n) { used[String(n).toLowerCase()] = 1; });
+  var free = LEVEL_NAMES.filter(function (n) { return !used[n.toLowerCase()]; });
+  if (free.length) return free[Math.floor(Math.random() * free.length)];
+  var base = LEVEL_NAMES[Math.floor(Math.random() * LEVEL_NAMES.length)];
+  for (var n = 2; n < 9999; n++)
+    if (!used[(base + " " + n).toLowerCase()]) return base + " " + n;
+  return base;
+}
+
+function edSave(quiet) {
   var name = $("edName").value.trim();
-  if (!name) { $("edName").focus(); return edSay("give it a name first", "bad"); }
+  /* it always has one - see edPickName - but a level whose name has
+     been rubbed out is given its own back rather than refused */
+  if (!name) { name = edPickName([]); $("edName").value = name; }
   var id = ed.id || newId();
   var rec = edAsLevel({ name: name, id: id });
   var bad = MutantLevelFormat.faults(rec);
@@ -10742,6 +11091,9 @@ function edSave() {
   vaultPut("levels", id, row).then(function (r) {
     if (!r || !r.ok) return edSay("this browser would not keep it" + (r && r.full ? " - it is out of room" : ""), "bad");
     ed.id = id; ed.dirty = false;
+    edCount();
+    if (quiet) return edSay(bad.length ? "saved - but " + bad.join("; ") : "saved",
+                            bad.length ? "bad" : "");
     var g = MutantCatalogue.gate({ id: "local", reached: 99, paid: false, played: {} }, Date.now());
     edSay("saved" + (bad.length ? " - but " + bad.join("; ") : "") +
           (g.beta ? " &middot; beta cellars may not survive to release - use Code to keep one" : ""),
@@ -10750,10 +11102,12 @@ function edSave() {
 }
 
 function edList() {
+  if (mode !== "edit") $("titleSheet").hidden = true;
   vaultAll("levels").then(function (rows) {
     var box = $("edList");
     box.innerHTML = "";
-    if (!rows.length) box.innerHTML = '<p class="fine">Nothing here yet.</p>';
+    if (!rows.length)
+      box.innerHTML = '<p class="fine">Nothing here yet \u2014 New cellar starts one.</p>';
     rows.sort(function (a, b) { return (b.edited || 0) - (a.edited || 0) });
     rows.forEach(function (row) {
       var el = document.createElement("div");
@@ -10893,10 +11247,9 @@ addEventListener("keydown", function (e) {
   if (a) { e.preventDefault(); held[a] = true; tapped[a] = true; Beeb.wake(); return; }
   if (k === " ") {
     e.preventDefault();
-    /* the browser repeats a held key for us, which is the hold gesture
-       - but only the first of a stroke is worth an undo step, or taking
-       a hill back would be thirty presses */
-    if (mode === "edit") { edStamp(e.repeat); }
+    /* In the editor space is how you take hold of the room to move it
+       about - the mouse is what puts things down. */
+    if (mode === "edit") return;
     else if (mode === "title") ($("continue").hidden ? newGame() : continueGame());
     else if (mode === "brief") beginTurns();
     return;
@@ -10906,7 +11259,7 @@ addEventListener("keydown", function (e) {
        the groups. Two things to learn instead of twenty-three. */
     if (k >= "1" && k <= "9") {
       var want = edViewTools()[parseInt(k, 10) - 1];
-      if (want !== undefined) { e.preventDefault(); ed.tool = want; edPaint(); edHow(); }
+      if (want !== undefined) { e.preventDefault(); ed.tool = want; edPaint(); edHow(); edDress(); }
       return;
     }
     if (k === "z" && (e.ctrlKey || e.metaKey)) {
@@ -10994,7 +11347,18 @@ addEventListener("blur", function () { held = {}; tapped = {}; if (mode === "pla
 
 
   /* the editor's buttons */
-  if ($("build")) $("build").addEventListener("click", function () { edEnter(null); });
+  if ($("build")) $("build").addEventListener("click", function () { edList(); });
+  if ($("edUp")) $("edUp").addEventListener("click", function () { edRowStep(-1); });
+  if ($("edDown")) $("edDown").addEventListener("click", function () { edRowStep(1); });
+  if ($("edFold")) $("edFold").addEventListener("click", function () {
+    ed.folded = !ed.folded;
+    ed.opened = false;
+    edFoldBar();
+  });
+  if ($("edShut")) $("edShut").addEventListener("click", function () {
+    ed.opened = false;
+    edFoldBar();
+  });
   if ($("edInfoBtn")) $("edInfoBtn").addEventListener("click", function () {
     var el = $("edInfo"), open = el.hidden;
     el.hidden = !open;
@@ -11009,47 +11373,56 @@ addEventListener("blur", function () { held = {}; tapped = {}; if (mode === "pla
     if (open) { $("edInfo").hidden = true; $("edInfoBtn").setAttribute("aria-pressed", "false"); edHow(); }
     edHelpFit(); resize();
   });
+  if ($("edBurger")) $("edBurger").addEventListener("click", function () {
+    var list = $("edBurgerList"), open = list.hidden;
+    list.hidden = !open;
+    $("edBurger").setAttribute("aria-pressed", open ? "true" : "false");
+    if (open) { $("edMenu").hidden = true; $("edMore").setAttribute("aria-pressed", "false"); }
+  });
+  if ($("edBurgerList")) $("edBurgerList").addEventListener("click", function (e) {
+    var b = e.target.closest ? e.target.closest("button[data-does]") : null;
+    if (!b) return;
+    $("edBurgerList").hidden = true;
+    $("edBurger").setAttribute("aria-pressed", "false");
+    /* through the real button, so there is one handler for each job */
+    var real = $(b.getAttribute("data-does"));
+    if (real) real.click();
+  });
   if ($("edMore")) $("edMore").addEventListener("click", function () {
-    var rest = $("edRest"), open = rest.hidden;
-    rest.hidden = !open;
+    var menu = $("edMenu"), open = menu.hidden;
+    menu.hidden = !open;
     $("edMore").setAttribute("aria-pressed", open ? "true" : "false");
+    if (open) {
+      edZoomBar();
+      $("edBurgerList").hidden = true;
+      $("edBurger").setAttribute("aria-pressed", "false");
+    }
   });
   if ($("edName")) $("edName").addEventListener("input", function () {
     ed.dirty = true; edCount();
   });
   var edWire = {
-    edSave: edSave, edOpen: edList,
-    edNew: function () { if (edSureToLose("Start a new one")) edEnter(null); },
     edUndo: function () { edStepBack(ed.undo, ed.redo); },
     edRedo: function () { edStepBack(ed.redo, ed.undo); },
-    edStampBtn: function () { edStamp(); },
-    edPaint: function () { ed.painting = !ed.painting; edButtons();
-      edSay(ed.painting ? "laying as you walk - press Paint again to stop" : ""); },
-    edTest: edTestPlay, edBot: edBotTest, edShare: edShare,
+    edTest: edTestPlay, edShare: edShare,
     edPublish: edPublish, edQuit: edLeave,
-    edListClose: function () { $("edListSheet").hidden = true; },
+    edListNew: function () {
+      if (!edSureToLose("Start a new one")) return;
+      $("edListSheet").hidden = true;
+      edEnter(null);
+    },
+    /* Back means the title screen when that is where you came from,
+       and the cellar you were building when it is not */
+    edListClose: function () {
+      $("edListSheet").hidden = true;
+      if (mode !== "edit") $("titleSheet").hidden = false;
+    },
     edCodeClose: function () { $("edCodeSheet").hidden = true; },
     edPaste: edLoadCode
   };
   for (var wk in edWire) (function (id, fn) {
     var el = $(id); if (el) el.addEventListener("click", fn);
   })(wk, edWire[wk]);
-  /* holding the button is the same gesture as holding the key, so the
-     hill can be pulled up on a phone too */
-  (function () {
-    var btn = $("edStampBtn"), timer = null;
-    if (!btn) return;
-    var stop = function () { clearInterval(timer); timer = null; ed.liftN = 0; ed.liftAt = ""; };
-    btn.addEventListener("pointerdown", function (e) {
-      e.preventDefault();
-      edStamp();
-      timer = setInterval(function () { edStamp(true); }, 110);
-    });
-    ["pointerup", "pointerleave", "pointercancel"].forEach(function (n) {
-      btn.addEventListener(n, stop);
-    });
-  })();
-
   if ($("edCopy")) $("edCopy").addEventListener("click", function () {
     var box = $("edCode");
     box.select();
@@ -11219,8 +11592,65 @@ function fromProp(prop, tint) {
   return m;
 }
 
-function thingPortrait(name, w, h) {
-  var key = name + w + "x" + h;
+/* ====================================================================
+   THE ONE THAT MOVES
+
+   A chopper is a blade going round, and a still picture of one is a
+   cross lying on the floor - which is the least interesting thing about
+   it and gives no clue what it does to a tree. It is photographed at
+   several points of its turn instead, laid side by side in one strip,
+   and the card steps along that strip: the oldest trick there is, and
+   the only one that costs nothing at all to draw.
+   ==================================================================== */
+var SPIN_FRAMES = 8;
+
+/* six small faces standing in for the room a marble is in */
+var PORTRAIT_ENV = null;
+function portraitEnv() {
+  if (PORTRAIT_ENV) return PORTRAIT_ENV;
+  var faces = [];
+  for (var i = 0; i < 6; i++) {
+    var c = document.createElement("canvas");
+    c.width = c.height = 32;
+    var g = c.getContext("2d");
+    if (i === 2) { g.fillStyle = "#c9a468"; g.fillRect(0, 0, 32, 32); }        /* the lamps */
+    else if (i === 3) { g.fillStyle = "#100c09"; g.fillRect(0, 0, 32, 32); }   /* the floor */
+    else {
+      var grad = g.createLinearGradient(0, 0, 0, 32);
+      grad.addColorStop(0, "#8a6f45"); grad.addColorStop(1, "#171009");
+      g.fillStyle = grad; g.fillRect(0, 0, 32, 32);
+      g.fillStyle = "rgba(255,200,140,.35)";
+      g.fillRect(4 + (i * 5) % 20, 9, 5, 8);                                   /* a torch */
+    }
+    faces.push(c);
+  }
+  PORTRAIT_ENV = new THREE.CubeTexture(faces);
+  PORTRAIT_ENV.needsUpdate = true;
+  PORTRAIT_ENV.encoding = THREE.sRGBEncoding;
+  return PORTRAIT_ENV;
+}
+
+function spinStrip(name, w, h) {
+  var key = "strip" + name + w;
+  if (THING_PICS[key]) return THING_PICS[key];
+  var cv = document.createElement("canvas");
+  cv.width = w * SPIN_FRAMES; cv.height = h;
+  var g = cv.getContext("2d");
+  for (var f = 0; f < SPIN_FRAMES; f++) {
+    var url = thingPortrait(name, w, h, (f / SPIN_FRAMES) * Math.PI * 2);
+    if (!url) return null;
+    var img = new Image();
+    img.src = url;
+    /* the data URI is already decoded in this document, so it draws
+       synchronously - no waiting on a load that has already happened */
+    try { g.drawImage(img, f * w, 0, w, h); } catch (e) {}
+  }
+  THING_PICS[key] = cv.toDataURL("image/png");
+  return THING_PICS[key];
+}
+
+function thingPortrait(name, w, h, spin) {
+  var key = name + w + "x" + h + (spin === undefined ? "" : "@" + spin.toFixed(3));
   if (THING_PICS[key]) return THING_PICS[key];
   try {
     var sc = new THREE.Scene();
@@ -11232,15 +11662,23 @@ function thingPortrait(name, w, h) {
     fill.position.set(-2.2, 1.8, 1.4);
     sc.add(fill);
 
-    /* a patch of the cellar's own floor to stand it on */
-    var floorMat = (terrains[0] && terrains[0].material) ||
-                   new THREE.MeshStandardMaterial({ color: 0x6d5f49 });
-    for (var r = -1; r <= 1; r++) for (var c = -1; c <= 1; c++) {
-      var t = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), floorMat);
-      t.position.set(c, -0.5, -r);
-      t.rotation.y = (((r * 7 + c * 3) % 4 + 4) % 4) * Math.PI / 2;
-      sc.add(t);
+    if (name === "Erase") {
+      /* the exception: bare floor is what this one leaves behind, so
+         bare floor is the picture of it */
+      var fm = (terrains[0] && terrains[0].material) ||
+               new THREE.MeshStandardMaterial({ color: 0x6d5f49 });
+      for (var fr = -1; fr <= 1; fr++) for (var fc = -1; fc <= 1; fc++) {
+        var ft = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), fm);
+        ft.position.set(fc, -0.5, -fr);
+        ft.rotation.y = (((fr * 7 + fc * 3) % 4 + 4) % 4) * Math.PI / 2;
+        sc.add(ft);
+      }
     }
+    /* No floor under the rest. Nine squares of stone behind every icon is
+       nine squares of the same stone thirteen times over - it filled
+       most of each card, made them all look alike at a glance, and told
+       you nothing you did not know about where things go. The thing on
+       its own, against the card. */
 
     var put = [];
     if (name === "Brick" || name === "Rock" || name === "Marble" ||
@@ -11253,22 +11691,65 @@ function thingPortrait(name, w, h) {
         bm.color = new THREE.Color(0xb8462e);
         put.push(standOn(new THREE.Mesh(new THREE.BoxGeometry(0.94, 0.66, 0.94), bm)));
       } else if (name === "Marble") {
-        /* the marble in the cellar mirrors its surroundings, and there
-           are none here - so it is given a plain polished stone instead
-           of coming out as a black ball */
-        put.push(standOn(new THREE.Mesh(new THREE.SphereGeometry(0.42, 20, 16),
-          new THREE.MeshStandardMaterial({ color: 0xcfd6dd, roughness: 0.18,
-                                           metalness: 0.25 }))));
+        /* The marble's own material, mirror and all. It mirrors the
+           cellar through the cube camera, and that texture is already
+           rendered - so the icon gets the same glass ball the room
+           does, with the room in it, rather than a plain white bead
+           standing in for one. */
+        var real = (marbleMeshes && marbleMeshes[1]) || (marbleMeshes && marbleMeshes[0]);
+        if (real) {
+          var mb2 = standOn(new THREE.Mesh(real.geometry, real.material));
+          put.push(mb2);
+          /* A marble is a mirror, and a mirror with nothing to mirror
+             is black - which is what it came out as. A shell round the
+             shot does not help: a standard material reflects its
+             envMap, not the scene, so the shell was reflected in
+             nothing and merely stood in front of the camera filling the
+             card. It gets an envMap of its own instead - six small
+             painted faces, warm overhead and dark underfoot, which is
+             what a cellar looks like from the middle of one. */
+          mb2.material = mb2.material.clone();
+          mb2.material.envMap = portraitEnv();
+          mb2.material.envMapIntensity = 1.25;
+          mb2.material.needsUpdate = true;
+          var glow = new THREE.PointLight(0xffe6c4, 12, 5, 2);
+          glow.position.set(0.8, 1.2, 1.0);
+          sc.add(glow);
+        } else {
+          put.push(standOn(new THREE.Mesh(new THREE.SphereGeometry(0.42, 20, 16),
+            new THREE.MeshStandardMaterial({ color: 0xcfd6dd, roughness: 0.18, metalness: 0.25 }))));
+        }
       } else {
         /* the cellar colours some of these per instance, so the bare
            material is white - which is not what a rock looks like */
-        put.push(fromProp(of, name === "Rock" ? 0x6f6559
-                            : name === "Set tar" ? 0x14100e : null));
+        var one2 = fromProp(of, name === "Rock" ? 0x574f45
+                              : name === "Set tar" ? 0x14100e : null);
+        if (one2 && name === "Rock") {
+          /* faceted and dull, which is what a rock is - the cellar's own
+             material is smooth and pale because the light down there
+             does the work instead */
+          one2.material.flatShading = true;
+          one2.material.roughness = 0.98;
+          one2.material.metalness = 0;
+          one2.material.needsUpdate = true;
+        }
+        put.push(one2);
       }
     } else if (name === "Tree") {
-      put.push(fromProp(props.trunk));
-      var crown = fromProp(props.crown);
-      if (crown) { crown.position.y += 0.55; put.push(crown); }
+      /* The cellar's tree is a trunk and one cone, which from a foot
+         away is a tree and in a card an inch across is a funnel on a
+         stick. Three cones tapering up read as foliage at any size, and
+         it is still the same trunk and the same greens. */
+      var tk = fromProp(props.trunk);
+      if (tk) put.push(tk);
+      var green = (props.crown && props.crown.material) ||
+                  new THREE.MeshStandardMaterial({ color: 0x2f4a24, flatShading: true });
+      [[0.40, 0.34, 0.42], [0.32, 0.28, 0.60], [0.22, 0.24, 0.76]].forEach(function (k) {
+        var cone = new THREE.Mesh(new THREE.ConeGeometry(k[0], k[1] * 2.1, 7), green);
+        cone.position.set(0, k[2] + k[1], 0);
+        cone.rotation.y = k[0];
+        put.push(cone);
+      });
     } else if (name === "Chopper") {
       put.push(fromProp(props.chopBed));
       /* the two arms of the blade, where the cellar puts them */
@@ -11276,13 +11757,20 @@ function thingPortrait(name, w, h) {
         var bl = fromProp(bp, 0xb9c2c9);
         if (!bl) return;
         bl.position.y = 0.26;
-        bl.rotation.y = 0.7;
+        bl.rotation.y = (spin === undefined ? 0.7 : spin);
         put.push(bl);
       });
     } else if (name === "Boots" || name === "Frost" || name === "Saw" || name === "Jar") {
       var n = { Boots: 1, Frost: 2, Saw: 3, Jar: 4 }[name];
       var it = fromProp(props["item" + n]);
       if (it) { it.position.y += 0.22; put.push(it); }
+    } else if (name === "Start") {
+      /* the man himself, since that is what the square is for - it was
+         a picture of bare floor, which is a picture of nothing */
+      try {
+        var him = manRig ? manRig.clone(true) : null;
+        if (him) { him.position.set(0, 0, 0); him.rotation.y = 0.4; sc.add(him); }
+      } catch (e) {}
     } else if (name === "Paint floor") {
       var pf = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1),
         new THREE.MeshStandardMaterial({ color: 0x6b8f4e, roughness: 0.95 }));
@@ -11291,20 +11779,128 @@ function thingPortrait(name, w, h) {
     }
     put.forEach(function (m) { if (m) sc.add(m); });
 
-    var cam = new THREE.PerspectiveCamera(34, w / h, 0.1, 40);
-    cam.position.set(1.0, 1.55, 2.05);
-    cam.lookAt(0, 0.32, 0);
+    /* framed on what is actually there, so a tall thing is not beheaded
+       and a small one is not a speck - the tree is three times the
+       height of a jar */
+    var tall = 0.5;
+    put.forEach(function (m) {
+      if (!m || !m.geometry) return;
+      m.geometry.computeBoundingBox();
+      tall = Math.max(tall, m.position.y + m.geometry.boundingBox.max.y);
+    });
+    var back = 1.25 + tall * 1.15;
+    var cam = new THREE.PerspectiveCamera(30, w / h, 0.1, 40);
+    cam.position.set(back * 0.42, 0.55 + tall * 0.75, back);
+    cam.lookAt(0, tall * 0.45, 0);
 
     var was = new THREE.Vector2();
     renderer.getSize(was);
-    var wasExp = renderer.toneMappingExposure;
+    var wasExp = renderer.toneMappingExposure, wasA = renderer.getClearAlpha();
     renderer.setSize(w, h, false);
     renderer.toneMappingExposure = 1;
+    renderer.setClearAlpha(0);            /* the card shows through */
     renderer.render(sc, cam);
-    var url = renderer.domElement.toDataURL("image/jpeg", 0.88);
+    var url = renderer.domElement.toDataURL("image/png");
     renderer.setSize(was.x, was.y, false);
     renderer.toneMappingExposure = wasExp;
+    renderer.setClearAlpha(wasA);
     THING_PICS[key] = url;
+    return url;
+  } catch (e) { return null; }
+}
+
+/* ====================================================================
+   FIVE PICTURES OF THE GROUND
+
+   The Floor tools were the last row of coloured chips left: a square of
+   brown beside the word "Lower" says nothing that the word did not, and
+   said it in the same brown as "Raise". These five do not put an object
+   down - they change the ground itself - so each one is photographed as
+   a patch of the cellar's own floor with the change already made to it.
+   Raise is a step up. Lower is a step down. Cut out is the hole. The
+   difference between them is the picture, which is the point.
+   ==================================================================== */
+function groundPortrait(name, w, h) {
+  var key = "g" + name + w + "x" + h;
+  if (EDGE_PICS[key]) return EDGE_PICS[key];
+  try {
+    var sc = new THREE.Scene();
+    sc.add(new THREE.HemisphereLight(0x3a3020, 0x0f0c09, 0.7));
+    var lamp = new THREE.DirectionalLight(0xffcf9a, 2.0);
+    lamp.position.set(1.6, 4.4, 3.2);
+    sc.add(lamp);
+    var fill = new THREE.DirectionalLight(0xbfd0ff, 0.5);
+    fill.position.set(-2.6, 2.2, 1.4);
+    sc.add(fill);
+
+    var floorMat = (terrains[0] && terrains[0].material) ||
+                   new THREE.MeshStandardMaterial({ color: 0x6d5f49 });
+    var geo = new THREE.BoxGeometry(1, 1, 1);
+
+    /* the square this tool would act on, and how it ends up */
+    var lift = { Raise: 1, Lower: -1 }[name] || 0;
+    var gone = (name === "Cut out");
+    var tint = (name === "Paint floor");
+
+    for (var r = 0; r < 3; r++) for (var c = -2; c <= 2; c++) {
+      var mid = (c === 0 && r === 1);
+      if (mid && gone) continue;                 /* the hole is the point */
+      var mat = floorMat;
+      if (mid && tint) {
+        mat = floorMat.clone();
+        mat.color = new THREE.Color(0x6b8f4e);   /* a square that has been painted */
+      }
+      var t = new THREE.Mesh(geo, mat);
+      /* the ground slopes to meet a lifted square, the way it does in
+         the cellar - a step standing on its own would be a lie */
+      var near = (Math.abs(c) <= 1 && r >= 0 && r <= 2) ? 1 : 0;
+      var y = mid ? lift : (near ? lift * 0.5 : 0);
+      t.position.set(c, -0.5 + y, -r);
+      t.rotation.y = (Math.floor(((r * 7 + c * 3) % 4 + 4) % 4) * Math.PI) / 2;
+      sc.add(t);
+    }
+
+    if (name === "Outline") {
+      /* the room's own boundary, which is what this tool draws */
+      var line = new THREE.MeshBasicMaterial({ color: 0xffd27a, toneMapped: false });
+      [[0, -2.6, 5.2, 0.16], [0, 0.6, 5.2, 0.16],
+       [-2.6, -1, 0.16, 3.4], [2.6, -1, 0.16, 3.4]].forEach(function (k) {
+        var bar = new THREE.Mesh(new THREE.BoxGeometry(k[2], 0.16, k[3]), line);
+        bar.position.set(k[0], 0.06, k[1]);
+        sc.add(bar);
+      });
+      [[-2.6, -2.6], [2.6, -2.6], [-2.6, 0.6], [2.6, 0.6]].forEach(function (k) {
+        var nub = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.42, 0.42), line);
+        nub.position.set(k[0], 0.2, k[1]);
+        sc.add(nub);
+      });
+    } else if (lift) {
+      /* which way it goes, said again in an arrow, because a step up and
+         a step down are the same photograph from some angles */
+      var head = new THREE.Mesh(new THREE.ConeGeometry(0.3, 0.55, 4),
+        new THREE.MeshBasicMaterial({ color: 0xffd27a, toneMapped: false }));
+      head.position.set(0, lift > 0 ? 1.35 : 0.35, -1);
+      head.rotation.y = Math.PI / 4;
+      if (lift < 0) head.rotation.x = Math.PI;
+      sc.add(head);
+    }
+
+    var cam = new THREE.PerspectiveCamera(38, w / h, 0.1, 60);
+    cam.position.set(0.9, 2.5, 3.0);
+    cam.lookAt(0, -0.1, -1);
+
+    var was = new THREE.Vector2();
+    renderer.getSize(was);
+    var wasExp = renderer.toneMappingExposure, wasA = renderer.getClearAlpha();
+    renderer.setSize(w, h, false);
+    renderer.toneMappingExposure = 1;
+    renderer.setClearAlpha(0);
+    renderer.render(sc, cam);
+    var url = renderer.domElement.toDataURL("image/png");
+    renderer.setSize(was.x, was.y, false);
+    renderer.toneMappingExposure = wasExp;
+    renderer.setClearAlpha(wasA);
+    EDGE_PICS[key] = url;
     return url;
   } catch (e) { return null; }
 }
@@ -11551,7 +12147,7 @@ function frame() {
   edShowMark();
 
   /* fade between playing light and building light (see edSun) */
-  var wantLit = (mode === "edit" && edViewNow().cam !== "close") ? 1 : 0;
+  var wantLit = (mode === "edit" && edAngleNow().cam !== "close") ? 1 : 0;
   if (edLit !== wantLit) {
     edLit += (wantLit - edLit) * (1 - Math.pow(0.002, dt));
     if (Math.abs(wantLit - edLit) < 0.004) edLit = wantLit;
@@ -11580,10 +12176,7 @@ function frame() {
         var nc = game.manC + d[0], nr = game.manR + d[1];
         if (game.inField(nc, nr)) {
           game.manC = nc; game.manR = nr;
-          /* laying as you walk: one mark for the whole stroke rather
-             than one per square, or undo would be forty presses */
-          if (ed.painting) edStamp(edPainted);
-          edPainted = ed.painting;
+          edPainted = false;
           drawPlan();
         }
         break;
@@ -11733,7 +12326,7 @@ function frame() {
     camPos.set(TITLE_AIM.x + Math.sin(a) * 12, 15.5, TITLE_AIM.z + 15.5 + Math.cos(a) * 3.5);
     camera.position.lerp(camPos, 1 - Math.pow(0.05, dt));
     camera.lookAt(TITLE_AIM);
-  } else if (mode === "edit" && edViewNow().cam === "plan") {
+  } else if (mode === "edit" && edAngleNow().cam === "plan") {
     /* ------------------------------------------------------------
        STRAIGHT DOWN
 
@@ -11753,7 +12346,7 @@ function frame() {
     camera.position.lerp(camPos, 1 - Math.pow(0.004, dt));
     camera.lookAt(camAim);
   } else if (mode === "edit" &&
-             (edViewNow().cam === "room" || edViewNow().cam === "low")) {
+             (edAngleNow().cam === "room" || edAngleNow().cam === "low")) {
     /* ------------------------------------------------------------
        The editor looks at the ROOM, not over the man's shoulder.
 
@@ -11788,7 +12381,7 @@ function frame() {
        exists to show, whether a side is walled, was the one thing you
        could not tell. From down here a wall stands up against the dark
        and a drop is the floor simply ending. */
-    var low = edViewNow().cam === "low";
+    var low = edAngleNow().cam === "low";
     /* Low enough that a wall stands up and high enough to see over the
        nearest one - at eleven the near wall filled the bottom third of
        the frame and hid the rows of floor behind it, which is a lot of
