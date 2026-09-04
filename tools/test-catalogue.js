@@ -122,7 +122,7 @@ console.log("\nThe order things come in\n");
   const a = lvl("a", { avg: 4, plays: 2, created: 500 });
   const b = lvl("b", { avg: 4, plays: 2, created: 500 });
   ok("levels made in the same instant still have a fixed order",
-     [order([a, b], "stars"), order([b, a], "stars")], [["a", "b"], ["a", "b"]]);
+     [order([a, b], "stars"), order([b, a], "stars")], [["b", "a"], ["b", "a"]]);
 }
 {
   const many = [];

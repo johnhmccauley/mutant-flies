@@ -1,0 +1,10 @@
+# what is in the repo but has no business being on the web
+worker
+tools
+src
+original
+node_modules
+.github
+.claude
+wrangler.toml
+.assetsignore

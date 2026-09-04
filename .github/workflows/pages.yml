@@ -52,6 +52,12 @@ jobs:
       - name: Check the vault a player's levels live in
         run: node tools/test-vault.js
 
+      - name: Check the credit economy cannot be farmed
+        run: node tools/test-credits.js
+
+      - name: Check the catalogue server, against a real SQLite
+        run: node tools/test-worker.js
+
       - uses: actions/configure-pages@v5
         with:
           enablement: true

@@ -104,11 +104,14 @@
   function plays(rec) { return rec.plays || 0; }
   function born(rec) { return rec.created || 0; }
 
-  /* newest first, and if two were made in the same millisecond the id
+  /* Newest first, and if two were made in the same millisecond the id
      breaks it, so the order is total and a list never reshuffles itself
-     between one render and the next */
+     between one render and the next. The id runs the same way as
+     everything else - descending - because the server pages the board
+     by comparing whole rows, and a single key running the other way
+     makes a page boundary skip whatever tied above it. */
   function newest(a, b) {
-    return (born(b) - born(a)) || String(a.id).localeCompare(String(b.id));
+    return (born(b) - born(a)) || String(b.id).localeCompare(String(a.id));
   }
 
   var SORTS = {

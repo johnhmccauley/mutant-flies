@@ -1330,5 +1330,87 @@ function deep(level) {
   ok("a robot nobody has started is not worth chasing", g.prey(m).c, 2);
 }
 
+
+/* ---- loose credits ------------------------------------------------ */
+function withCoin(c, r, level) {
+  const g = bare(level || 6);
+  g.feat.coins = true;
+  g.coins.push({ c, r, value: 10, life: 50 });
+  return g;
+}
+{
+  const g = withCoin(11, 10);
+  g.manC = 10; g.manR = 10;
+  g.steps = 3;
+  const ev = g.step("right");
+  ok("walking onto one collects it",
+     [ev.tookCoin.length, ev.tookCoin[0] && ev.tookCoin[0].value, g.coins.length], [1, 10, 0]);
+}
+{
+  /* a monster that gets there first takes it */
+  const g = withCoin(15, 15);
+  g.leash = 0;
+  monster(g, "spider", 15, 15);
+  g.manC = 2; g.manR = 2;
+  const ev = g.step(null);
+  ok("a monster standing on one takes it",
+     [g.coins.length, ev.lostCoin[0] && ev.lostCoin[0].why], [0, "a monster got there first"]);
+}
+{
+  /* shove a brick onto it and you have buried it yourself */
+  const g = withCoin(12, 10);
+  g.manC = 10; g.manR = 10;
+  put(g, 11, 10);
+  g.steps = 3;
+  const ev = g.step("right");
+  ok("a brick pushed onto one buries it",
+     [g.coins.length, ev.lostCoin[0] && ev.lostCoin[0].why], [0, "buried"]);
+}
+{
+  const g = withCoin(12, 10);
+  g.fluid[I(12, 10)] = MF.TAR; g.fvol[I(12, 10)] = 6;
+  g.manC = 2; g.manR = 2;
+  const ev = g.step(null);
+  ok("tar takes one", [g.coins.length, ev.lostCoin[0] && ev.lostCoin[0].why], [0, "gone in the tar"]);
+}
+{
+  const g = withCoin(12, 10);
+  g.fluid[I(12, 10)] = MF.WATER; g.fvol[I(12, 10)] = 6;
+  g.manC = 2; g.manR = 2;
+  const ev = g.step(null);
+  ok("and so does water", [g.coins.length, ev.lostCoin[0] && ev.lostCoin[0].why], [0, "washed away"]);
+}
+{
+  /* they do not sit there for ever */
+  const g = withCoin(20, 20);
+  g.coins[0].life = 3;
+  g.manC = 2; g.manR = 2;
+  let went = -1;
+  for (let t = 0; t < 10 && went < 0; t++) { g.step(null); if (!g.coins.length) went = t; }
+  ok("a coin nobody reaches goes away on its own", went >= 0 && went < 6, true);
+}
+{
+  /* and they turn up by themselves, but not in the first cellars */
+  const g = bare(6);
+  g.manC = 2; g.manR = 2;
+  let ever = false;
+  for (let t = 0; t < 600 && !ever; t++) { g.step(null); if (g.coins.length) ever = true; }
+  ok("coins turn up on their own", ever, true);
+}
+{
+  const g = bare(1);
+  g.manC = 2; g.manR = 2;
+  let ever = false;
+  for (let t = 0; t < 600 && !ever; t++) { g.step(null); if (g.coins.length) ever = true; }
+  ok("but never in the top cellar, which has none of this in it", ever, false);
+}
+{
+  const g = new MF.Game({ classic: true, seed: SEED });
+  g.sheet();
+  let ever = false;
+  for (let t = 0; t < 400 && !ever; t++) { g.step(null); if (g.coins.length) ever = true; }
+  ok("and never at all in the 1985 game", ever, false);
+}
+
 console.log("\n" + pass + " passed, " + fail + " failed");
 process.exit(fail ? 1 : 0);

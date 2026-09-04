@@ -703,13 +703,13 @@
        8  marbles
        9  the unlabelled jars
      ================================================================== */
-  var FEATURE_AT = { walls: 2, snake: 12, rocks: 15, robots: 16, slopes: 4, boots: 5, frost: 6, trees: 7, saw: 7,
+  var FEATURE_AT = { walls: 2, coins: 3, snake: 12, rocks: 15, robots: 16, slopes: 4, boots: 5, frost: 6, trees: 7, saw: 7,
                      marbles: 8, jar: 9, tar: 10, water: 11, choppers: 13 };
 
   var PLAN = [
     /*  1 */ { kinds: ["fly"], PE: 200, PA: 400, adds: [] },
     /*  2 */ { kinds: ["fly"], PE: 175, PA: 300, adds: ["walls"] },
-    /*  3 */ { kinds: ["spider"], PE: 165, PA: 260, adds: ["spider"] },
+    /*  3 */ { kinds: ["spider"], PE: 165, PA: 260, adds: ["spider", "coins"] },
     /*  4 */ { kinds: ["fly"], PE: 155, PA: 220, adds: ["slopes"] },
     /*  5 */ { kinds: ["beetle"], PE: 150, PA: 200, adds: ["beetle", "boots"] },
     /*  6 */ { kinds: ["wasp"], PE: 145, PA: 190, adds: ["wasp", "frost"] },
@@ -754,6 +754,7 @@
     snake:   { name: "The snake", body: "It comes at you without stopping, and it is not one square but a line of them. Shove a brick at its head and it takes the brick off you. Get at its back and the brick goes through - but that does not kill it, it cuts it, and what you get is two snakes, one either side of the cut. Cut it in the middle and you get two halves. Cut it near the head and you get a short one and a long one, and the long one grows back fastest. A piece shorter than two squares dies. Walling it in is the only thing that actually finishes it - and it is long, so you will want a corridor, not a corner." },
     rocks:   { name: "Rocks", body: "Bricks with ideas. A rock is four bricks' worth of shove, and there is only so much of you: two rocks at once, or one rock and four bricks, and past that you will not move it at all. In exchange nothing down here can destroy one. A beetle cannot eat it, tar will not burn through it, a marble comes straight off it. A rock in the wrong place is there for good - and a rock in the right place is one side of a trap that nothing can take away from you." },
     robots:  { name: "Robots", body: "Somebody was down here before you with machinery, and some of it still works. One turns up on its own, stands about for a while and wanders off if you ignore it. Walk into it and it starts, and then it plays: fetching bricks and building walls the way you would, until its charge runs out. It has more in it than you do - three rocks at once, and the big ones more - and while it is working a monster will go for whichever of you is nearer. That is the real reason to start one. It is also why you get it back in pieces." },
+    coins:   { name: "Loose credits", body: "Somebody dropped money down here and it does not stay dropped. A few coins turn up on their own, sit for a short while and go. Reach one first and it is yours. A monster that wanders over it takes it; so does tar, so does water - and so does a brick, if you shove one onto it. That last one is the choice worth noticing: a coin sitting in the line you were about to push is the wall you were building or the money, and not both." },
     spider:  { name: "The spider", body: "It does not wander. It comes straight at you, and takes a step on every second turn. You can out-walk it - but it never stops, and it will be behind you the whole way." },
     beetle:  { name: "The beetle", body: "It keeps closer than the fly, and every fourteen turns it eats a brick beside it. It destroys the one thing you need. Wall it in early, or it will eat the cellar out from under you." },
     wasp:    { name: "The wasp", body: "It stands still for a turn, then crosses two squares at once. Its dead turn is the only safe moment to get near it. Count them." },
@@ -828,6 +829,7 @@
     this.stress = new Uint8Array(COLS * ROWS);   /* how hard a tree is leaning */
     this.monsters = [];
     this.robots = [];
+    this.coins = [];
     this.marbles = [];
     this.sources = [];
     this.reset(1);
@@ -910,6 +912,72 @@
      where the marbles have rolled to. So a cellar is a place you can
      learn, and still a different problem each time you go down.
      -------------------------------------------------------------------- */
+  /* ==================================================================
+     LOOSE CREDITS
+
+     Somebody dropped money down here, and it does not stay dropped.
+
+     A few coins turn up on their own, sit for a short while, and go. If
+     you reach one first you have it. If a monster wanders over it, it is
+     gone. Shove a brick onto it and you have buried it yourself, which
+     is the interesting one - a coin sitting in the line you were about
+     to push is a choice: the wall you were building, or the money.
+
+     Tar and water take them too. Anything that reaches the square first
+     takes it away, which is what makes them worth going for rather than
+     waiting for.
+     ================================================================== */
+  var COIN_EVERY = 40;              /* roughly one turn in this many */
+  var COIN_LIVES = 26;              /* and it is there for about this long */
+
+  Game.prototype.coinAt = function (c, r) {
+    for (var i = 0; i < this.coins.length; i++)
+      if (this.coins[i].c === c && this.coins[i].r === r) return this.coins[i];
+    return null;
+  };
+
+  Game.prototype.spawnCoin = function (ev) {
+    if (this.classic || !this.feat.coins) return;
+    if (this.coins.length >= 2) return;
+    if (rnd(COIN_EVERY) !== 0) return;
+    var spot = this.openSpot([[this.manC, this.manR]], 3);
+    if (!spot) return;
+    if (this.coinAt(spot[0], spot[1])) return;
+    var coin = {
+      c: spot[0], r: spot[1],
+      value: 5 + rnd(3) * 5,                 /* five, ten or fifteen */
+      life: COIN_LIVES + rnd(14)
+    };
+    this.coins.push(coin);
+    ev.coinCame = coin;
+  };
+
+  /* Anything on the square takes it. Checked after everything else has
+     moved, so a brick that slid onto one, tar that reached one and a
+     monster that stepped on one all count - and the man, who gets first
+     refusal because he is checked first. */
+  Game.prototype.runCoins = function (ev) {
+    if (this.classic) return;
+    for (var i = this.coins.length - 1; i >= 0; i--) {
+      var k = this.coins[i], at = this.idx(k.c, k.r);
+      var lost = null;
+      if (k.c === this.manC && k.r === this.manR) {
+        this.coins.splice(i, 1);
+        ev.tookCoin.push(k);
+        continue;
+      }
+      if (this.monsterAt(k.c, k.r)) lost = "a monster got there first";
+      else if (this.grid[at] !== EMPTY) lost = "buried";
+      else if (this.fluid[at] === TAR) lost = "gone in the tar";
+      else if (this.fluid[at] === WATER) lost = "washed away";
+      else if (--k.life <= 0) lost = "gone";
+      if (lost) {
+        this.coins.splice(i, 1);
+        ev.lostCoin.push({ coin: k, why: lost });
+      }
+    }
+  };
+
   /* ==================================================================
      ROBOTS
 
@@ -1137,6 +1205,7 @@
     /* now the movable parts, dealt fresh */
     this.monsters = [];
     this.robots = [];
+    this.coins = [];
     if (this.classic) {
       this.manC = MAN_C0; this.manR = MAN_R0;       /* line 130 */
       this.monsters.push(this.newMonster(lv.kinds[0], MON_C0, MON_R0));
@@ -1683,7 +1752,8 @@
      ================================================================== */
   Game.prototype.step = function (dir) {
     var ev = { moved: false, pushed: 0, lostOverEdge: 0, overTheEdge: [], fell: false,
-               robotCame: null, robotStarted: null, robotLeft: null, robotDied: null, crunched: 0, crunchedBy: null,
+               robotCame: null, robotStarted: null, robotLeft: null, robotDied: null,
+               coinCame: null, tookCoin: [], lostCoin: [], crunched: 0, crunchedBy: null,
                eaten: 0, chopped: 0, picked: null, strained: false, rolled: [],
                smashed: 0, crushed: [], trappedNow: [], won: false, lost: false,
                lostTo: null, bonus: 0, stuck: false, spawned: null,
@@ -1715,6 +1785,8 @@
     if (ev.lost) return ev;
     this.runRobots(ev);
     this.spawnRobot(ev);
+    this.runCoins(ev);
+    this.spawnCoin(ev);
     this.checkSeals(ev);
     this.flowFluids(ev);
     if (ev.lost) return ev;
@@ -3621,6 +3693,11 @@ function buildProps() {
   props.trunk = inst(new THREE.CylinderGeometry(0.13, 0.19, 1.5, 7), bark, 40, true);
   props.crown = inst(new THREE.IcosahedronGeometry(0.62, 0), leaf, 40, true);
   props.cooled = inst(new THREE.BoxGeometry(0.98, 0.34, 0.98), slag, 320, true);
+  /* loose credits: a coin on edge, turning, so it catches the torches
+     and is visible from across the room - which is the point of it */
+  props.coin = inst(new THREE.CylinderGeometry(0.3, 0.3, 0.07, 18).rotateX(Math.PI / 2),
+    new THREE.MeshStandardMaterial({ color: 0xe8c04a, roughness: 0.25, metalness: 0.85,
+                                     emissive: 0x8a6410, emissiveIntensity: 0.45 }), 8, true);
   /* robots: a body, a head lamp, and treads. Dull brass when it is
      standing about, lit up once it is working. */
   var brass = new THREE.MeshStandardMaterial({ color: 0x9a7b3c, roughness: 0.42, metalness: 0.72 });
@@ -4373,7 +4450,7 @@ function syncTerrain() {
 /* everything that can change from one turn to the next */
 function syncWorld() {
   var counts = { trunk: 0, crown: 0, cooled: 0, vatT: 0, vatW: 0, water: 0, tar: 0,
-                 snakeSeg: 0, snakeHead: 0, snakeEye: 0, rock: 0,
+                 snakeSeg: 0, snakeHead: 0, snakeEye: 0, rock: 0, coin: 0,
                  robot: 0, robotOn: 0, robotTread: 0, robotEye: 0,
                  chopBed: 0, chopBlade: 0, chopBlade2: 0,
                  item1: 0, item2: 0, item3: 0, item4: 0 };
@@ -4416,6 +4493,19 @@ function syncWorld() {
       placeAt(mesh, counts[kk]++, c, r, g0 + depth / 2, 0.99, depth, 0.99);
     }
   }
+  /* the coins, on edge and turning. They fade as their time runs out,
+     so a player can see one is about to go rather than being surprised
+     by it - the tension is meant to be the walk, not the clock. */
+  for (var ci = 0; ci < game.coins.length; ci++) {
+    var k = game.coins[ci];
+    var cg = game.height[k.r * COLS + k.c] * STEP;
+    var fading = Math.min(1, k.life / 10);
+    var lift = 0.34 + Math.sin(bobT * 3 + ci) * 0.05;
+    placeAt(props.coin, counts.coin++, k.c, k.r, cg + lift,
+            1, 1, 1, bobT * 2.6 + ci);
+    if (props.coin.material) props.coin.material.emissiveIntensity = 0.2 + fading * 0.35;
+  }
+
   /* the robots. Bigger ones are visibly bigger, which is the whole
      point of picking one */
   for (var ri = 0; ri < game.robots.length; ri++) {

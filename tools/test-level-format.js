@@ -32,6 +32,13 @@ function mul(a) {
     return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
   };
 }
+/* Pin the live stream for the whole file. Laying a cellar out draws on
+   it as well as the seeded one - openSpot picks the man's square, the
+   monsters' and the marbles' from it - so a test that builds a cellar
+   without pinning gets a different room every run, which is exactly how
+   the play-length check below came and went. */
+MF.luck(MF.mulberry32(20260903));
+
 function built(seed, F) {
   const g = new MF.Game({ seed });
   g.F = F; g.sheet();
@@ -169,6 +176,9 @@ console.log("\nTwo people, one code, the same cellar\n");
      same way with the same run of luck, must not diverge by a square. */
   /* a fly cellar, because the point is to run for a long time and a
      snake catches the man inside a minute */
+  /* the cellar itself, pinned too - and a run of luck the man survives,
+     because a test that ends on turn thirty proves thirty turns */
+  MF.luck(mul(222));
   const code = LF.toCode(LF.capture(built(2024, 7)));
   const MOVES = ["left", "up", "right", "right", "down", null, "up", "left", "down", "right"];
   function playIt(luckSeed) {
