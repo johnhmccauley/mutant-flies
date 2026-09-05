@@ -160,6 +160,7 @@ node tools/test-elements.js  # 53 on slopes, trees, marbles, items, tar, water, 
 node tools/test-steer.js     # 36 on which way a leant or swiped phone walks him
 node tools/levels100.js      # play the first hundred cellars with the bot, and report
 node tools/plan.js           # print the descent
+node tools/deploy.js         # build, check, and put it where a phone can reach it
 ```
 
 Ninety-nine assertions in all, and every push to `main` runs the lot before

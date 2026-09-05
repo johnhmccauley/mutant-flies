@@ -187,10 +187,12 @@
   body.padOn .pad{display:grid}
   .pad button{
     appearance:none;border:1px solid rgba(232,220,200,.2);border-radius:4px;
-    background:rgba(20,15,11,.66);color:var(--bone);aspect-ratio:1;font-size:19px;
-    font-family:"IBM Plex Mono",ui-monospace,monospace;display:grid;place-items:center;
+    background:rgba(20,15,11,.66);color:var(--bone);aspect-ratio:1;
+    display:grid;place-items:center;
     -webkit-tap-highlight-color:transparent;touch-action:none;
   }
+  .pad button svg{width:44%;height:44%;display:block}
+  .pad button svg .fill{fill:currentColor;stroke:none}
   .pad button:active{background:var(--blood);border-color:var(--blood)}
   .pad .e{visibility:hidden}
 
@@ -685,10 +687,10 @@
 <div id="banner" hidden></div>
 <p class="hint" id="hint" hidden>P pause &nbsp;&middot;&nbsp; R restart cellar &nbsp;&middot;&nbsp; M sound &nbsp;&middot;&nbsp; D debug</p>
 
-<div class="pad" id="pad" aria-hidden="true">
-  <button class="e" tabindex="-1"></button><button data-act="up">:</button><button class="e" tabindex="-1"></button>
-  <button data-act="left">Z</button><button class="e" tabindex="-1"></button><button data-act="right">X</button>
-  <button class="e" tabindex="-1"></button><button data-act="down">/</button><button class="e" tabindex="-1"></button>
+<div class="pad" id="pad" role="group" aria-label="Walk">
+  <button class="e" tabindex="-1" aria-hidden="true"></button><button data-act="up" aria-label="Walk up"><svg viewBox="0 0 16 16" aria-hidden="true"><path class="fill" d="M8 3.6 13.2 12.4H2.8z"/></svg></button><button class="e" tabindex="-1" aria-hidden="true"></button>
+  <button data-act="left" aria-label="Walk left"><svg viewBox="0 0 16 16" aria-hidden="true"><path class="fill" d="M3.6 8 12.4 2.8v10.4z"/></svg></button><button class="e" tabindex="-1" aria-hidden="true"></button><button data-act="right" aria-label="Walk right"><svg viewBox="0 0 16 16" aria-hidden="true"><path class="fill" d="M12.4 8 3.6 13.2V2.8z"/></svg></button>
+  <button class="e" tabindex="-1" aria-hidden="true"></button><button data-act="down" aria-label="Walk down"><svg viewBox="0 0 16 16" aria-hidden="true"><path class="fill" d="M8 12.4 2.8 3.6h10.4z"/></svg></button><button class="e" tabindex="-1" aria-hidden="true"></button>
 </div>
 
 <div class="sheet" id="titleSheet">
