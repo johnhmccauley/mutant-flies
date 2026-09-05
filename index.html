@@ -783,7 +783,7 @@
     <div class="row">
       <button class="go" id="resume" type="button">Carry on</button>
       <button class="go quiet" id="restart" type="button">Restart cellar</button>
-      <button class="go quiet" id="giveup" type="button">Save &amp; quit</button>
+      <button class="go quiet" id="giveup" type="button">Stop for now</button>
     </div>
     <div class="ctrlPick" id="pauseCtrl">
       <button class="edBtn" type="button" data-scheme="pad">Buttons</button>
@@ -793,7 +793,7 @@
     <p class="fine ctrlSay" id="pauseCtrlSay"></p>
     <button class="edBtn" id="ctrlZero" type="button" hidden>Re-centre</button>
     <p class="fine ctrlRead" id="ctrlRead" hidden></p>
-    <p class="fine">Your progress is kept in this browser. Come back and continue.</p>
+    <p class="fine" id="pauseKept"></p>
   </div>
 </div>
 
@@ -8890,6 +8890,15 @@ function enterTitle() {
   $("overSheet").hidden = true; $("pauseSheet").hidden = true;
   $("edListSheet").hidden = true; $("edCodeSheet").hidden = true;
   $("titleSheet").hidden = false;
+  /* the moment there is nothing to interrupt, ask whether there is a
+     newer build - otherwise a tab left open all day only finds out on
+     the fifteen minute timer */
+  if (navigator.serviceWorker && navigator.serviceWorker.getRegistration)
+    navigator.serviceWorker.getRegistration().then(function (reg) {
+      if (!reg) return;
+      if (reg.waiting) return offerUpdate(reg);
+      reg.update().catch(function () {});
+    }).catch(function () {});
 
   /* a flat, empty cellar with the word laid out in brick, the way
      PROCtitle_page did it */
@@ -9190,6 +9199,9 @@ function pause(on) {
                                            : "Cellar " + game.F) + ". " +
     game.bricks + " bricks left, " +
     (kinds.length ? kinds.length + " still loose: " + kinds.join(", ") + "." : "nothing loose.");
+  if ($("pauseKept"))
+    $("pauseKept").textContent = "Stopping keeps cellar " + game.F + " and your score of " +
+      game.SC + ". Continue starts that cellar again - what is laid out in it is not kept.";
   $("pauseSheet").hidden = !on;
   /* whatever you shifted to while it was paused is the pose you are
      about to play in, so that is the one to call level */
@@ -13918,24 +13930,37 @@ if (!window.THREE) {
    so and offers to take it. Their choice, at a moment when nothing is
    in progress.
    ===================================================================== */
+function takeUpdate(waiting) {
+  /* tell it to stop waiting, and reload when it has taken over - with a
+     timer behind it, because a worker that never answers must not leave
+     somebody staring at "one moment" for ever */
+  navigator.serviceWorker.addEventListener("controllerchange", function () {
+    location.reload();
+  });
+  waiting.postMessage({ mutantFly: "takeOver" });
+  setTimeout(function () { location.reload(); }, 1200);
+}
+
 function offerUpdate(reg) {
   var waiting = reg.waiting;
   if (!waiting) return;
+
+  /* Nothing in progress, nothing to lose. The whole reason a new build
+     waits is that it must not interrupt a run, and on the title screen
+     there is no run - so it goes straight in and the player never has to
+     know there was a version to take. */
+  if (mode === "title") return takeUpdate(waiting);
+
   var el = document.getElementById("freshSays");
   if (!el || !el.hidden) return;
   el.hidden = false;
-  el.textContent = "There is a newer version of the game. ";
+  el.textContent = "There is a newer version. It will start itself the next time you are on the title screen. ";
   var go = document.createElement("button");
   go.type = "button";
-  go.textContent = "Take it";
+  go.textContent = "Take it now";
   go.addEventListener("click", function () {
     go.textContent = "one moment...";
-    /* tell it to stop waiting, and reload when it has taken over */
-    navigator.serviceWorker.addEventListener("controllerchange", function () {
-      location.reload();
-    });
-    waiting.postMessage({ mutantFly: "takeOver" });
-    setTimeout(function () { location.reload(); }, 1200);
+    takeUpdate(waiting);
   });
   el.appendChild(go);
 }
