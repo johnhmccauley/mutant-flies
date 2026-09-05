@@ -13930,15 +13930,26 @@ if (!window.THREE) {
    so and offers to take it. Their choice, at a moment when nothing is
    in progress.
    ===================================================================== */
-function takeUpdate(waiting) {
-  /* tell it to stop waiting, and reload when it has taken over - with a
-     timer behind it, because a worker that never answers must not leave
-     somebody staring at "one moment" for ever */
-  navigator.serviceWorker.addEventListener("controllerchange", function () {
-    location.reload();
-  });
-  waiting.postMessage({ mutantFly: "takeOver" });
-  setTimeout(function () { location.reload(); }, 1200);
+function takeUpdate(reg) {
+  var done = false;
+  function go() { if (done) return; done = true; location.reload(); }
+
+  navigator.serviceWorker.addEventListener("controllerchange", go);
+
+  /* read afresh: the one that was waiting when the offer was made may
+     be two deploys stale and past listening to anybody */
+  var waiting = reg && reg.waiting;
+  if (waiting) waiting.postMessage({ mutantFly: "takeOver" });
+
+  /* and if it will not stand down, take the registration away from it.
+     A worker that does not exist cannot serve last week's shell. */
+  setTimeout(function () {
+    if (done) return;
+    done = true;
+    var after = function () { location.reload(); };
+    if (reg && reg.unregister) reg.unregister().then(after, after);
+    else after();
+  }, 2000);
 }
 
 function offerUpdate(reg) {
@@ -13949,7 +13960,7 @@ function offerUpdate(reg) {
      waits is that it must not interrupt a run, and on the title screen
      there is no run - so it goes straight in and the player never has to
      know there was a version to take. */
-  if (mode === "title") return takeUpdate(waiting);
+  if (mode === "title") return takeUpdate(reg);
 
   var el = document.getElementById("freshSays");
   if (!el || !el.hidden) return;
@@ -13960,7 +13971,7 @@ function offerUpdate(reg) {
   go.textContent = "Take it now";
   go.addEventListener("click", function () {
     go.textContent = "one moment...";
-    takeUpdate(waiting);
+    takeUpdate(reg);
   });
   el.appendChild(go);
 }
