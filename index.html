@@ -438,7 +438,11 @@
   border-radius: 3px; padding: 3px 8px; font: inherit; font-size: 10px;
   cursor: pointer; white-space: nowrap; flex: 0 0 auto; }
 .edBtn:hover { border-color: #b98c3e; color: #ffe6b8; }
-.edBtn.warm { border-color: #7a5a2a; color: #ffd27a; }
+/* the one Enter would press, in the same red the title uses for it */
+.edBtn.warm { background: var(--blood); border-color: var(--blood); color: #fff;
+  font-weight: 700; box-shadow: 0 5px 18px -8px rgba(195,58,38,.9); }
+.edBtn.warm:hover:not(:disabled) { background: #d84632; border-color: #d84632;
+  color: #fff; }
 /* Six different jobs were sitting in one undifferentiated row, with the
    way out next to the button you press hundreds of times. */
 .edSet { display: flex; gap: 3px; padding-right: 9px; margin-right: 3px;
@@ -654,7 +658,6 @@
 <div class="sheet" id="titleSheet">
   <div class="card">
     <div class="lockup">
-      <p class="kicker">The Micro User &middot; July 1985 &middot; John McCauley</p>
       <h1>Mutant <em>Fly</em></h1>
       <hr>
     </div>
@@ -675,10 +678,7 @@
       <span class="sep">&middot;</span> bricks shove in whole lines
       <span class="sep">&middot;</span> one pushed off the edge is gone
     </p>
-    <p class="provenance">
-      Ported from the original BBC&nbsp;Micro BASIC, recovered from the 1985 cassette.
-      <a href="classic/">Play it on the 1985 screen &rarr;</a>
-    </p>
+    
   </div>
 </div>
 
@@ -8545,6 +8545,7 @@ function enterTitle() {
   $("hud").hidden = true; plan.hidden = true; $("hint").hidden = true;
   $("banner").hidden = true;
   $("overSheet").hidden = true; $("pauseSheet").hidden = true;
+  $("edListSheet").hidden = true; $("edCodeSheet").hidden = true;
   $("titleSheet").hidden = false;
 
   /* a flat, empty cellar with the word laid out in brick, the way
@@ -11619,7 +11620,7 @@ function edShelfDraw() {
   if (!box) return;
   box.innerHTML = "";
   if (!edShelf.length) {
-    box.innerHTML = '<p class="fine">Nothing here yet \u2014 New cellar starts one.</p>';
+    box.innerHTML = '<p class="fine">Nothing here yet \u2014 New starts one.</p>';
     return edShelfActs();
   }
   edShelf.forEach(function (row) {
