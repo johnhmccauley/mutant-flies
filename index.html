@@ -178,7 +178,13 @@
     position:fixed;left:clamp(10px,2vw,20px);bottom:clamp(10px,2vw,20px);
     display:none;grid-template-columns:repeat(3,1fr);gap:6px;width:min(45vw,186px);
   }
-  body.touch .pad{display:grid}
+  /* The pad used to appear on any phone, in every mode, because its
+     visibility was one CSS rule and nothing ever asked what the game was
+     doing - so it was drawn over the title card, the briefings and the
+     level editor, where the sheets happened to paint on top of it and
+     hid the fault. It is a class the game sets now, and the game sets it
+     only while somebody is playing. */
+  body.padOn .pad{display:grid}
   .pad button{
     appearance:none;border:1px solid rgba(232,220,200,.2);border-radius:4px;
     background:rgba(20,15,11,.66);color:var(--bone);aspect-ratio:1;font-size:19px;
@@ -213,7 +219,33 @@
     font-family:"IBM Plex Mono",ui-monospace,monospace;font-size:11px;letter-spacing:.14em;
     text-transform:uppercase;color:#6f655a;pointer-events:none;
   }
-  body.touch .hint{display:none}
+  /* it used to be hidden outright on a phone, which left a phone player
+     with no instructions at all - and the title card still told them to
+     press Z and X */
+  body.padOn .hint{ left:auto; right:12px; transform:none; max-width:52vw; text-align:right; }
+
+  /* ---------- how you steer it ---------- */
+  .ctrlPick{ display:none; gap:6px; justify-content:center; flex-wrap:wrap; }
+  body.touch .ctrlPick{ display:flex; }
+  .ctrlPick button[aria-pressed="true"]{
+    background:var(--blood);border-color:var(--blood);color:#fff;font-weight:700;
+  }
+  .ctrlSay{ display:none; margin-top:-4px; }
+  body.touch .ctrlSay{ display:block; }
+  .ctrlRead{
+    font-family:"IBM Plex Mono",ui-monospace,monospace;color:#8e8172;
+  }
+  body.touch #keysline{ display:none; }
+
+  #pauseBtn{
+    display:none;margin-left:14px;width:30px;height:30px;padding:0;border-radius:6px;
+    border:1px solid rgba(232,220,200,.2);background:rgba(20,15,11,.66);color:var(--bone);
+    pointer-events:auto;-webkit-tap-highlight-color:transparent;
+    place-items:center;
+  }
+  #pauseBtn svg{width:15px;height:15px;fill:none;stroke:currentColor}
+  #pauseBtn svg .fill{fill:currentColor;stroke:none}
+  body.touch #pauseBtn{display:grid}
   /* ---------- debug: D ---------- */
   #dbg{
     position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);
@@ -644,6 +676,10 @@
   <div class="stat right"><span class="k">Loose</span><span class="v" id="hLoose"></span></div>
   <div class="stat right" id="sBricks"><span class="k">Bricks</span><span class="v" id="hBricks">200</span></div>
   <div class="stat right" id="sMoves"><span class="k">Moves</span><span class="v" id="hMoves">0</span></div>
+  <!-- A phone had no way to pause at all: pausing was the P key and
+       nothing else, so the one screen where you can change how you are
+       steering could not be reached from the device that needs it. -->
+  <button id="pauseBtn" type="button" aria-label="Pause"><svg viewBox="0 0 16 16" aria-hidden="true"><rect class="fill" x="4" y="3.5" width="2.6" height="9" rx=".6"/><rect class="fill" x="9.4" y="3.5" width="2.6" height="9" rx=".6"/></svg></button>
 </div>
 <canvas id="plan" width="34" height="26" hidden></canvas>
 <div id="banner" hidden></div>
@@ -673,7 +709,18 @@
     <p class="fine" id="record"></p>
     <p class="fine" id="betaSays"></p>
     <p class="fine" id="freshSays" hidden></p>
-    <p class="keysline">
+    <!-- What the game is steered with. On a phone this is the first
+         real decision, so it is on the title screen where it can be made
+         before anything is chasing you - and again on the pause card,
+         because the way to find out a scheme is not for you is to play
+         with it for a minute. -->
+    <div class="ctrlPick" id="titleCtrl">
+      <button class="edBtn" type="button" data-scheme="pad">Buttons</button>
+      <button class="edBtn" type="button" data-scheme="swipe">Swipe</button>
+      <button class="edBtn" type="button" data-scheme="tilt">Tilt</button>
+    </div>
+    <p class="fine ctrlSay" id="titleCtrlSay"></p>
+    <p class="keysline" id="keysline">
       <span class="grp"><kbd>Z</kbd><kbd>X</kbd><kbd>:</kbd><kbd>/</kbd></span> move
       <span class="sep">&middot;</span> bricks shove in whole lines
       <span class="sep">&middot;</span> one pushed off the edge is gone
@@ -736,6 +783,14 @@
       <button class="go quiet" id="restart" type="button">Restart cellar</button>
       <button class="go quiet" id="giveup" type="button">Save &amp; quit</button>
     </div>
+    <div class="ctrlPick" id="pauseCtrl">
+      <button class="edBtn" type="button" data-scheme="pad">Buttons</button>
+      <button class="edBtn" type="button" data-scheme="swipe">Swipe</button>
+      <button class="edBtn" type="button" data-scheme="tilt">Tilt</button>
+    </div>
+    <p class="fine ctrlSay" id="pauseCtrlSay"></p>
+    <button class="edBtn" id="ctrlZero" type="button" hidden>Re-centre</button>
+    <p class="fine ctrlRead" id="ctrlRead" hidden></p>
     <p class="fine">Your progress is kept in this browser. Come back and continue.</p>
   </div>
 </div>
@@ -6387,6 +6442,174 @@
 })(typeof window !== "undefined" ? window : globalThis);
 </script>
 <!--/inline-->
+<!--inline:src/steer.js-->
+<script>
+/* =====================================================================
+   STEERING A PHONE
+
+   Everything hard about tilt is arithmetic, and none of it needs a
+   browser: which way is "right" when the phone is held sideways, how
+   far you have to lean before it counts, and how to stop a shaking hand
+   flickering between two directions. So it lives here with the rest of
+   the game's thinking, where node can run it and tools/test-steer.js
+   can hold it to account. What is left in the page is listeners and
+   permission prompts, which are the parts a test could only pretend to
+   check anyway.
+
+   THE ONE FACT THAT MAKES THIS TRACTABLE
+
+   The play camera never rotates. It sits on the +Z side of the man and
+   looks along -Z with no yaw (index.html, the play branch of the camera
+   block), and grid `up` is dr = +1 which worldOf turns into a SMALLER
+   world z. So screen-up is always grid up and screen-right is always
+   grid right, in every cellar, for ever. There is no camera angle to
+   compensate for - only the phone's own angle.
+
+   HOW A LEAN BECOMES A DIRECTION
+
+   beta and gamma describe which way the screen's normal is leaning: a
+   positive beta tips it toward the bottom of the screen, a positive
+   gamma toward the right. The side a surface leans toward is its
+   downhill side, so the man rolls downhill on the glass the way a
+   marble rolls on a tray - which is a metaphor this game already owns,
+   because it has marbles and they do exactly that.
+
+   Turning the phone in its own plane rotates the tray without changing
+   how it is tilted, so the whole of landscape support is one table of
+   sign swaps. It is a table rather than trigonometry because there are
+   four cases, they are exact, and a table can be corrected one row at a
+   time when a browser turns out to report gamma backwards - which some
+   have.
+
+   The angle comes in as an argument rather than being read from
+   screen.orientation in here, which is the single decision that lets
+   all four orientations be tested in node with no browser at all.
+   ===================================================================== */
+(function (root) {
+  "use strict";
+
+  /* how far you must lean before it counts as a direction at all. Small,
+     and it has to be: people hold a phone somewhere between thirty and
+     sixty degrees off flat, and a lean of twenty on top of a neutral of
+     sixty puts beta at eighty - inside the region where gamma stops
+     meaning anything. Twelve keeps the whole working range clear of it. */
+  var TILT_ON = 12;
+
+  /* and how far back you must come before it stops. Lower than TILT_ON,
+     because letting go is a movement too: returning to level overshoots
+     a little, and without the gap that overshoot reads as a lean the
+     other way and takes a step you did not ask for. */
+  var TILT_OFF = 7;
+
+  /* how much the other axis must beat the current one by before the
+     direction changes. Without it, a lean held near the diagonal
+     flutters between two directions several times a second, which in a
+     game where one square wrong is a wasp is not a small thing. */
+  var TILT_BIAS = 5;
+
+  /* past this the phone is nearly upright, gamma is in gimbal lock and
+     reports nonsense. Standing still is a legal move here - the world
+     still ticks and a step point still banks - so the honest answer to
+     a confused sensor is to stand still, which costs a turn rather than
+     walking you somewhere you did not choose. */
+  var TILT_LOCK = 78;
+
+  /* a swipe, in pixels: about a thumb-width of obvious intent. Below it
+     the finger was resting or tapping, not asking for anything. */
+  var SWIPE_MIN = 28;
+
+  /* screenRight and screenDown, in terms of beta and gamma, at each of
+     the four ways up a phone can be. Signs only - it is a rotation of
+     (gamma, beta) by minus the screen angle.
+
+        angle    screen right     screen down
+           0       +gamma           +beta
+          90       +beta            -gamma
+         180       -gamma           -beta
+         270       -beta            +gamma
+
+     Treat this as data that may be wrong on somebody's phone rather
+     than as a proof. Each row is one sign to flip. */
+  var AXES = {
+    0:   { rb: 0, rg: 1, db: 1, dg: 0 },
+    90:  { rb: 1, rg: 0, db: 0, dg: -1 },
+    180: { rb: 0, rg: -1, db: -1, dg: 0 },
+    270: { rb: -1, rg: 0, db: 0, dg: 1 }
+  };
+
+  /* Which way the phone is leaning, in the screen's own axes.
+
+     Returns lost:true when the reading cannot be trusted, and zeroes
+     with it, so a caller that ignores the flag still gets the safe
+     answer rather than a wrong one. */
+  function toScreen(beta, gamma, angle) {
+    var a = AXES[angle] || AXES[0];
+    /* A phone with no gyroscope reports null rather than a number, and
+       isFinite(null) is TRUE - null becomes nought on the way in - so
+       the obvious check waves it straight through as a phone held
+       perfectly level. It has to be asked whether it is a number. */
+    if (typeof beta !== "number" || typeof gamma !== "number" ||
+        !isFinite(beta) || !isFinite(gamma))
+      return { right: 0, down: 0, lost: true };
+    if (Math.abs(beta) > TILT_LOCK)
+      return { right: 0, down: 0, lost: true };
+    return {
+      right: a.rb * beta + a.rg * gamma,
+      down: a.db * beta + a.dg * gamma,
+      lost: false
+    };
+  }
+
+  /* A lean, in screen axes and already measured from wherever the
+     player calls level, becomes one of the four directions or nothing.
+
+     `was` is what it said last time, and it is not decoration: both
+     hystereses are about it. Coming back toward level has to fall
+     further than going out did, and changing axis has to beat the
+     current one by a margin - otherwise the answer chatters. */
+  function tiltDir(sr, sd, was) {
+    var mag = Math.max(Math.abs(sr), Math.abs(sd));
+    if (was ? mag < TILT_OFF : mag < TILT_ON) return null;
+
+    var upDown = (was === "up" || was === "down");
+    var leftRight = (was === "left" || was === "right");
+    var vertical;
+    if (upDown) vertical = Math.abs(sd) + TILT_BIAS >= Math.abs(sr);
+    else if (leftRight) vertical = Math.abs(sd) > Math.abs(sr) + TILT_BIAS;
+    else vertical = Math.abs(sd) > Math.abs(sr);
+
+    if (vertical) return sd > 0 ? "down" : "up";
+    return sr > 0 ? "right" : "left";
+  }
+
+  /* A finger dragged across the glass, in pixels from where it started
+     or from where it last turned a corner. Screen down is grid down:
+     you are dragging the man, not the room.
+
+     The same bias as tilt, and for the same reason - a drag reversed
+     mid-stroke should not flutter while it crosses the diagonal. */
+  function swipeDir(dx, dy, was) {
+    if (Math.max(Math.abs(dx), Math.abs(dy)) < SWIPE_MIN) return null;
+
+    var upDown = (was === "up" || was === "down");
+    var leftRight = (was === "left" || was === "right");
+    var vertical;
+    if (upDown) vertical = Math.abs(dy) + TILT_BIAS >= Math.abs(dx);
+    else if (leftRight) vertical = Math.abs(dy) > Math.abs(dx) + TILT_BIAS;
+    else vertical = Math.abs(dy) > Math.abs(dx);
+
+    if (vertical) return dy > 0 ? "down" : "up";
+    return dx > 0 ? "right" : "left";
+  }
+
+  root.MutantSteer = {
+    toScreen: toScreen, tiltDir: tiltDir, swipeDir: swipeDir,
+    AXES: AXES, TILT_ON: TILT_ON, TILT_OFF: TILT_OFF, TILT_BIAS: TILT_BIAS,
+    TILT_LOCK: TILT_LOCK, SWIPE_MIN: SWIPE_MIN
+  };
+})(typeof window !== "undefined" ? window : globalThis);
+</script>
+<!--/inline-->
 <script>
 "use strict";
 /* =====================================================================
@@ -8966,7 +9189,9 @@ function pause(on) {
     game.bricks + " bricks left, " +
     (kinds.length ? kinds.length + " still loose: " + kinds.join(", ") + "." : "nothing loose.");
   $("pauseSheet").hidden = !on;
-  if (!on) turnAcc = 0;
+  /* whatever you shifted to while it was paused is the pose you are
+     about to play in, so that is the one to call level */
+  if (!on) { turnAcc = 0; tilt.wantZero = true; }
 }
 
 
@@ -12302,15 +12527,296 @@ addEventListener("blur", function () { held = {}; tapped = {}; if (mode === "pla
       .then(function () { edSay("copied", "good"); }, function () { edSay("select it and copy"); });
   });
 
+/* ====================================================================
+   STEERING IT WITH A PHONE
+
+   There are three ways, and the player picks. Which is not indecision:
+   the research on this is consistent and it says a virtual pad measures
+   best for exactly this kind of task - four fixed directions, precision
+   mattering - with swipe close behind on grid games, and tilt a distant
+   third because it is "not sufficiently precise and quick" for
+   direction-restricted movement. But tilt is the one people ask for and
+   it is genuinely nice on a slow cellar, so it is offered and it is not
+   the default.
+
+   All three write into `held` and `tapped`, which is where the keyboard
+   already writes, so the turn loop needs no new case and nothing here
+   can invent a move the keyboard could not have made. The keyboard
+   stays live in every scheme - a bluetooth keyboard on a tablet must
+   not be locked out, and neither must whoever is testing at a desk.
+
+   TWO THINGS THAT LOOK LIKE DETAILS AND ARE NOT
+
+   `tapped` is a latch that survives until a turn consumes it, and a turn
+   is 150ms apart. The old pad set `held` only, so a tap quicker than a
+   turn was silently thrown away - the same tap on a key worked, because
+   keydown sets both. That is why the pad felt unreliable and the keys
+   did not.
+
+   And `held` is not a play-only channel: the level editor's own loop
+   reads the same object to walk its cursor. So every writer here asks
+   whether the game is being PLAYED, not merely whether it is not being
+   edited, and everything is released the moment it is not.
+   ==================================================================== */
+var ctrl = "keys";            /* keys | pad | swipe | tilt */
+var padShown = false;
+var swipe = null;             /* the finger in flight, or nothing */
+var tilt = { dir: null, sr: 0, sd: 0, zr: 0, zd: 0,
+             wantZero: false, seen: 0, watch: 0, live: false, raw: null };
+
+var CTRL_SAY = {
+  keys: "Z X : / walk him.",
+  pad: "The four buttons walk him. Letting go is standing still, and standing still is a move.",
+  swipe: "Swipe on the cellar to walk. Keep your finger down and he keeps going.",
+  tilt: "Lean the phone and he walks downhill. Hold it level and he stands still."
+};
+
+/* Whatever is holding a direction lets go of it.
+
+   Only ever the key this file set, never one somebody else is holding -
+   and it is called from the frame loop whenever the game stops being
+   played, which also fixes an older leak: a direction held at the moment
+   of a pause, a death or a jump into the editor used to stay held,
+   because only losing window focus ever cleared it. */
+function steerRelease() {
+  if (tilt.dir) { held[tilt.dir] = false; tilt.dir = null; }
+  if (swipe && swipe.dir) held[swipe.dir] = false;
+  swipe = null;
+}
+
+function ctrlLoad() {
+  var w = MF.save.read() || {};
+  var want = w.ctrl;
+  if (["keys", "pad", "swipe", "tilt"].indexOf(want) < 0) want = null;
+  /* An absent choice is not "keys" - it is "whatever suits this device",
+     worked out afresh every time. Writing a default down the first time
+     anybody played at a desk would hand their phone a keyboard scheme
+     and no way to walk. */
+  ctrl = want || (document.body.classList.contains("touch") ? "pad" : "keys");
+}
+
+function ctrlSet(name) {
+  ctrl = name;
+  var w = MF.save.read() || {};
+  w.ctrl = name;
+  MF.save.write(w);
+  ctrlApply();
+}
+
+function ctrlApply() {
+  steerRelease();
+  ["titleCtrl", "pauseCtrl"].forEach(function (id) {
+    var box = $(id);
+    if (!box) return;
+    Array.prototype.forEach.call(box.querySelectorAll("button[data-scheme]"), function (b) {
+      b.setAttribute("aria-pressed", b.dataset.scheme === ctrl ? "true" : "false");
+    });
+  });
+  var say = CTRL_SAY[ctrl] || "";
+  if ($("titleCtrlSay")) $("titleCtrlSay").textContent = say;
+  if ($("pauseCtrlSay")) $("pauseCtrlSay").textContent = say;
+  if ($("ctrlZero")) $("ctrlZero").hidden = (ctrl !== "tilt");
+  if ($("ctrlRead")) $("ctrlRead").hidden = (ctrl !== "tilt");
+  if ($("hint")) $("hint").textContent = document.body.classList.contains("touch")
+    ? say : "P pause · R restart cellar · M sound · D debug";
+  if (ctrl === "tilt") tiltArm(false); else tiltStop();
+}
+
+Array.prototype.forEach.call(document.querySelectorAll(".ctrlPick button[data-scheme]"), function (b) {
+  b.addEventListener("click", function () {
+    var want = b.dataset.scheme;
+    /* Tilt is the one that can refuse. It is not written down until the
+       phone has actually agreed to report its angle, or a player who
+       said no once would come back tomorrow to a game with no controls
+       at all. */
+    if (want === "tilt") { ctrl = "tilt"; ctrlApply(); return tiltArm(true); }
+    ctrlSet(want);
+  });
+});
+if ($("ctrlZero")) $("ctrlZero").addEventListener("click", function () {
+  tilt.wantZero = true;
+  edSayCtrl("hold it the way you mean to play, and let go");
+});
+if ($("pauseBtn")) $("pauseBtn").addEventListener("click", function () { pause(true); });
+
+function edSayCtrl(msg) { if ($("ctrlRead")) $("ctrlRead").textContent = msg; }
+
+/* ---- the buttons ------------------------------------------------- */
 Array.prototype.forEach.call(document.querySelectorAll(".pad button[data-act]"), function (b) {
   var a = b.dataset.act;
-  b.addEventListener("pointerdown", function (ev) { ev.preventDefault(); held[a] = true; Beeb.wake(); });
+  b.addEventListener("pointerdown", function (ev) {
+    ev.preventDefault();
+    /* asked at the press rather than at the turn, because `tapped`
+       outlives the press: a button poked while a briefing card was up
+       would otherwise be eaten by the first turn of the cellar and give
+       a free step the instant play began */
+    if (mode !== "play") return;
+    held[a] = true;
+    tapped[a] = true;                /* the fix: a quick tap used to vanish */
+    Beeb.wake();
+  });
   var off = function () { held[a] = false; };
   b.addEventListener("pointerup", off);
   b.addEventListener("pointerleave", off);
   b.addEventListener("pointercancel", off);
 });
+
+/* ---- a finger dragged across the cellar --------------------------- */
+(function () {
+  var el = document.getElementById("gl");
+  if (!el) return;
+
+  /* This is deliberately a second block rather than another branch of
+     the editor's pointer code above. Every handler in that one bails
+     unless the game is being EDITED and every handler in this one bails
+     unless it is being PLAYED, so the two sets cannot reach each other
+     and the editor's pan, pinch and stamping are not touched at all. */
+  function mine(e) {
+    return ctrl === "swipe" && mode === "play" &&
+           (!swipe || swipe.id === e.pointerId);
+  }
+
+  el.addEventListener("pointerdown", function (e) {
+    if (ctrl !== "swipe" || mode !== "play") return;
+    if (swipe) { steerRelease(); return; }    /* a second finger is a pinch, not a walk */
+    swipe = { id: e.pointerId, x: e.clientX, y: e.clientY, dir: null };
+    Beeb.wake();
+  });
+
+  el.addEventListener("pointermove", function (e) {
+    if (!swipe || !mine(e)) return;
+    var d = MutantSteer.swipeDir(e.clientX - swipe.x, e.clientY - swipe.y, swipe.dir);
+    if (!d) return;
+    /* The anchor moves to where the finger is every time a square is
+       asked for, so one long drag walks one square per thumb-width
+       rather than one square per drag - which is what a finger held
+       against the glass is obviously asking for. */
+    swipe.x = e.clientX; swipe.y = e.clientY;
+    if (swipe.dir && swipe.dir !== d) held[swipe.dir] = false;
+    swipe.dir = d;
+    held[d] = true;
+    tapped[d] = true;
+  });
+
+  ["pointerup", "pointercancel", "pointerleave"].forEach(function (n) {
+    el.addEventListener(n, function (e) {
+      if (!swipe || swipe.id !== e.pointerId) return;
+      if (swipe.dir) held[swipe.dir] = false;
+      swipe = null;
+    });
+  });
+})();
+
+/* ---- leaning it ---------------------------------------------------- */
+
+/* which way up the phone is being held, as one of four numbers */
+function steerAngle() {
+  var a = (screen.orientation && screen.orientation.angle);
+  if (typeof a !== "number") a = window.orientation;
+  if (typeof a !== "number") return 0;
+  a = ((a % 360) + 360) % 360;
+  return a;
+}
+
+function tiltFail(why) {
+  tiltStop();
+  ctrl = "pad";
+  ctrlApply();
+  edSayCtrl(why);
+}
+
+function tiltStop() {
+  tilt.live = false;
+  if (tilt.watch) { clearTimeout(tilt.watch); tilt.watch = 0; }
+  removeEventListener("deviceorientation", onTilt);
+  steerRelease();
+}
+
+function tiltOn() {
+  if (tilt.live) return;
+  tilt.live = true;
+  tilt.seen = 0;
+  tilt.wantZero = true;
+  addEventListener("deviceorientation", onTilt);
+  /* Some phones and every desktop attach the listener happily and then
+     never send an event. Without this the player has chosen a scheme
+     that does nothing and has no way of knowing why, so it gives up out
+     loud and hands the buttons back. */
+  tilt.watch = setTimeout(function () {
+    tilt.watch = 0;
+    if (!tilt.seen) tiltFail("This one does not report which way it is being held.");
+  }, 1400);
+  var w = MF.save.read() || {};
+  w.ctrl = "tilt";
+  MF.save.write(w);
+  edSayCtrl("hold it the way you mean to play, and lean");
+}
+
+function tiltArm(fromTap) {
+  var DOE = window.DeviceOrientationEvent;
+  if (!DOE) return tiltFail("This one has nothing that can tell which way it is tipped.");
+  /* Android and older iOS just work. iOS 13 and after will only ask on
+     the back of a real tap, and only over https - and when either is
+     missing it REJECTS rather than answering "denied", so the failure
+     needs a handler of its own and not a one-armed then(). */
+  if (typeof DOE.requestPermission !== "function") return tiltOn();
+  if (!fromTap) return edSayCtrl("tap Tilt again to let it read the phone's angle");
+  DOE.requestPermission().then(function (r) {
+    if (r === "granted") tiltOn();
+    else tiltFail("Motion access was refused. iPhone: Settings, Safari, Motion & Orientation Access.");
+  }, function () {
+    tiltFail("The phone would not say. Leaning needs the page over https.");
+  });
+}
+
+function onTilt(e) {
+  tilt.seen = 1;
+  var s = MutantSteer.toScreen(e.beta, e.gamma, steerAngle());
+  if (s.lost && tilt.wantZero) return;          /* not a pose to call level */
+  if (tilt.wantZero) { tilt.zr = s.right; tilt.zd = s.down; tilt.wantZero = false; }
+
+  /* a light smoothing, because hands shake and a cellar is not a place
+     to be walked into a wasp by a tremor */
+  var k = 0.35;
+  tilt.sr += ((s.right - tilt.zr) - tilt.sr) * k;
+  tilt.sd += ((s.down - tilt.zd) - tilt.sd) * k;
+  tilt.raw = e;
+
+  if (ctrl !== "tilt" || mode !== "play") { steerRelease(); return; }
+  var d = MutantSteer.tiltDir(tilt.sr, tilt.sd, tilt.dir);
+  if (d === tilt.dir) return;
+  if (tilt.dir) held[tilt.dir] = false;
+  tilt.dir = d;
+  /* held so that leaning and staying leant keeps him walking, the way
+     holding a key does - and tapped on the way IN, because a lean that
+     starts and ends inside one 150ms turn would otherwise do nothing at
+     all, which is the exact complaint the pad had. It cannot double-step:
+     a turn takes one direction from the union of the two. */
+  if (d) { held[d] = true; tapped[d] = true; Beeb.wake(); }
+}
+
+/* the numbers, while the pause card is open, which is also the moment
+   somebody is calibrating - so this is the calibration readout as well
+   as the way to find out that a phone reports gamma backwards */
+function tiltRead() {
+  if (ctrl !== "tilt" || !$("ctrlRead") || $("ctrlRead").hidden) return;
+  var e = tilt.raw;
+  if (!e) return;
+  $("ctrlRead").textContent =
+    "beta " + Math.round(e.beta) + "  gamma " + Math.round(e.gamma) +
+    "  up " + steerAngle() + "°  →  " +
+    Math.round(tilt.sr) + ", " + Math.round(tilt.sd) +
+    "  →  " + (MutantSteer.tiltDir(tilt.sr, tilt.sd, tilt.dir) || "still");
+}
+
+addEventListener("visibilitychange", function () {
+  if (document.hidden) steerRelease();
+  else tilt.wantZero = true;      /* you put it down and picked it up again */
+});
+
 if (matchMedia("(hover:none)").matches) document.body.classList.add("touch");
+ctrlLoad();
+ctrlApply();
 
 /* the theme card is the first of up to two - so "down we go" means the
    next card if there is one, and the cellar if there is not */
@@ -13070,6 +13576,21 @@ function aiSetLabel() {
 var camPos = new THREE.Vector3(), camAim = new THREE.Vector3(), tmp = new THREE.Vector3();
 var TITLE_AIM = new THREE.Vector3(17.5, 0.6, ROWS - 1 - 17 + 0.5);
 
+/* The pad is shown by the game rather than by a media query, so it
+   knows about the title screen and the briefings and the editor - and
+   whatever is being held is let go of the moment the game stops being
+   played, which is the same check and therefore the same line. Compared
+   before it is written, so it is one boolean test a frame. */
+function steerFrame() {
+  var want = (ctrl === "pad" && mode === "play");
+  if (want !== padShown) {
+    padShown = want;
+    document.body.classList.toggle("padOn", want);
+  }
+  if (mode !== "play") steerRelease();
+  tiltRead();
+}
+
 function frame() {
   requestAnimationFrame(frame);
   var dt = Math.min(0.05, clock.getDelta()), now = clock.elapsedTime;
@@ -13151,6 +13672,7 @@ function frame() {
   }
   /* rebuilt every frame so the loose items turn on the spot and the
      fire breathes - it is under a thousand matrix writes */
+  steerFrame();
   if (mode === "play" || mode === "brief" || mode === "edit") syncWorld();
 
   manPos.lerp(manWant, k);

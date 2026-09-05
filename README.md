@@ -157,6 +157,8 @@ node tools/check.js          # geometry, syntax, markup, inlined copies in sync
 node tools/test-rules.js     # 17 assertions pinning the port to the 1985 listing
 node tools/test-monsters.js  # 29 on the monsters, the endless levels, the saves
 node tools/test-elements.js  # 53 on slopes, trees, marbles, items, tar, water, choppers
+node tools/test-steer.js     # 36 on which way a leant or swiped phone walks him
+node tools/levels100.js      # play the first hundred cellars with the bot, and report
 node tools/plan.js           # print the descent
 ```
 
