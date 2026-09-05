@@ -1,5 +1,5 @@
 {
- "runs": 8,
+ "runs": 10,
  "limit": 1200,
  "rows": [
   {
@@ -17,18 +17,19 @@
     "robots": 0
    },
    "play": {
-    "cleared": 0,
-    "caught": 8,
+    "cleared": 3,
+    "caught": 7,
     "stuck": 0,
     "ranOn": 0,
-    "medianTurns": null,
-    "medianLived": 156,
-    "shortest": 37,
-    "longest": 311,
+    "medianTurns": 103,
+    "medianLived": 77,
+    "shortest": 15,
+    "longest": 185,
     "why": {
-     "caught": 8
+     "cleared": 3,
+     "caught": 7
     },
-    "winRate": 0
+    "winRate": 0.3
    }
   },
   {
@@ -46,18 +47,19 @@
     "robots": 0
    },
    "play": {
-    "cleared": 0,
-    "caught": 8,
+    "cleared": 1,
+    "caught": 9,
     "stuck": 0,
     "ranOn": 0,
-    "medianTurns": null,
-    "medianLived": 47,
-    "shortest": 21,
-    "longest": 635,
+    "medianTurns": 64,
+    "medianLived": 64,
+    "shortest": 24,
+    "longest": 217,
     "why": {
-     "caught": 8
+     "caught": 9,
+     "cleared": 1
     },
-    "winRate": 0
+    "winRate": 0.1
    }
   },
   {
@@ -75,19 +77,19 @@
     "robots": 0
    },
    "play": {
-    "cleared": 1,
-    "caught": 7,
+    "cleared": 0,
+    "caught": 9,
     "stuck": 0,
-    "ranOn": 0,
-    "medianTurns": 62,
-    "medianLived": 62,
-    "shortest": 20,
-    "longest": 140,
+    "ranOn": 1,
+    "medianTurns": null,
+    "medianLived": 36,
+    "shortest": 10,
+    "longest": 1200,
     "why": {
-     "caught": 7,
-     "cleared": 1
+     "caught": 9,
+     "ran on": 1
     },
-    "winRate": 0.13
+    "winRate": 0
    }
   },
   {
@@ -106,19 +108,18 @@
     "robots": 0
    },
    "play": {
-    "cleared": 2,
-    "caught": 6,
+    "cleared": 0,
+    "caught": 10,
     "stuck": 0,
     "ranOn": 0,
-    "medianTurns": 41,
-    "medianLived": 50,
-    "shortest": 32,
-    "longest": 457,
+    "medianTurns": null,
+    "medianLived": 112,
+    "shortest": 4,
+    "longest": 405,
     "why": {
-     "caught": 6,
-     "cleared": 2
+     "caught": 10
     },
-    "winRate": 0.25
+    "winRate": 0
    }
   },
   {
@@ -139,15 +140,15 @@
    },
    "play": {
     "cleared": 0,
-    "caught": 8,
+    "caught": 10,
     "stuck": 0,
     "ranOn": 0,
     "medianTurns": null,
-    "medianLived": 210,
-    "shortest": 110,
-    "longest": 436,
+    "medianLived": 154,
+    "shortest": 23,
+    "longest": 357,
     "why": {
-     "caught": 8
+     "caught": 10
     },
     "winRate": 0
    }
@@ -170,18 +171,19 @@
     "robots": 0
    },
    "play": {
-    "cleared": 0,
-    "caught": 8,
+    "cleared": 1,
+    "caught": 9,
     "stuck": 0,
     "ranOn": 0,
-    "medianTurns": null,
-    "medianLived": 87,
-    "shortest": 25,
-    "longest": 255,
+    "medianTurns": 159,
+    "medianLived": 161,
+    "shortest": 29,
+    "longest": 453,
     "why": {
-     "caught": 8
+     "caught": 9,
+     "cleared": 1
     },
-    "winRate": 0
+    "winRate": 0.1
    }
   },
   {
@@ -204,18 +206,19 @@
     "robots": 0
    },
    "play": {
-    "cleared": 0,
-    "caught": 8,
+    "cleared": 1,
+    "caught": 9,
     "stuck": 0,
     "ranOn": 0,
-    "medianTurns": null,
-    "medianLived": 73,
-    "shortest": 20,
-    "longest": 129,
+    "medianTurns": 214,
+    "medianLived": 145,
+    "shortest": 23,
+    "longest": 500,
     "why": {
-     "caught": 8
+     "caught": 9,
+     "cleared": 1
     },
-    "winRate": 0
+    "winRate": 0.1
    }
   },
   {
@@ -239,19 +242,20 @@
     "robots": 0
    },
    "play": {
-    "cleared": 0,
-    "caught": 7,
+    "cleared": 1,
+    "caught": 8,
     "stuck": 0,
     "ranOn": 1,
-    "medianTurns": null,
-    "medianLived": 36,
-    "shortest": 16,
+    "medianTurns": 64,
+    "medianLived": 52,
+    "shortest": 30,
     "longest": 1200,
     "why": {
-     "caught": 7,
-     "ran on": 1
+     "caught": 8,
+     "ran on": 1,
+     "cleared": 1
     },
-    "winRate": 0
+    "winRate": 0.1
    }
   },
   {
@@ -266,8 +270,8 @@
      "brick": 140,
      "raised": 554,
      "tree": 12,
-     "item4": 4,
      "marble": 5,
+     "item4": 4,
      "item2": 2,
      "item3": 3,
      "item1": 2
@@ -277,15 +281,15 @@
    },
    "play": {
     "cleared": 0,
-    "caught": 8,
+    "caught": 10,
     "stuck": 0,
     "ranOn": 0,
     "medianTurns": null,
-    "medianLived": 153,
-    "shortest": 45,
-    "longest": 321,
+    "medianLived": 84,
+    "shortest": 41,
+    "longest": 432,
     "why": {
-     "caught": 8
+     "caught": 10
     },
     "winRate": 0
    }
@@ -303,8 +307,8 @@
      "brick": 202,
      "raised": 546,
      "tree": 7,
-     "tarvat": 1,
      "marble": 4,
+     "tarvat": 1,
      "item2": 2,
      "item1": 2,
      "item4": 3,
@@ -315,16 +319,15 @@
    },
    "play": {
     "cleared": 0,
-    "caught": 7,
+    "caught": 10,
     "stuck": 0,
-    "ranOn": 1,
+    "ranOn": 0,
     "medianTurns": null,
-    "medianLived": 74,
-    "shortest": 15,
-    "longest": 1200,
+    "medianLived": 56,
+    "shortest": 24,
+    "longest": 220,
     "why": {
-     "caught": 7,
-     "ran on": 1
+     "caught": 10
     },
     "winRate": 0
    }
@@ -343,27 +346,27 @@
      "raised": 317,
      "item3": 3,
      "tree": 11,
-     "marble": 3,
      "item4": 4,
      "item1": 2,
      "watervat": 2,
      "item2": 2,
-     "tarvat": 1
+     "tarvat": 1,
+     "marble": 3
     },
     "coins": 0,
     "robots": 0
    },
    "play": {
     "cleared": 0,
-    "caught": 8,
+    "caught": 10,
     "stuck": 0,
     "ranOn": 0,
     "medianTurns": null,
-    "medianLived": 33,
-    "shortest": 10,
-    "longest": 414,
+    "medianLived": 81,
+    "shortest": 19,
+    "longest": 271,
     "why": {
-     "caught": 8
+     "caught": 10
     },
     "winRate": 0
    }
@@ -380,9 +383,9 @@
      "brick": 218,
      "raised": 589,
      "tree": 6,
-     "marble": 5,
      "item1": 2,
      "item2": 2,
+     "marble": 5,
      "watervat": 1,
      "item3": 3,
      "tarvat": 1,
@@ -393,19 +396,19 @@
    },
    "play": {
     "cleared": 1,
-    "caught": 6,
+    "caught": 5,
     "stuck": 0,
-    "ranOn": 1,
-    "medianTurns": 37,
-    "medianLived": 29,
-    "shortest": 10,
+    "ranOn": 4,
+    "medianTurns": 31,
+    "medianLived": 32,
+    "shortest": 7,
     "longest": 1200,
     "why": {
-     "caught": 6,
-     "ran on": 1,
-     "cleared": 1
+     "ran on": 4,
+     "cleared": 1,
+     "caught": 5
     },
-    "winRate": 0.13
+    "winRate": 0.1
    }
   },
   {
@@ -419,11 +422,11 @@
     "bricks": 160,
     "stuff": {
      "brick": 192,
-     "marble": 2,
      "item4": 2,
      "raised": 473,
      "chopper": 3,
      "item1": 2,
+     "marble": 2,
      "item3": 2,
      "tree": 6,
      "item2": 2,
@@ -435,15 +438,15 @@
    },
    "play": {
     "cleared": 0,
-    "caught": 7,
+    "caught": 9,
     "stuck": 0,
     "ranOn": 1,
     "medianTurns": null,
-    "medianLived": 49,
-    "shortest": 26,
+    "medianLived": 73,
+    "shortest": 11,
     "longest": 1200,
     "why": {
-     "caught": 7,
+     "caught": 9,
      "ran on": 1
     },
     "winRate": 0
@@ -462,13 +465,13 @@
      "brick": 244,
      "raised": 478,
      "item3": 3,
-     "marble": 2,
      "tree": 8,
      "chopper": 4,
      "item4": 2,
      "item2": 2,
      "tarvat": 2,
      "item1": 2,
+     "marble": 2,
      "watervat": 1
     },
     "coins": 0,
@@ -476,15 +479,15 @@
    },
    "play": {
     "cleared": 0,
-    "caught": 7,
+    "caught": 9,
     "stuck": 0,
     "ranOn": 1,
     "medianTurns": null,
-    "medianLived": 43,
-    "shortest": 15,
+    "medianLived": 26,
+    "shortest": 12,
     "longest": 1200,
     "why": {
-     "caught": 7,
+     "caught": 9,
      "ran on": 1
     },
     "winRate": 0
@@ -501,8 +504,8 @@
     "bricks": 150,
     "stuff": {
      "brick": 198,
-     "tarvat": 2,
      "marble": 5,
+     "tarvat": 2,
      "rock": 15,
      "tree": 6,
      "raised": 469,
@@ -517,18 +520,19 @@
     "robots": 0
    },
    "play": {
-    "cleared": 0,
-    "caught": 8,
+    "cleared": 1,
+    "caught": 9,
     "stuck": 0,
     "ranOn": 0,
-    "medianTurns": null,
-    "medianLived": 65,
-    "shortest": 10,
-    "longest": 200,
+    "medianTurns": 64,
+    "medianLived": 259,
+    "shortest": 14,
+    "longest": 745,
     "why": {
-     "caught": 8
+     "cleared": 1,
+     "caught": 9
     },
-    "winRate": 0
+    "winRate": 0.1
    }
   },
   {
@@ -561,15 +565,15 @@
    },
    "play": {
     "cleared": 0,
-    "caught": 8,
+    "caught": 10,
     "stuck": 0,
     "ranOn": 0,
     "medianTurns": null,
-    "medianLived": 44,
-    "shortest": 12,
-    "longest": 111,
+    "medianLived": 45,
+    "shortest": 22,
+    "longest": 304,
     "why": {
-     "caught": 8
+     "caught": 10
     },
     "winRate": 0
    }
@@ -579,12 +583,12 @@
    "plan": {
     "monsters": 2,
     "kinds": {
-     "spider": 1,
+     "beetle": 1,
      "fly": 1
     },
-    "bricks": 142,
+    "bricks": 149,
     "stuff": {
-     "brick": 190,
+     "brick": 197,
      "rock": 12,
      "marble": 5,
      "item2": 2,
@@ -601,19 +605,18 @@
     "robots": 0
    },
    "play": {
-    "cleared": 1,
-    "caught": 7,
+    "cleared": 0,
+    "caught": 10,
     "stuck": 0,
     "ranOn": 0,
-    "medianTurns": 36,
-    "medianLived": 70,
-    "shortest": 26,
-    "longest": 616,
+    "medianTurns": null,
+    "medianLived": 169,
+    "shortest": 15,
+    "longest": 425,
     "why": {
-     "caught": 7,
-     "cleared": 1
+     "caught": 10
     },
-    "winRate": 0.13
+    "winRate": 0
    }
   },
   {
@@ -621,22 +624,22 @@
    "plan": {
     "monsters": 2,
     "kinds": {
-     "beetle": 1,
+     "wasp": 1,
      "spider": 1
     },
-    "bricks": 140,
+    "bricks": 144,
     "stuff": {
-     "brick": 204,
+     "brick": 208,
      "raised": 444,
      "tarvat": 2,
      "chopper": 3,
+     "marble": 3,
      "item1": 2,
      "item2": 2,
      "rock": 4,
      "tree": 10,
      "item3": 2,
      "item4": 2,
-     "marble": 3,
      "watervat": 2
     },
     "coins": 0,
@@ -644,15 +647,16 @@
    },
    "play": {
     "cleared": 0,
-    "caught": 8,
+    "caught": 9,
     "stuck": 0,
-    "ranOn": 0,
+    "ranOn": 1,
     "medianTurns": null,
-    "medianLived": 86,
-    "shortest": 19,
-    "longest": 301,
+    "medianLived": 55,
+    "shortest": 8,
+    "longest": 1200,
     "why": {
-     "caught": 8
+     "caught": 9,
+     "ran on": 1
     },
     "winRate": 0
    }
@@ -662,12 +666,12 @@
    "plan": {
     "monsters": 2,
     "kinds": {
-     "wasp": 1,
+     "snake": 1,
      "beetle": 1
     },
-    "bricks": 138,
+    "bricks": 140,
     "stuff": {
-     "brick": 170,
+     "brick": 172,
      "raised": 610,
      "item4": 4,
      "tree": 12,
@@ -685,18 +689,18 @@
    },
    "play": {
     "cleared": 1,
-    "caught": 7,
+    "caught": 9,
     "stuck": 0,
     "ranOn": 0,
-    "medianTurns": 58,
-    "medianLived": 129,
-    "shortest": 23,
-    "longest": 235,
+    "medianTurns": 34,
+    "medianLived": 40,
+    "shortest": 9,
+    "longest": 307,
     "why": {
-     "caught": 7,
+     "caught": 9,
      "cleared": 1
     },
-    "winRate": 0.13
+    "winRate": 0.1
    }
   },
   {
@@ -726,19 +730,18 @@
     "robots": 0
    },
    "play": {
-    "cleared": 1,
-    "caught": 7,
+    "cleared": 0,
+    "caught": 10,
     "stuck": 0,
     "ranOn": 0,
-    "medianTurns": 41,
-    "medianLived": 157,
-    "shortest": 41,
-    "longest": 643,
+    "medianTurns": null,
+    "medianLived": 83,
+    "shortest": 9,
+    "longest": 181,
     "why": {
-     "caught": 7,
-     "cleared": 1
+     "caught": 10
     },
-    "winRate": 0.13
+    "winRate": 0
    }
   },
   {
@@ -749,39 +752,35 @@
      "spider": 1,
      "fly": 1
     },
-    "bricks": 134,
+    "bricks": 146,
     "stuff": {
-     "brick": 166,
-     "raised": 667,
-     "tree": 11,
-     "marble": 3,
-     "chopper": 4,
-     "item1": 2,
-     "tarvat": 1,
-     "item4": 2,
+     "brick": 178,
+     "raised": 747,
      "watervat": 2,
+     "marble": 3,
+     "item4": 4,
+     "tree": 9,
+     "item1": 2,
      "item2": 2,
-     "rock": 5,
-     "item3": 3
+     "item3": 3,
+     "tarvat": 2
     },
     "coins": 0,
     "robots": 0
    },
    "play": {
-    "cleared": 1,
-    "caught": 6,
+    "cleared": 0,
+    "caught": 10,
     "stuck": 0,
-    "ranOn": 1,
-    "medianTurns": 31,
-    "medianLived": 94,
+    "ranOn": 0,
+    "medianTurns": null,
+    "medianLived": 54,
     "shortest": 6,
-    "longest": 1200,
+    "longest": 144,
     "why": {
-     "caught": 6,
-     "cleared": 1,
-     "ran on": 1
+     "caught": 10
     },
-    "winRate": 0.13
+    "winRate": 0
    }
   },
   {
@@ -789,21 +788,19 @@
    "plan": {
     "monsters": 2,
     "kinds": {
-     "beetle": 1,
-     "spider": 1
+     "spider": 1,
+     "fly": 1
     },
-    "bricks": 132,
+    "bricks": 144,
     "stuff": {
-     "brick": 164,
-     "raised": 496,
+     "brick": 208,
+     "raised": 691,
      "item1": 2,
+     "item3": 2,
+     "tree": 6,
      "item2": 2,
-     "rock": 9,
-     "tree": 8,
-     "chopper": 2,
-     "item3": 3,
+     "item4": 3,
      "watervat": 1,
-     "item4": 2,
      "marble": 2,
      "tarvat": 1
     },
@@ -811,19 +808,18 @@
     "robots": 0
    },
    "play": {
-    "cleared": 1,
-    "caught": 7,
+    "cleared": 0,
+    "caught": 10,
     "stuck": 0,
     "ranOn": 0,
-    "medianTurns": 35,
-    "medianLived": 54,
-    "shortest": 9,
-    "longest": 168,
+    "medianTurns": null,
+    "medianLived": 66,
+    "shortest": 30,
+    "longest": 260,
     "why": {
-     "caught": 7,
-     "cleared": 1
+     "caught": 10
     },
-    "winRate": 0.13
+    "winRate": 0
    }
   },
   {
@@ -831,38 +827,37 @@
    "plan": {
     "monsters": 2,
     "kinds": {
-     "wasp": 1,
-     "beetle": 1
+     "spider": 1,
+     "fly": 1
     },
-    "bricks": 130,
+    "bricks": 141,
     "stuff": {
-     "brick": 194,
-     "raised": 609,
-     "rock": 7,
-     "item4": 4,
-     "tree": 6,
-     "item2": 2,
-     "item3": 3,
+     "brick": 189,
+     "raised": 660,
+     "tree": 11,
      "item1": 2,
-     "chopper": 3,
-     "tarvat": 1,
-     "watervat": 2,
-     "marble": 3
+     "item3": 3,
+     "marble": 2,
+     "item4": 3,
+     "item2": 2,
+     "tarvat": 2,
+     "watervat": 2
     },
     "coins": 0,
     "robots": 0
    },
    "play": {
     "cleared": 0,
-    "caught": 8,
+    "caught": 9,
     "stuck": 0,
-    "ranOn": 0,
+    "ranOn": 1,
     "medianTurns": null,
-    "medianLived": 75,
-    "shortest": 15,
-    "longest": 186,
+    "medianLived": 62,
+    "shortest": 18,
+    "longest": 1200,
     "why": {
-     "caught": 8
+     "caught": 9,
+     "ran on": 1
     },
     "winRate": 0
    }
@@ -870,41 +865,38 @@
   {
    "F": 24,
    "plan": {
-    "monsters": 3,
+    "monsters": 2,
     "kinds": {
-     "fly": 1,
-     "wasp": 1,
-     "beetle": 1
+     "spider": 1,
+     "fly": 1
     },
-    "bricks": 150,
+    "bricks": 139,
     "stuff": {
-     "brick": 198,
-     "raised": 758,
-     "chopper": 4,
-     "item2": 2,
-     "tree": 7,
-     "item4": 4,
-     "item3": 2,
-     "rock": 11,
-     "tarvat": 2,
+     "brick": 187,
+     "raised": 764,
+     "tree": 9,
      "marble": 3,
+     "item4": 4,
+     "item2": 2,
+     "watervat": 1,
      "item1": 2,
-     "watervat": 1
+     "tarvat": 1,
+     "item3": 2
     },
     "coins": 0,
     "robots": 0
    },
    "play": {
     "cleared": 0,
-    "caught": 8,
+    "caught": 10,
     "stuck": 0,
     "ranOn": 0,
     "medianTurns": null,
-    "medianLived": 94,
-    "shortest": 16,
-    "longest": 167,
+    "medianLived": 72,
+    "shortest": 14,
+    "longest": 99,
     "why": {
-     "caught": 8
+     "caught": 10
     },
     "winRate": 0
    }
@@ -912,41 +904,39 @@
   {
    "F": 25,
    "plan": {
-    "monsters": 3,
+    "monsters": 2,
     "kinds": {
      "spider": 1,
-     "fly": 1,
-     "wasp": 1
+     "fly": 1
     },
-    "bricks": 148,
+    "bricks": 137,
     "stuff": {
-     "brick": 180,
-     "raised": 661,
-     "marble": 5,
-     "rock": 12,
-     "tarvat": 2,
-     "tree": 11,
-     "item1": 2,
+     "brick": 201,
+     "raised": 663,
      "item4": 4,
+     "item3": 3,
+     "marble": 3,
+     "item1": 2,
+     "tree": 10,
      "watervat": 1,
-     "item3": 2,
      "item2": 2,
-     "chopper": 2
+     "tarvat": 1
     },
     "coins": 0,
     "robots": 0
    },
    "play": {
     "cleared": 0,
-    "caught": 8,
+    "caught": 9,
     "stuck": 0,
-    "ranOn": 0,
+    "ranOn": 1,
     "medianTurns": null,
-    "medianLived": 44,
-    "shortest": 9,
-    "longest": 267,
+    "medianLived": 106,
+    "shortest": 6,
+    "longest": 1200,
     "why": {
-     "caught": 8
+     "ran on": 1,
+     "caught": 9
     },
     "winRate": 0
    }
@@ -956,23 +946,21 @@
    "plan": {
     "monsters": 3,
     "kinds": {
-     "beetle": 1,
      "spider": 1,
-     "fly": 1
+     "fly": 1,
+     "beetle": 1
     },
-    "bricks": 146,
+    "bricks": 149,
     "stuff": {
-     "brick": 194,
-     "raised": 541,
-     "rock": 3,
-     "tree": 10,
-     "marble": 4,
+     "brick": 197,
+     "raised": 715,
+     "marble": 3,
      "item1": 2,
-     "item3": 2,
-     "watervat": 2,
-     "item4": 3,
+     "item4": 4,
+     "tree": 9,
+     "item3": 3,
+     "watervat": 1,
      "tarvat": 1,
-     "chopper": 2,
      "item2": 2
     },
     "coins": 0,
@@ -980,15 +968,15 @@
    },
    "play": {
     "cleared": 0,
-    "caught": 8,
+    "caught": 10,
     "stuck": 0,
     "ranOn": 0,
     "medianTurns": null,
-    "medianLived": 52,
-    "shortest": 14,
-    "longest": 293,
+    "medianLived": 32,
+    "shortest": 7,
+    "longest": 200,
     "why": {
-     "caught": 8
+     "caught": 10
     },
     "winRate": 0
    }
@@ -998,39 +986,37 @@
    "plan": {
     "monsters": 3,
     "kinds": {
-     "wasp": 1,
-     "beetle": 1,
-     "spider": 1
+     "spider": 1,
+     "fly": 1,
+     "beetle": 1
     },
-    "bricks": 144,
+    "bricks": 146,
     "stuff": {
-     "brick": 192,
-     "raised": 408,
+     "brick": 178,
+     "raised": 645,
+     "watervat": 2,
+     "marble": 2,
      "tree": 12,
-     "rock": 12,
-     "marble": 3,
      "item4": 3,
-     "chopper": 3,
      "tarvat": 2,
      "item2": 2,
      "item3": 2,
-     "item1": 2,
-     "watervat": 1
+     "item1": 2
     },
     "coins": 0,
     "robots": 0
    },
    "play": {
     "cleared": 0,
-    "caught": 8,
+    "caught": 10,
     "stuck": 0,
     "ranOn": 0,
     "medianTurns": null,
-    "medianLived": 76,
-    "shortest": 22,
-    "longest": 253,
+    "medianLived": 130,
+    "shortest": 7,
+    "longest": 193,
     "why": {
-     "caught": 8
+     "caught": 10
     },
     "winRate": 0
    }
@@ -1040,39 +1026,37 @@
    "plan": {
     "monsters": 3,
     "kinds": {
+     "spider": 1,
      "fly": 1,
-     "wasp": 1,
      "beetle": 1
     },
-    "bricks": 142,
+    "bricks": 144,
     "stuff": {
-     "brick": 206,
-     "raised": 496,
-     "item4": 3,
-     "chopper": 3,
-     "tree": 6,
-     "item3": 3,
-     "rock": 9,
-     "tarvat": 2,
+     "brick": 208,
+     "raised": 732,
+     "tree": 7,
      "item1": 2,
      "item2": 2,
-     "marble": 2,
-     "watervat": 1
+     "item4": 3,
+     "tarvat": 2,
+     "item3": 2,
+     "watervat": 2,
+     "marble": 3
     },
     "coins": 0,
     "robots": 0
    },
    "play": {
     "cleared": 0,
-    "caught": 8,
+    "caught": 10,
     "stuck": 0,
     "ranOn": 0,
     "medianTurns": null,
-    "medianLived": 84,
-    "shortest": 32,
-    "longest": 459,
+    "medianLived": 23,
+    "shortest": 10,
+    "longest": 138,
     "why": {
-     "caught": 8
+     "caught": 10
     },
     "winRate": 0
    }
@@ -1084,38 +1068,35 @@
     "kinds": {
      "spider": 1,
      "fly": 1,
-     "wasp": 1
+     "beetle": 1
     },
-    "bricks": 140,
+    "bricks": 142,
     "stuff": {
-     "brick": 188,
-     "raised": 610,
+     "brick": 174,
+     "raised": 731,
      "marble": 5,
-     "tarvat": 1,
-     "tree": 7,
-     "item2": 2,
-     "item3": 3,
-     "rock": 13,
      "item1": 2,
-     "chopper": 3,
+     "tree": 11,
      "item4": 3,
-     "watervat": 2
+     "watervat": 2,
+     "tarvat": 1,
+     "item2": 2,
+     "item3": 3
     },
     "coins": 0,
     "robots": 0
    },
    "play": {
     "cleared": 0,
-    "caught": 7,
+    "caught": 10,
     "stuck": 0,
-    "ranOn": 1,
+    "ranOn": 0,
     "medianTurns": null,
-    "medianLived": 32,
-    "shortest": 10,
-    "longest": 1200,
+    "medianLived": 48,
+    "shortest": 14,
+    "longest": 62,
     "why": {
-     "ran on": 1,
-     "caught": 7
+     "caught": 10
     },
     "winRate": 0
    }
@@ -1125,239 +1106,21 @@
    "plan": {
     "monsters": 3,
     "kinds": {
-     "beetle": 1,
-     "spider": 1,
-     "fly": 1
-    },
-    "bricks": 138,
-    "stuff": {
-     "brick": 186,
-     "raised": 338,
-     "tarvat": 1,
-     "tree": 12,
-     "item4": 3,
-     "rock": 3,
-     "marble": 3,
-     "item2": 2,
-     "watervat": 1,
-     "item3": 2,
-     "item1": 2,
-     "chopper": 2
-    },
-    "coins": 0,
-    "robots": 0
-   },
-   "play": {
-    "cleared": 0,
-    "caught": 8,
-    "stuck": 0,
-    "ranOn": 0,
-    "medianTurns": null,
-    "medianLived": 86,
-    "shortest": 14,
-    "longest": 424,
-    "why": {
-     "caught": 8
-    },
-    "winRate": 0
-   }
-  },
-  {
-   "F": 31,
-   "plan": {
-    "monsters": 4,
-    "kinds": {
-     "wasp": 1,
-     "beetle": 1,
-     "spider": 1,
-     "fly": 1
-    },
-    "bricks": 158,
-    "stuff": {
-     "brick": 206,
-     "raised": 609,
-     "chopper": 2,
-     "tree": 12,
-     "rock": 7,
-     "item3": 2,
-     "item2": 2,
-     "item4": 2,
-     "tarvat": 1,
-     "item1": 2,
-     "watervat": 1,
-     "marble": 3
-    },
-    "coins": 0,
-    "robots": 0
-   },
-   "play": {
-    "cleared": 0,
-    "caught": 8,
-    "stuck": 0,
-    "ranOn": 0,
-    "medianTurns": null,
-    "medianLived": 60,
-    "shortest": 8,
-    "longest": 166,
-    "why": {
-     "caught": 8
-    },
-    "winRate": 0
-   }
-  },
-  {
-   "F": 32,
-   "plan": {
-    "monsters": 4,
-    "kinds": {
-     "fly": 1,
-     "wasp": 1,
-     "beetle": 1,
-     "spider": 1
-    },
-    "bricks": 156,
-    "stuff": {
-     "brick": 188,
-     "raised": 596,
-     "item4": 4,
-     "tree": 7,
-     "chopper": 4,
-     "marble": 4,
-     "item2": 2,
-     "rock": 6,
-     "watervat": 1,
-     "item3": 2,
-     "tarvat": 1,
-     "item1": 2
-    },
-    "coins": 0,
-    "robots": 0
-   },
-   "play": {
-    "cleared": 0,
-    "caught": 8,
-    "stuck": 0,
-    "ranOn": 0,
-    "medianTurns": null,
-    "medianLived": 52,
-    "shortest": 8,
-    "longest": 144,
-    "why": {
-     "caught": 8
-    },
-    "winRate": 0
-   }
-  },
-  {
-   "F": 33,
-   "plan": {
-    "monsters": 4,
-    "kinds": {
      "spider": 1,
      "fly": 1,
-     "wasp": 1,
      "beetle": 1
     },
-    "bricks": 154,
+    "bricks": 140,
     "stuff": {
-     "brick": 218,
-     "raised": 632,
-     "rock": 13,
-     "marble": 5,
-     "tree": 8,
-     "item4": 3,
-     "tarvat": 2,
-     "watervat": 2,
-     "item2": 2,
-     "item1": 2,
-     "chopper": 3,
-     "item3": 2
-    },
-    "coins": 0,
-    "robots": 0
-   },
-   "play": {
-    "cleared": 0,
-    "caught": 8,
-    "stuck": 0,
-    "ranOn": 0,
-    "medianTurns": null,
-    "medianLived": 64,
-    "shortest": 13,
-    "longest": 302,
-    "why": {
-     "caught": 8
-    },
-    "winRate": 0
-   }
-  },
-  {
-   "F": 34,
-   "plan": {
-    "monsters": 4,
-    "kinds": {
-     "beetle": 1,
-     "spider": 1,
-     "fly": 1,
-     "wasp": 1
-    },
-    "bricks": 152,
-    "stuff": {
-     "brick": 184,
-     "item4": 4,
+     "brick": 188,
+     "raised": 710,
      "marble": 3,
-     "raised": 686,
-     "tarvat": 1,
-     "rock": 11,
-     "tree": 8,
-     "chopper": 3,
-     "item2": 2,
-     "watervat": 1,
-     "item3": 3,
-     "item1": 2
-    },
-    "coins": 0,
-    "robots": 0
-   },
-   "play": {
-    "cleared": 0,
-    "caught": 7,
-    "stuck": 0,
-    "ranOn": 1,
-    "medianTurns": null,
-    "medianLived": 136,
-    "shortest": 36,
-    "longest": 1200,
-    "why": {
-     "ran on": 1,
-     "caught": 7
-    },
-    "winRate": 0
-   }
-  },
-  {
-   "F": 35,
-   "plan": {
-    "monsters": 4,
-    "kinds": {
-     "wasp": 1,
-     "beetle": 1,
-     "spider": 1,
-     "fly": 1
-    },
-    "bricks": 150,
-    "stuff": {
-     "brick": 214,
      "item4": 3,
+     "tree": 6,
+     "item3": 2,
      "item1": 2,
-     "marble": 2,
-     "rock": 10,
-     "raised": 454,
-     "chopper": 2,
-     "tree": 9,
      "watervat": 1,
-     "tarvat": 2,
-     "item3": 3,
+     "tarvat": 1,
      "item2": 2
     },
     "coins": 0,
@@ -1365,15 +1128,219 @@
    },
    "play": {
     "cleared": 0,
-    "caught": 8,
+    "caught": 10,
     "stuck": 0,
     "ranOn": 0,
     "medianTurns": null,
-    "medianLived": 80,
+    "medianLived": 23,
     "shortest": 8,
-    "longest": 240,
+    "longest": 49,
     "why": {
-     "caught": 8
+     "caught": 10
+    },
+    "winRate": 0
+   }
+  },
+  {
+   "F": 31,
+   "plan": {
+    "monsters": 2,
+    "kinds": {
+     "beetle": 1,
+     "wasp": 1
+    },
+    "bricks": 84,
+    "stuff": {
+     "brick": 116,
+     "raised": 204,
+     "watervat": 1,
+     "tree": 11,
+     "marble": 3,
+     "item2": 2,
+     "chopper": 3,
+     "item3": 2,
+     "item4": 3,
+     "item1": 2,
+     "tarvat": 1
+    },
+    "coins": 0,
+    "robots": 0
+   },
+   "play": {
+    "cleared": 1,
+    "caught": 9,
+    "stuck": 0,
+    "ranOn": 0,
+    "medianTurns": 32,
+    "medianLived": 38,
+    "shortest": 8,
+    "longest": 249,
+    "why": {
+     "caught": 9,
+     "cleared": 1
+    },
+    "winRate": 0.1
+   }
+  },
+  {
+   "F": 32,
+   "plan": {
+    "monsters": 2,
+    "kinds": {
+     "beetle": 1,
+     "wasp": 1
+    },
+    "bricks": 83,
+    "stuff": {
+     "brick": 147,
+     "raised": 486,
+     "watervat": 2,
+     "item1": 2,
+     "chopper": 4,
+     "tree": 6,
+     "item4": 4,
+     "tarvat": 2,
+     "item2": 2,
+     "marble": 3,
+     "item3": 2
+    },
+    "coins": 0,
+    "robots": 0
+   },
+   "play": {
+    "cleared": 0,
+    "caught": 10,
+    "stuck": 0,
+    "ranOn": 0,
+    "medianTurns": null,
+    "medianLived": 113,
+    "shortest": 24,
+    "longest": 359,
+    "why": {
+     "caught": 10
+    },
+    "winRate": 0
+   }
+  },
+  {
+   "F": 33,
+   "plan": {
+    "monsters": 3,
+    "kinds": {
+     "beetle": 1,
+     "wasp": 1,
+     "fly": 1
+    },
+    "bricks": 95,
+    "stuff": {
+     "brick": 143,
+     "raised": 427,
+     "marble": 5,
+     "tree": 11,
+     "item4": 4,
+     "tarvat": 2,
+     "watervat": 2,
+     "item1": 2,
+     "chopper": 3,
+     "item3": 2,
+     "item2": 2
+    },
+    "coins": 0,
+    "robots": 0
+   },
+   "play": {
+    "cleared": 0,
+    "caught": 10,
+    "stuck": 0,
+    "ranOn": 0,
+    "medianTurns": null,
+    "medianLived": 56,
+    "shortest": 18,
+    "longest": 215,
+    "why": {
+     "caught": 10
+    },
+    "winRate": 0
+   }
+  },
+  {
+   "F": 34,
+   "plan": {
+    "monsters": 3,
+    "kinds": {
+     "beetle": 1,
+     "wasp": 1,
+     "fly": 1
+    },
+    "bricks": 94,
+    "stuff": {
+     "brick": 126,
+     "chopper": 4,
+     "raised": 686,
+     "marble": 5,
+     "tree": 8,
+     "item3": 2,
+     "item4": 4,
+     "item2": 2,
+     "tarvat": 1,
+     "watervat": 2,
+     "item1": 2
+    },
+    "coins": 0,
+    "robots": 0
+   },
+   "play": {
+    "cleared": 0,
+    "caught": 10,
+    "stuck": 0,
+    "ranOn": 0,
+    "medianTurns": null,
+    "medianLived": 57,
+    "shortest": 21,
+    "longest": 200,
+    "why": {
+     "caught": 10
+    },
+    "winRate": 0
+   }
+  },
+  {
+   "F": 35,
+   "plan": {
+    "monsters": 3,
+    "kinds": {
+     "beetle": 1,
+     "wasp": 1,
+     "fly": 1
+    },
+    "bricks": 93,
+    "stuff": {
+     "brick": 141,
+     "chopper": 4,
+     "item2": 2,
+     "marble": 4,
+     "item3": 3,
+     "item1": 2,
+     "raised": 429,
+     "item4": 3,
+     "tree": 10,
+     "watervat": 1,
+     "tarvat": 2
+    },
+    "coins": 0,
+    "robots": 0
+   },
+   "play": {
+    "cleared": 0,
+    "caught": 10,
+    "stuck": 0,
+    "ranOn": 0,
+    "medianTurns": null,
+    "medianLived": 55,
+    "shortest": 10,
+    "longest": 572,
+    "why": {
+     "caught": 10
     },
     "winRate": 0
    }
@@ -1383,41 +1350,39 @@
    "plan": {
     "monsters": 4,
     "kinds": {
-     "fly": 1,
-     "wasp": 1,
      "beetle": 1,
+     "wasp": 1,
+     "fly": 1,
      "spider": 1
     },
-    "bricks": 148,
+    "bricks": 105,
     "stuff": {
-     "brick": 196,
-     "raised": 621,
-     "item2": 2,
-     "tree": 11,
-     "tarvat": 1,
-     "watervat": 2,
-     "marble": 5,
+     "brick": 153,
+     "raised": 286,
      "item1": 2,
-     "chopper": 4,
-     "item4": 3,
-     "rock": 3,
-     "item3": 2
+     "item4": 4,
+     "chopper": 2,
+     "watervat": 2,
+     "marble": 4,
+     "tarvat": 1,
+     "item3": 2,
+     "tree": 6,
+     "item2": 2
     },
     "coins": 0,
     "robots": 0
    },
    "play": {
     "cleared": 0,
-    "caught": 7,
+    "caught": 10,
     "stuck": 0,
-    "ranOn": 1,
+    "ranOn": 0,
     "medianTurns": null,
-    "medianLived": 52,
-    "shortest": 7,
-    "longest": 1200,
+    "medianLived": 44,
+    "shortest": 17,
+    "longest": 104,
     "why": {
-     "caught": 7,
-     "ran on": 1
+     "caught": 10
     },
     "winRate": 0
    }
@@ -1427,40 +1392,39 @@
    "plan": {
     "monsters": 4,
     "kinds": {
-     "spider": 1,
-     "fly": 1,
+     "beetle": 1,
      "wasp": 1,
-     "beetle": 1
+     "fly": 1,
+     "spider": 1
     },
-    "bricks": 146,
+    "bricks": 104,
     "stuff": {
-     "brick": 194,
-     "raised": 414,
-     "tree": 6,
-     "rock": 11,
-     "marble": 3,
-     "item3": 2,
-     "chopper": 2,
-     "item1": 2,
-     "tarvat": 2,
-     "item4": 2,
+     "brick": 152,
      "item2": 2,
-     "watervat": 2
+     "raised": 146,
+     "tree": 11,
+     "item3": 3,
+     "item1": 2,
+     "item4": 3,
+     "watervat": 2,
+     "tarvat": 1,
+     "marble": 4,
+     "chopper": 4
     },
     "coins": 0,
     "robots": 0
    },
    "play": {
     "cleared": 0,
-    "caught": 8,
+    "caught": 10,
     "stuck": 0,
     "ranOn": 0,
     "medianTurns": null,
-    "medianLived": 174,
-    "shortest": 8,
-    "longest": 623,
+    "medianLived": 30,
+    "shortest": 14,
+    "longest": 343,
     "why": {
-     "caught": 8
+     "caught": 10
     },
     "winRate": 0
    }
@@ -1471,39 +1435,38 @@
     "monsters": 4,
     "kinds": {
      "beetle": 1,
-     "spider": 1,
+     "wasp": 1,
      "fly": 1,
-     "wasp": 1
+     "spider": 1
     },
-    "bricks": 144,
+    "bricks": 103,
     "stuff": {
-     "brick": 208,
-     "raised": 520,
-     "rock": 6,
+     "brick": 151,
+     "raised": 475,
      "tree": 6,
-     "chopper": 3,
-     "item3": 2,
-     "item2": 2,
-     "tarvat": 2,
+     "marble": 5,
+     "item3": 3,
+     "watervat": 2,
      "item1": 2,
-     "item4": 4,
-     "marble": 2,
-     "watervat": 2
+     "chopper": 4,
+     "item2": 2,
+     "tarvat": 1,
+     "item4": 2
     },
     "coins": 0,
     "robots": 0
    },
    "play": {
     "cleared": 0,
-    "caught": 8,
+    "caught": 10,
     "stuck": 0,
     "ranOn": 0,
     "medianTurns": null,
-    "medianLived": 24,
+    "medianLived": 52,
     "shortest": 8,
-    "longest": 170,
+    "longest": 159,
     "why": {
-     "caught": 8
+     "caught": 10
     },
     "winRate": 0
    }
@@ -1511,42 +1474,42 @@
   {
    "F": 39,
    "plan": {
-    "monsters": 4,
+    "monsters": 5,
     "kinds": {
-     "wasp": 1,
      "beetle": 1,
+     "wasp": 1,
+     "fly": 1,
      "spider": 1,
-     "fly": 1
+     "snake": 1
     },
-    "bricks": 142,
+    "bricks": 116,
     "stuff": {
-     "brick": 206,
-     "raised": 555,
-     "tree": 10,
-     "item3": 2,
+     "brick": 148,
+     "raised": 513,
+     "tree": 12,
+     "item3": 3,
      "item4": 3,
-     "rock": 3,
-     "chopper": 3,
      "item1": 2,
+     "chopper": 3,
+     "item2": 2,
      "tarvat": 2,
      "watervat": 1,
-     "item2": 2,
-     "marble": 3
+     "marble": 4
     },
     "coins": 0,
     "robots": 0
    },
    "play": {
     "cleared": 0,
-    "caught": 8,
+    "caught": 10,
     "stuck": 0,
     "ranOn": 0,
     "medianTurns": null,
-    "medianLived": 37,
+    "medianLived": 25,
     "shortest": 7,
-    "longest": 90,
+    "longest": 196,
     "why": {
-     "caught": 8
+     "caught": 10
     },
     "winRate": 0
    }
@@ -1554,42 +1517,42 @@
   {
    "F": 40,
    "plan": {
-    "monsters": 4,
+    "monsters": 5,
     "kinds": {
-     "fly": 1,
-     "wasp": 1,
      "beetle": 1,
-     "spider": 1
+     "wasp": 1,
+     "fly": 1,
+     "spider": 1,
+     "snake": 1
     },
-    "bricks": 140,
+    "bricks": 114,
     "stuff": {
-     "brick": 188,
-     "raised": 567,
-     "marble": 2,
-     "item2": 2,
-     "tree": 9,
-     "rock": 11,
-     "chopper": 3,
+     "brick": 178,
+     "raised": 545,
+     "marble": 5,
+     "item1": 2,
+     "tree": 11,
+     "chopper": 4,
+     "item4": 4,
      "item3": 2,
      "watervat": 1,
      "tarvat": 1,
-     "item4": 3,
-     "item1": 2
+     "item2": 2
     },
     "coins": 0,
     "robots": 0
    },
    "play": {
     "cleared": 0,
-    "caught": 8,
+    "caught": 10,
     "stuck": 0,
     "ranOn": 0,
     "medianTurns": null,
-    "medianLived": 36,
-    "shortest": 22,
-    "longest": 108,
+    "medianLived": 24,
+    "shortest": 4,
+    "longest": 260,
     "why": {
-     "caught": 8
+     "caught": 10
     },
     "winRate": 0
    }
@@ -1597,42 +1560,39 @@
   {
    "F": 41,
    "plan": {
-    "monsters": 4,
+    "monsters": 2,
     "kinds": {
-     "spider": 1,
-     "fly": 1,
-     "wasp": 1,
-     "beetle": 1
+     "snake": 1,
+     "spider": 1
     },
-    "bricks": 138,
+    "bricks": 126,
     "stuff": {
-     "brick": 186,
-     "raised": 374,
-     "chopper": 2,
-     "marble": 3,
-     "tree": 9,
-     "tarvat": 1,
-     "item4": 2,
-     "item1": 2,
-     "rock": 5,
+     "brick": 158,
+     "raised": 580,
      "item2": 2,
-     "item3": 3,
-     "watervat": 1
+     "chopper": 2,
+     "tarvat": 2,
+     "watervat": 2,
+     "rock": 6,
+     "item3": 2,
+     "marble": 2,
+     "item1": 2,
+     "item4": 4
     },
     "coins": 0,
     "robots": 0
    },
    "play": {
     "cleared": 0,
-    "caught": 7,
+    "caught": 9,
     "stuck": 0,
     "ranOn": 1,
     "medianTurns": null,
-    "medianLived": 82,
-    "shortest": 25,
+    "medianLived": 58,
+    "shortest": 6,
     "longest": 1200,
     "why": {
-     "caught": 7,
+     "caught": 9,
      "ran on": 1
     },
     "winRate": 0
@@ -1641,112 +1601,64 @@
   {
    "F": 42,
    "plan": {
-    "monsters": 4,
+    "monsters": 2,
     "kinds": {
-     "beetle": 1,
-     "spider": 1,
-     "fly": 1,
-     "wasp": 1
+     "snake": 1,
+     "spider": 1
     },
-    "bricks": 136,
+    "bricks": 124,
     "stuff": {
-     "brick": 168,
-     "raised": 446,
-     "tree": 12,
-     "marble": 3,
+     "brick": 172,
+     "raised": 715,
      "item2": 2,
-     "item4": 4,
-     "rock": 11,
-     "item1": 2,
+     "chopper": 3,
+     "watervat": 1,
+     "marble": 2,
      "item3": 2,
-     "chopper": 2,
-     "watervat": 2,
-     "tarvat": 1
+     "tarvat": 1,
+     "item4": 4,
+     "rock": 4,
+     "item1": 2
     },
     "coins": 0,
     "robots": 0
    },
    "play": {
-    "cleared": 0,
+    "cleared": 2,
     "caught": 8,
     "stuck": 0,
     "ranOn": 0,
-    "medianTurns": null,
-    "medianLived": 28,
-    "shortest": 8,
-    "longest": 112,
+    "medianTurns": 39,
+    "medianLived": 31,
+    "shortest": 7,
+    "longest": 357,
     "why": {
-     "caught": 8
+     "caught": 8,
+     "cleared": 2
     },
-    "winRate": 0
+    "winRate": 0.2
    }
   },
   {
    "F": 43,
    "plan": {
-    "monsters": 4,
+    "monsters": 2,
     "kinds": {
-     "wasp": 1,
-     "beetle": 1,
-     "spider": 1,
-     "fly": 1
-    },
-    "bricks": 134,
-    "stuff": {
-     "brick": 182,
-     "raised": 527,
-     "chopper": 4,
-     "rock": 9,
-     "marble": 2,
-     "item3": 3,
-     "tarvat": 2,
-     "item1": 2,
-     "tree": 9,
-     "watervat": 2,
-     "item2": 2,
-     "item4": 2
-    },
-    "coins": 0,
-    "robots": 0
-   },
-   "play": {
-    "cleared": 0,
-    "caught": 8,
-    "stuck": 0,
-    "ranOn": 0,
-    "medianTurns": null,
-    "medianLived": 26,
-    "shortest": 8,
-    "longest": 64,
-    "why": {
-     "caught": 8
-    },
-    "winRate": 0
-   }
-  },
-  {
-   "F": 44,
-   "plan": {
-    "monsters": 4,
-    "kinds": {
-     "fly": 1,
-     "wasp": 1,
-     "beetle": 1,
+     "snake": 1,
      "spider": 1
     },
-    "bricks": 132,
+    "bricks": 122,
     "stuff": {
-     "brick": 180,
-     "raised": 443,
-     "tree": 8,
-     "item4": 3,
-     "rock": 6,
-     "item1": 2,
-     "chopper": 4,
-     "item3": 3,
-     "tarvat": 2,
-     "item2": 2,
+     "brick": 170,
+     "raised": 643,
      "marble": 5,
+     "tarvat": 1,
+     "chopper": 4,
+     "item1": 2,
+     "item2": 2,
+     "item3": 3,
+     "rock": 3,
+     "item4": 2,
      "watervat": 1
     },
     "coins": 0,
@@ -1754,15 +1666,55 @@
    },
    "play": {
     "cleared": 0,
-    "caught": 8,
+    "caught": 10,
     "stuck": 0,
     "ranOn": 0,
     "medianTurns": null,
-    "medianLived": 42,
-    "shortest": 26,
-    "longest": 248,
+    "medianLived": 20,
+    "shortest": 9,
+    "longest": 92,
     "why": {
-     "caught": 8
+     "caught": 10
+    },
+    "winRate": 0
+   }
+  },
+  {
+   "F": 44,
+   "plan": {
+    "monsters": 2,
+    "kinds": {
+     "snake": 1,
+     "spider": 1
+    },
+    "bricks": 120,
+    "stuff": {
+     "brick": 168,
+     "raised": 566,
+     "rock": 10,
+     "marble": 5,
+     "item1": 2,
+     "watervat": 1,
+     "tarvat": 2,
+     "item4": 4,
+     "item2": 2,
+     "item3": 2,
+     "chopper": 2
+    },
+    "coins": 0,
+    "robots": 0
+   },
+   "play": {
+    "cleared": 0,
+    "caught": 10,
+    "stuck": 0,
+    "ranOn": 0,
+    "medianTurns": null,
+    "medianLived": 34,
+    "shortest": 10,
+    "longest": 60,
+    "why": {
+     "caught": 10
     },
     "winRate": 0
    }
@@ -1770,42 +1722,39 @@
   {
    "F": 45,
    "plan": {
-    "monsters": 4,
+    "monsters": 2,
     "kinds": {
-     "spider": 1,
-     "fly": 1,
-     "wasp": 1,
-     "beetle": 1
+     "snake": 1,
+     "spider": 1
     },
-    "bricks": 130,
+    "bricks": 118,
     "stuff": {
-     "brick": 194,
-     "raised": 424,
-     "rock": 8,
-     "tree": 11,
-     "item4": 3,
+     "brick": 182,
+     "raised": 624,
      "tarvat": 2,
+     "rock": 4,
+     "item2": 2,
+     "item4": 3,
      "chopper": 4,
-     "item3": 3,
-     "marble": 5,
-     "item1": 2,
+     "item3": 2,
      "watervat": 2,
-     "item2": 2
+     "marble": 5,
+     "item1": 2
     },
     "coins": 0,
     "robots": 0
    },
    "play": {
     "cleared": 0,
-    "caught": 8,
+    "caught": 10,
     "stuck": 0,
     "ranOn": 0,
     "medianTurns": null,
-    "medianLived": 80,
-    "shortest": 24,
-    "longest": 397,
+    "medianLived": 19,
+    "shortest": 6,
+    "longest": 86,
     "why": {
-     "caught": 8
+     "caught": 10
     },
     "winRate": 0
    }
@@ -1813,26 +1762,24 @@
   {
    "F": 46,
    "plan": {
-    "monsters": 4,
+    "monsters": 3,
     "kinds": {
-     "beetle": 1,
+     "snake": 1,
      "spider": 1,
-     "fly": 1,
-     "wasp": 1
+     "beetle": 1
     },
-    "bricks": 128,
+    "bricks": 130,
     "stuff": {
-     "brick": 176,
-     "raised": 571,
-     "tree": 12,
-     "rock": 11,
-     "marble": 5,
-     "tarvat": 2,
+     "brick": 178,
+     "raised": 739,
+     "marble": 2,
+     "item4": 3,
+     "watervat": 1,
      "item2": 2,
-     "item3": 3,
-     "chopper": 3,
-     "watervat": 2,
-     "item4": 2,
+     "tarvat": 1,
+     "rock": 12,
+     "chopper": 2,
+     "item3": 2,
      "item1": 2
     },
     "coins": 0,
@@ -1840,15 +1787,16 @@
    },
    "play": {
     "cleared": 0,
-    "caught": 8,
+    "caught": 9,
     "stuck": 0,
-    "ranOn": 0,
+    "ranOn": 1,
     "medianTurns": null,
-    "medianLived": 30,
+    "medianLived": 42,
     "shortest": 4,
-    "longest": 114,
+    "longest": 1200,
     "why": {
-     "caught": 8
+     "caught": 9,
+     "ran on": 1
     },
     "winRate": 0
    }
@@ -1856,42 +1804,40 @@
   {
    "F": 47,
    "plan": {
-    "monsters": 4,
+    "monsters": 3,
     "kinds": {
-     "wasp": 1,
-     "beetle": 1,
+     "snake": 1,
      "spider": 1,
-     "fly": 1
+     "beetle": 1
     },
-    "bricks": 126,
+    "bricks": 128,
     "stuff": {
-     "brick": 158,
-     "raised": 722,
-     "tarvat": 1,
-     "rock": 8,
-     "item3": 2,
-     "item2": 2,
-     "item1": 2,
-     "watervat": 1,
-     "tree": 6,
+     "brick": 192,
+     "raised": 746,
      "item4": 3,
+     "rock": 6,
+     "tarvat": 2,
+     "item1": 2,
+     "watervat": 2,
+     "item2": 2,
+     "item3": 3,
      "chopper": 2,
-     "marble": 3
+     "marble": 5
     },
     "coins": 0,
     "robots": 0
    },
    "play": {
     "cleared": 0,
-    "caught": 8,
+    "caught": 10,
     "stuck": 0,
     "ranOn": 0,
     "medianTurns": null,
-    "medianLived": 29,
-    "shortest": 12,
-    "longest": 92,
+    "medianLived": 68,
+    "shortest": 11,
+    "longest": 404,
     "why": {
-     "caught": 8
+     "caught": 10
     },
     "winRate": 0
    }
@@ -1899,42 +1845,40 @@
   {
    "F": 48,
    "plan": {
-    "monsters": 4,
+    "monsters": 3,
     "kinds": {
-     "fly": 1,
-     "wasp": 1,
-     "beetle": 1,
-     "spider": 1
+     "snake": 1,
+     "spider": 1,
+     "beetle": 1
     },
-    "bricks": 124,
+    "bricks": 126,
     "stuff": {
-     "brick": 188,
-     "raised": 547,
-     "item4": 4,
-     "rock": 9,
+     "brick": 158,
+     "raised": 653,
+     "watervat": 2,
      "item1": 2,
-     "tree": 12,
      "item3": 3,
-     "watervat": 1,
-     "tarvat": 2,
-     "item2": 2,
-     "chopper": 3,
-     "marble": 3
+     "item4": 2,
+     "rock": 7,
+     "tarvat": 1,
+     "chopper": 2,
+     "marble": 4,
+     "item2": 2
     },
     "coins": 0,
     "robots": 0
    },
    "play": {
     "cleared": 0,
-    "caught": 8,
+    "caught": 10,
     "stuck": 0,
     "ranOn": 0,
     "medianTurns": null,
-    "medianLived": 35,
-    "shortest": 19,
-    "longest": 84,
+    "medianLived": 25,
+    "shortest": 11,
+    "longest": 201,
     "why": {
-     "caught": 8
+     "caught": 10
     },
     "winRate": 0
    }
@@ -1942,26 +1886,24 @@
   {
    "F": 49,
    "plan": {
-    "monsters": 4,
+    "monsters": 3,
     "kinds": {
+     "snake": 1,
      "spider": 1,
-     "fly": 1,
-     "wasp": 1,
      "beetle": 1
     },
-    "bricks": 122,
+    "bricks": 124,
     "stuff": {
-     "brick": 170,
-     "raised": 698,
-     "tarvat": 1,
+     "brick": 156,
+     "raised": 721,
+     "marble": 4,
+     "item3": 3,
+     "rock": 12,
      "watervat": 2,
-     "marble": 2,
-     "tree": 8,
-     "rock": 5,
-     "item3": 2,
      "item2": 2,
-     "chopper": 3,
-     "item4": 2,
+     "item4": 3,
+     "chopper": 2,
+     "tarvat": 1,
      "item1": 2
     },
     "coins": 0,
@@ -1969,15 +1911,15 @@
    },
    "play": {
     "cleared": 0,
-    "caught": 8,
+    "caught": 10,
     "stuck": 0,
     "ranOn": 0,
     "medianTurns": null,
-    "medianLived": 61,
-    "shortest": 34,
-    "longest": 122,
+    "medianLived": 30,
+    "shortest": 12,
+    "longest": 348,
     "why": {
-     "caught": 8
+     "caught": 10
     },
     "winRate": 0
    }
@@ -1985,42 +1927,40 @@
   {
    "F": 50,
    "plan": {
-    "monsters": 4,
+    "monsters": 3,
     "kinds": {
-     "beetle": 1,
+     "snake": 1,
      "spider": 1,
-     "fly": 1,
-     "wasp": 1
+     "beetle": 1
     },
     "bricks": 122,
     "stuff": {
      "brick": 170,
-     "raised": 635,
-     "tree": 7,
-     "marble": 5,
-     "tarvat": 2,
+     "raised": 671,
+     "rock": 6,
+     "chopper": 4,
      "item2": 2,
-     "watervat": 2,
+     "item4": 3,
      "item3": 2,
-     "chopper": 3,
-     "rock": 12,
-     "item4": 2,
-     "item1": 2
+     "item1": 2,
+     "watervat": 2,
+     "tarvat": 1,
+     "marble": 3
     },
     "coins": 0,
     "robots": 0
    },
    "play": {
     "cleared": 0,
-    "caught": 8,
+    "caught": 10,
     "stuck": 0,
     "ranOn": 0,
     "medianTurns": null,
-    "medianLived": 38,
-    "shortest": 17,
-    "longest": 182,
+    "medianLived": 23,
+    "shortest": 11,
+    "longest": 116,
     "why": {
-     "caught": 8
+     "caught": 10
     },
     "winRate": 0
    }
@@ -2028,26 +1968,21 @@
   {
    "F": 51,
    "plan": {
-    "monsters": 4,
+    "monsters": 2,
     "kinds": {
      "wasp": 1,
-     "beetle": 1,
-     "spider": 1,
-     "fly": 1
+     "beetle": 1
     },
-    "bricks": 122,
+    "bricks": 74,
     "stuff": {
-     "brick": 170,
-     "raised": 718,
+     "brick": 74,
+     "raised": 682,
+     "item3": 2,
+     "marble": 5,
+     "rock": 6,
      "chopper": 4,
      "item2": 2,
-     "marble": 3,
-     "tarvat": 2,
-     "tree": 11,
-     "item3": 2,
-     "item4": 2,
-     "rock": 5,
-     "watervat": 1,
+     "item4": 4,
      "item1": 2
     },
     "coins": 0,
@@ -2055,15 +1990,15 @@
    },
    "play": {
     "cleared": 0,
-    "caught": 8,
+    "caught": 10,
     "stuck": 0,
     "ranOn": 0,
     "medianTurns": null,
-    "medianLived": 44,
-    "shortest": 10,
-    "longest": 351,
+    "medianLived": 96,
+    "shortest": 31,
+    "longest": 328,
     "why": {
-     "caught": 8
+     "caught": 10
     },
     "winRate": 0
    }
@@ -2071,42 +2006,37 @@
   {
    "F": 52,
    "plan": {
-    "monsters": 4,
+    "monsters": 2,
     "kinds": {
-     "fly": 1,
      "wasp": 1,
-     "beetle": 1,
-     "spider": 1
+     "beetle": 1
     },
-    "bricks": 122,
+    "bricks": 73,
     "stuff": {
-     "brick": 170,
-     "raised": 634,
-     "item2": 2,
-     "item1": 2,
-     "watervat": 2,
-     "tarvat": 2,
-     "rock": 10,
-     "item3": 3,
-     "marble": 3,
-     "item4": 3,
+     "brick": 73,
+     "raised": 582,
      "chopper": 3,
-     "tree": 7
+     "item1": 2,
+     "rock": 4,
+     "item3": 2,
+     "item4": 4,
+     "marble": 5,
+     "item2": 2
     },
     "coins": 0,
     "robots": 0
    },
    "play": {
     "cleared": 0,
-    "caught": 8,
+    "caught": 10,
     "stuck": 0,
     "ranOn": 0,
     "medianTurns": null,
-    "medianLived": 77,
-    "shortest": 11,
-    "longest": 200,
+    "medianLived": 91,
+    "shortest": 17,
+    "longest": 189,
     "why": {
-     "caught": 8
+     "caught": 10
     },
     "winRate": 0
    }
@@ -2114,42 +2044,38 @@
   {
    "F": 53,
    "plan": {
-    "monsters": 4,
+    "monsters": 3,
     "kinds": {
-     "spider": 1,
-     "fly": 1,
      "wasp": 1,
-     "beetle": 1
+     "beetle": 1,
+     "fly": 1
     },
-    "bricks": 122,
+    "bricks": 86,
     "stuff": {
-     "brick": 186,
-     "raised": 547,
-     "tree": 11,
+     "brick": 86,
+     "raised": 542,
+     "rock": 7,
      "item2": 2,
-     "marble": 4,
-     "rock": 3,
-     "tarvat": 1,
-     "watervat": 2,
-     "item1": 2,
-     "chopper": 2,
      "item3": 2,
-     "item4": 2
+     "item4": 4,
+     "marble": 3,
+     "chopper": 3,
+     "item1": 2
     },
     "coins": 0,
     "robots": 0
    },
    "play": {
     "cleared": 0,
-    "caught": 8,
+    "caught": 10,
     "stuck": 0,
     "ranOn": 0,
     "medianTurns": null,
-    "medianLived": 40,
-    "shortest": 12,
-    "longest": 90,
+    "medianLived": 77,
+    "shortest": 17,
+    "longest": 97,
     "why": {
-     "caught": 8
+     "caught": 10
     },
     "winRate": 0
    }
@@ -2157,42 +2083,38 @@
   {
    "F": 54,
    "plan": {
-    "monsters": 4,
+    "monsters": 3,
     "kinds": {
+     "wasp": 1,
      "beetle": 1,
-     "spider": 1,
-     "fly": 1,
-     "wasp": 1
+     "fly": 1
     },
-    "bricks": 122,
+    "bricks": 85,
     "stuff": {
-     "brick": 170,
      "raised": 630,
-     "chopper": 4,
-     "tree": 6,
-     "watervat": 2,
-     "marble": 2,
-     "rock": 10,
-     "item3": 3,
+     "brick": 85,
+     "rock": 8,
+     "item4": 2,
      "item1": 2,
      "item2": 2,
-     "tarvat": 2,
-     "item4": 3
+     "chopper": 4,
+     "item3": 2,
+     "marble": 4
     },
     "coins": 0,
     "robots": 0
    },
    "play": {
     "cleared": 0,
-    "caught": 8,
+    "caught": 10,
     "stuck": 0,
     "ranOn": 0,
     "medianTurns": null,
-    "medianLived": 29,
-    "shortest": 13,
-    "longest": 44,
+    "medianLived": 85,
+    "shortest": 24,
+    "longest": 243,
     "why": {
-     "caught": 8
+     "caught": 10
     },
     "winRate": 0
    }
@@ -2200,42 +2122,38 @@
   {
    "F": 55,
    "plan": {
-    "monsters": 4,
+    "monsters": 3,
     "kinds": {
      "wasp": 1,
      "beetle": 1,
-     "spider": 1,
      "fly": 1
     },
-    "bricks": 122,
+    "bricks": 83,
     "stuff": {
-     "brick": 186,
-     "raised": 737,
-     "marble": 5,
-     "rock": 6,
-     "item2": 2,
-     "tree": 9,
-     "item3": 3,
-     "item4": 4,
+     "brick": 83,
+     "raised": 603,
+     "marble": 3,
+     "chopper": 4,
+     "item3": 2,
+     "rock": 4,
      "item1": 2,
-     "chopper": 3,
-     "tarvat": 2,
-     "watervat": 2
+     "item4": 3,
+     "item2": 2
     },
     "coins": 0,
     "robots": 0
    },
    "play": {
     "cleared": 0,
-    "caught": 8,
+    "caught": 10,
     "stuck": 0,
     "ranOn": 0,
     "medianTurns": null,
-    "medianLived": 42,
-    "shortest": 20,
-    "longest": 200,
+    "medianLived": 91,
+    "shortest": 27,
+    "longest": 467,
     "why": {
-     "caught": 8
+     "caught": 10
     },
     "winRate": 0
    }
@@ -2245,40 +2163,37 @@
    "plan": {
     "monsters": 4,
     "kinds": {
-     "fly": 1,
      "wasp": 1,
      "beetle": 1,
+     "fly": 1,
      "spider": 1
     },
-    "bricks": 122,
+    "bricks": 96,
     "stuff": {
-     "brick": 186,
-     "watervat": 2,
-     "tarvat": 2,
-     "raised": 526,
-     "item1": 2,
-     "marble": 2,
-     "item4": 2,
-     "tree": 9,
-     "item2": 2,
-     "rock": 7,
+     "brick": 96,
+     "marble": 5,
+     "raised": 388,
+     "chopper": 4,
      "item3": 2,
-     "chopper": 2
+     "rock": 7,
+     "item4": 3,
+     "item2": 2,
+     "item1": 2
     },
     "coins": 0,
     "robots": 0
    },
    "play": {
     "cleared": 0,
-    "caught": 8,
+    "caught": 10,
     "stuck": 0,
     "ranOn": 0,
     "medianTurns": null,
-    "medianLived": 90,
-    "shortest": 18,
-    "longest": 140,
+    "medianLived": 72,
+    "shortest": 9,
+    "longest": 328,
     "why": {
-     "caught": 8
+     "caught": 10
     },
     "winRate": 0
    }
@@ -2288,40 +2203,37 @@
    "plan": {
     "monsters": 4,
     "kinds": {
-     "spider": 1,
-     "fly": 1,
      "wasp": 1,
-     "beetle": 1
+     "beetle": 1,
+     "fly": 1,
+     "spider": 1
     },
-    "bricks": 122,
+    "bricks": 95,
     "stuff": {
-     "brick": 170,
-     "raised": 688,
-     "marble": 5,
-     "tree": 6,
-     "chopper": 4,
-     "item2": 2,
-     "tarvat": 1,
-     "item4": 4,
-     "watervat": 1,
+     "brick": 95,
+     "raised": 638,
+     "marble": 4,
      "item3": 3,
-     "rock": 3,
-     "item1": 2
+     "item1": 2,
+     "rock": 6,
+     "chopper": 2,
+     "item4": 4,
+     "item2": 2
     },
     "coins": 0,
     "robots": 0
    },
    "play": {
     "cleared": 0,
-    "caught": 8,
+    "caught": 10,
     "stuck": 0,
     "ranOn": 0,
     "medianTurns": null,
-    "medianLived": 52,
-    "shortest": 16,
-    "longest": 206,
+    "medianLived": 43,
+    "shortest": 11,
+    "longest": 223,
     "why": {
-     "caught": 8
+     "caught": 10
     },
     "winRate": 0
    }
@@ -2331,40 +2243,37 @@
    "plan": {
     "monsters": 4,
     "kinds": {
+     "wasp": 1,
      "beetle": 1,
-     "spider": 1,
      "fly": 1,
-     "wasp": 1
+     "spider": 1
     },
-    "bricks": 122,
+    "bricks": 94,
     "stuff": {
-     "brick": 170,
-     "raised": 589,
-     "rock": 10,
-     "tree": 9,
-     "item4": 4,
-     "item2": 2,
-     "watervat": 1,
-     "item3": 2,
+     "brick": 94,
+     "raised": 581,
+     "item3": 3,
      "chopper": 3,
+     "rock": 5,
+     "item4": 4,
+     "marble": 4,
      "item1": 2,
-     "tarvat": 1,
-     "marble": 2
+     "item2": 2
     },
     "coins": 0,
     "robots": 0
    },
    "play": {
     "cleared": 0,
-    "caught": 8,
+    "caught": 10,
     "stuck": 0,
     "ranOn": 0,
     "medianTurns": null,
-    "medianLived": 76,
-    "shortest": 15,
-    "longest": 184,
+    "medianLived": 36,
+    "shortest": 12,
+    "longest": 142,
     "why": {
-     "caught": 8
+     "caught": 10
     },
     "winRate": 0
    }
@@ -2372,42 +2281,40 @@
   {
    "F": 59,
    "plan": {
-    "monsters": 4,
+    "monsters": 5,
     "kinds": {
      "wasp": 1,
      "beetle": 1,
+     "fly": 1,
      "spider": 1,
-     "fly": 1
+     "snake": 1
     },
-    "bricks": 122,
+    "bricks": 107,
     "stuff": {
-     "brick": 186,
+     "rock": 10,
+     "brick": 107,
      "marble": 4,
-     "raised": 554,
-     "tree": 12,
-     "watervat": 2,
-     "rock": 8,
-     "chopper": 4,
-     "item2": 2,
+     "chopper": 2,
+     "raised": 541,
+     "item1": 2,
      "item4": 2,
      "item3": 2,
-     "item1": 2,
-     "tarvat": 1
+     "item2": 2
     },
     "coins": 0,
     "robots": 0
    },
    "play": {
     "cleared": 0,
-    "caught": 8,
+    "caught": 10,
     "stuck": 0,
     "ranOn": 0,
     "medianTurns": null,
-    "medianLived": 63,
-    "shortest": 6,
-    "longest": 137,
+    "medianLived": 20,
+    "shortest": 4,
+    "longest": 39,
     "why": {
-     "caught": 8
+     "caught": 10
     },
     "winRate": 0
    }
@@ -2415,42 +2322,40 @@
   {
    "F": 60,
    "plan": {
-    "monsters": 4,
+    "monsters": 5,
     "kinds": {
-     "fly": 1,
      "wasp": 1,
      "beetle": 1,
-     "spider": 1
+     "fly": 1,
+     "spider": 1,
+     "snake": 1
     },
-    "bricks": 122,
+    "bricks": 106,
     "stuff": {
-     "brick": 170,
-     "raised": 596,
-     "watervat": 2,
-     "tree": 10,
-     "marble": 4,
+     "brick": 106,
+     "raised": 423,
      "item2": 2,
-     "tarvat": 2,
-     "chopper": 4,
-     "rock": 9,
-     "item4": 2,
-     "item3": 2,
-     "item1": 2
+     "marble": 3,
+     "rock": 10,
+     "item3": 3,
+     "chopper": 3,
+     "item1": 2,
+     "item4": 2
     },
     "coins": 0,
     "robots": 0
    },
    "play": {
     "cleared": 0,
-    "caught": 8,
+    "caught": 10,
     "stuck": 0,
     "ranOn": 0,
     "medianTurns": null,
-    "medianLived": 41,
-    "shortest": 6,
-    "longest": 88,
+    "medianLived": 40,
+    "shortest": 9,
+    "longest": 139,
     "why": {
-     "caught": 8
+     "caught": 10
     },
     "winRate": 0
    }
@@ -2460,16 +2365,12 @@
    "plan": {
     "monsters": 4,
     "kinds": {
-     "spider": 1,
-     "fly": 1,
-     "wasp": 1,
-     "beetle": 1
+     "spider": 4
     },
-    "bricks": 122,
+    "bricks": 114,
     "stuff": {
-     "brick": 186,
+     "brick": 146,
      "raised": 430,
-     "rock": 6,
      "chopper": 3,
      "item1": 2,
      "marble": 5,
@@ -2485,15 +2386,15 @@
    },
    "play": {
     "cleared": 0,
-    "caught": 8,
+    "caught": 10,
     "stuck": 0,
     "ranOn": 0,
     "medianTurns": null,
-    "medianLived": 64,
-    "shortest": 40,
-    "longest": 101,
+    "medianLived": 42,
+    "shortest": 10,
+    "longest": 212,
     "why": {
-     "caught": 8
+     "caught": 10
     },
     "winRate": 0
    }
@@ -2503,40 +2404,36 @@
    "plan": {
     "monsters": 4,
     "kinds": {
-     "beetle": 1,
-     "spider": 1,
-     "fly": 1,
-     "wasp": 1
+     "beetle": 4
     },
-    "bricks": 122,
+    "bricks": 113,
     "stuff": {
-     "brick": 186,
+     "brick": 177,
      "raised": 523,
-     "rock": 12,
      "item3": 2,
      "chopper": 3,
      "tree": 9,
      "watervat": 1,
-     "marble": 5,
      "tarvat": 2,
      "item2": 2,
      "item1": 2,
-     "item4": 2
+     "item4": 2,
+     "marble": 5
     },
     "coins": 0,
     "robots": 0
    },
    "play": {
     "cleared": 0,
-    "caught": 8,
+    "caught": 10,
     "stuck": 0,
     "ranOn": 0,
     "medianTurns": null,
-    "medianLived": 53,
-    "shortest": 29,
-    "longest": 342,
+    "medianLived": 36,
+    "shortest": 9,
+    "longest": 149,
     "why": {
-     "caught": 8
+     "caught": 10
     },
     "winRate": 0
    }
@@ -2546,22 +2443,18 @@
    "plan": {
     "monsters": 4,
     "kinds": {
-     "wasp": 1,
-     "beetle": 1,
-     "spider": 1,
-     "fly": 1
+     "wasp": 4
     },
-    "bricks": 122,
+    "bricks": 111,
     "stuff": {
-     "brick": 186,
      "raised": 432,
+     "brick": 159,
      "tree": 7,
-     "rock": 11,
+     "marble": 5,
      "item3": 2,
      "tarvat": 2,
      "item4": 4,
      "chopper": 3,
-     "marble": 5,
      "item1": 2,
      "item2": 2,
      "watervat": 1
@@ -2570,38 +2463,35 @@
     "robots": 0
    },
    "play": {
-    "cleared": 0,
+    "cleared": 2,
     "caught": 8,
     "stuck": 0,
     "ranOn": 0,
-    "medianTurns": null,
-    "medianLived": 51,
-    "shortest": 16,
-    "longest": 87,
+    "medianTurns": 45,
+    "medianLived": 44,
+    "shortest": 13,
+    "longest": 299,
     "why": {
-     "caught": 8
+     "caught": 8,
+     "cleared": 2
     },
-    "winRate": 0
+    "winRate": 0.2
    }
   },
   {
    "F": 64,
    "plan": {
-    "monsters": 4,
+    "monsters": 5,
     "kinds": {
-     "fly": 1,
-     "wasp": 1,
-     "beetle": 1,
-     "spider": 1
+     "snake": 5
     },
-    "bricks": 122,
+    "bricks": 124,
     "stuff": {
-     "brick": 154,
+     "brick": 188,
      "raised": 611,
-     "marble": 5,
      "item4": 2,
+     "marble": 5,
      "tree": 9,
-     "rock": 10,
      "item3": 2,
      "watervat": 2,
      "chopper": 2,
@@ -2614,15 +2504,15 @@
    },
    "play": {
     "cleared": 0,
-    "caught": 8,
+    "caught": 10,
     "stuck": 0,
     "ranOn": 0,
     "medianTurns": null,
-    "medianLived": 43,
+    "medianLived": 40,
     "shortest": 8,
-    "longest": 208,
+    "longest": 112,
     "why": {
-     "caught": 8
+     "caught": 10
     },
     "winRate": 0
    }
@@ -2630,42 +2520,38 @@
   {
    "F": 65,
    "plan": {
-    "monsters": 4,
+    "monsters": 5,
     "kinds": {
-     "spider": 1,
-     "fly": 1,
-     "wasp": 1,
-     "beetle": 1
+     "fly": 5
     },
-    "bricks": 122,
+    "bricks": 123,
     "stuff": {
-     "brick": 170,
+     "brick": 171,
      "raised": 439,
      "item3": 3,
-     "rock": 11,
      "watervat": 2,
      "item4": 3,
      "tree": 6,
      "item1": 2,
+     "marble": 4,
      "chopper": 2,
      "item2": 2,
-     "tarvat": 1,
-     "marble": 4
+     "tarvat": 1
     },
     "coins": 0,
     "robots": 0
    },
    "play": {
     "cleared": 0,
-    "caught": 8,
+    "caught": 10,
     "stuck": 0,
     "ranOn": 0,
     "medianTurns": null,
-    "medianLived": 42,
-    "shortest": 21,
-    "longest": 105,
+    "medianLived": 38,
+    "shortest": 22,
+    "longest": 301,
     "why": {
-     "caught": 8
+     "caught": 10
     },
     "winRate": 0
    }
@@ -2673,22 +2559,18 @@
   {
    "F": 66,
    "plan": {
-    "monsters": 4,
+    "monsters": 5,
     "kinds": {
-     "beetle": 1,
-     "spider": 1,
-     "fly": 1,
-     "wasp": 1
+     "spider": 5
     },
-    "bricks": 122,
+    "bricks": 121,
     "stuff": {
-     "brick": 154,
+     "brick": 169,
      "raised": 585,
-     "marble": 3,
      "item1": 2,
+     "marble": 3,
      "item2": 2,
      "watervat": 1,
-     "rock": 9,
      "tree": 6,
      "tarvat": 2,
      "chopper": 2,
@@ -2700,15 +2582,15 @@
    },
    "play": {
     "cleared": 0,
-    "caught": 8,
+    "caught": 10,
     "stuck": 0,
     "ranOn": 0,
     "medianTurns": null,
-    "medianLived": 64,
-    "shortest": 14,
-    "longest": 99,
+    "medianLived": 39,
+    "shortest": 6,
+    "longest": 176,
     "why": {
-     "caught": 8
+     "caught": 10
     },
     "winRate": 0
    }
@@ -2716,23 +2598,19 @@
   {
    "F": 67,
    "plan": {
-    "monsters": 4,
+    "monsters": 5,
     "kinds": {
-     "wasp": 1,
-     "beetle": 1,
-     "spider": 1,
-     "fly": 1
+     "beetle": 5
     },
-    "bricks": 122,
+    "bricks": 120,
     "stuff": {
-     "brick": 170,
+     "brick": 168,
      "raised": 587,
-     "marble": 2,
      "watervat": 2,
      "tarvat": 2,
      "tree": 11,
      "item4": 2,
-     "rock": 5,
+     "marble": 2,
      "chopper": 4,
      "item2": 2,
      "item3": 3,
@@ -2743,15 +2621,15 @@
    },
    "play": {
     "cleared": 0,
-    "caught": 8,
+    "caught": 10,
     "stuck": 0,
     "ranOn": 0,
     "medianTurns": null,
-    "medianLived": 68,
-    "shortest": 8,
-    "longest": 181,
+    "medianLived": 90,
+    "shortest": 14,
+    "longest": 207,
     "why": {
-     "caught": 8
+     "caught": 10
     },
     "winRate": 0
    }
@@ -2759,26 +2637,22 @@
   {
    "F": 68,
    "plan": {
-    "monsters": 4,
+    "monsters": 6,
     "kinds": {
-     "fly": 1,
-     "wasp": 1,
-     "beetle": 1,
-     "spider": 1
+     "wasp": 6
     },
-    "bricks": 122,
+    "bricks": 133,
     "stuff": {
-     "brick": 170,
+     "brick": 165,
      "raised": 550,
      "watervat": 2,
      "item1": 2,
      "item2": 2,
+     "marble": 4,
      "tree": 9,
      "item3": 2,
-     "rock": 4,
      "item4": 3,
      "chopper": 4,
-     "marble": 4,
      "tarvat": 2
     },
     "coins": 0,
@@ -2786,15 +2660,15 @@
    },
    "play": {
     "cleared": 0,
-    "caught": 8,
+    "caught": 10,
     "stuck": 0,
     "ranOn": 0,
     "medianTurns": null,
-    "medianLived": 42,
-    "shortest": 15,
-    "longest": 52,
+    "medianLived": 61,
+    "shortest": 9,
+    "longest": 187,
     "why": {
-     "caught": 8
+     "caught": 10
     },
     "winRate": 0
    }
@@ -2802,24 +2676,20 @@
   {
    "F": 69,
    "plan": {
-    "monsters": 4,
+    "monsters": 6,
     "kinds": {
-     "spider": 1,
-     "fly": 1,
-     "wasp": 1,
-     "beetle": 1
+     "snake": 6
     },
-    "bricks": 122,
+    "bricks": 131,
     "stuff": {
-     "brick": 170,
+     "brick": 195,
      "tree": 6,
      "chopper": 2,
      "item4": 3,
+     "marble": 2,
      "raised": 374,
      "item2": 2,
-     "marble": 2,
      "tarvat": 2,
-     "rock": 9,
      "item3": 3,
      "watervat": 2,
      "item1": 2
@@ -2829,15 +2699,15 @@
    },
    "play": {
     "cleared": 0,
-    "caught": 8,
+    "caught": 10,
     "stuck": 0,
     "ranOn": 0,
     "medianTurns": null,
-    "medianLived": 96,
-    "shortest": 34,
-    "longest": 390,
+    "medianLived": 15,
+    "shortest": 4,
+    "longest": 115,
     "why": {
-     "caught": 8
+     "caught": 10
     },
     "winRate": 0
    }
@@ -2845,24 +2715,20 @@
   {
    "F": 70,
    "plan": {
-    "monsters": 4,
+    "monsters": 6,
     "kinds": {
-     "beetle": 1,
-     "spider": 1,
-     "fly": 1,
-     "wasp": 1
+     "fly": 6
     },
-    "bricks": 122,
+    "bricks": 130,
     "stuff": {
-     "brick": 170,
+     "brick": 178,
      "tarvat": 2,
-     "marble": 3,
      "tree": 7,
+     "marble": 3,
      "item3": 3,
      "raised": 555,
      "item2": 2,
      "watervat": 1,
-     "rock": 7,
      "item1": 2,
      "chopper": 4,
      "item4": 3
@@ -2872,15 +2738,15 @@
    },
    "play": {
     "cleared": 0,
-    "caught": 8,
+    "caught": 10,
     "stuck": 0,
     "ranOn": 0,
     "medianTurns": null,
-    "medianLived": 58,
-    "shortest": 15,
-    "longest": 400,
+    "medianLived": 68,
+    "shortest": 17,
+    "longest": 195,
     "why": {
-     "caught": 8
+     "caught": 10
     },
     "winRate": 0
    }
@@ -2888,42 +2754,39 @@
   {
    "F": 71,
    "plan": {
-    "monsters": 4,
+    "monsters": 2,
     "kinds": {
-     "wasp": 1,
-     "beetle": 1,
-     "spider": 1,
-     "fly": 1
+     "fly": 1,
+     "spider": 1
     },
-    "bricks": 122,
+    "bricks": 76,
     "stuff": {
-     "brick": 170,
-     "raised": 593,
-     "tree": 8,
-     "item4": 3,
-     "rock": 7,
-     "tarvat": 2,
-     "item3": 3,
-     "item2": 2,
-     "chopper": 3,
-     "marble": 5,
+     "brick": 124,
+     "raised": 651,
      "item1": 2,
-     "watervat": 2
+     "rock": 4,
+     "item3": 3,
+     "item4": 3,
+     "item2": 2,
+     "tarvat": 1,
+     "chopper": 2,
+     "watervat": 1,
+     "marble": 2
     },
     "coins": 0,
     "robots": 0
    },
    "play": {
     "cleared": 0,
-    "caught": 8,
+    "caught": 10,
     "stuck": 0,
     "ranOn": 0,
     "medianTurns": null,
-    "medianLived": 54,
-    "shortest": 14,
-    "longest": 96,
+    "medianLived": 46,
+    "shortest": 18,
+    "longest": 124,
     "why": {
-     "caught": 8
+     "caught": 10
     },
     "winRate": 0
    }
@@ -2931,42 +2794,39 @@
   {
    "F": 72,
    "plan": {
-    "monsters": 4,
+    "monsters": 2,
     "kinds": {
      "fly": 1,
-     "wasp": 1,
-     "beetle": 1,
      "spider": 1
     },
-    "bricks": 122,
+    "bricks": 75,
     "stuff": {
-     "brick": 154,
-     "raised": 548,
-     "marble": 2,
-     "item2": 2,
-     "watervat": 2,
+     "brick": 123,
+     "raised": 683,
      "rock": 5,
-     "tree": 9,
+     "chopper": 3,
      "item3": 3,
+     "watervat": 2,
+     "marble": 3,
      "item1": 2,
-     "chopper": 2,
-     "tarvat": 1,
-     "item4": 2
+     "item2": 2,
+     "item4": 4,
+     "tarvat": 1
     },
     "coins": 0,
     "robots": 0
    },
    "play": {
     "cleared": 0,
-    "caught": 8,
+    "caught": 10,
     "stuck": 0,
     "ranOn": 0,
     "medianTurns": null,
-    "medianLived": 32,
-    "shortest": 6,
-    "longest": 98,
+    "medianLived": 46,
+    "shortest": 8,
+    "longest": 227,
     "why": {
-     "caught": 8
+     "caught": 10
     },
     "winRate": 0
    }
@@ -2974,42 +2834,40 @@
   {
    "F": 73,
    "plan": {
-    "monsters": 4,
+    "monsters": 2,
     "kinds": {
-     "spider": 1,
      "fly": 1,
-     "wasp": 1,
-     "beetle": 1
+     "spider": 1
     },
-    "bricks": 122,
+    "bricks": 74,
     "stuff": {
-     "brick": 170,
-     "raised": 646,
-     "item2": 2,
+     "brick": 106,
+     "raised": 720,
+     "marble": 2,
+     "item3": 3,
+     "tarvat": 2,
+     "rock": 3,
+     "watervat": 1,
+     "chopper": 3,
+     "item4": 2,
      "item1": 2,
-     "chopper": 2,
-     "tarvat": 1,
-     "item3": 2,
-     "tree": 9,
-     "item4": 4,
-     "watervat": 2,
-     "rock": 6,
-     "marble": 5
+     "item2": 2
     },
     "coins": 0,
     "robots": 0
    },
    "play": {
     "cleared": 0,
-    "caught": 8,
+    "caught": 9,
     "stuck": 0,
-    "ranOn": 0,
+    "ranOn": 1,
     "medianTurns": null,
-    "medianLived": 56,
-    "shortest": 9,
-    "longest": 101,
+    "medianLived": 59,
+    "shortest": 12,
+    "longest": 1200,
     "why": {
-     "caught": 8
+     "caught": 9,
+     "ran on": 1
     },
     "winRate": 0
    }
@@ -3017,86 +2875,82 @@
   {
    "F": 74,
    "plan": {
-    "monsters": 4,
+    "monsters": 3,
     "kinds": {
-     "beetle": 1,
-     "spider": 1,
      "fly": 1,
+     "spider": 1,
      "wasp": 1
     },
-    "bricks": 122,
+    "bricks": 86,
     "stuff": {
-     "brick": 170,
-     "tree": 7,
-     "raised": 459,
-     "rock": 12,
+     "brick": 118,
+     "raised": 619,
+     "marble": 2,
+     "rock": 8,
      "item1": 2,
-     "marble": 5,
-     "item3": 3,
-     "item2": 2,
-     "tarvat": 2,
-     "item4": 3,
      "chopper": 2,
-     "watervat": 1
+     "tarvat": 2,
+     "item2": 2,
+     "watervat": 2,
+     "item3": 2,
+     "item4": 2
     },
     "coins": 0,
     "robots": 0
    },
    "play": {
-    "cleared": 0,
-    "caught": 8,
+    "cleared": 1,
+    "caught": 9,
     "stuck": 0,
     "ranOn": 0,
-    "medianTurns": null,
-    "medianLived": 58,
-    "shortest": 9,
-    "longest": 176,
+    "medianTurns": 7,
+    "medianLived": 48,
+    "shortest": 7,
+    "longest": 130,
     "why": {
-     "caught": 8
+     "caught": 9,
+     "cleared": 1
     },
-    "winRate": 0
+    "winRate": 0.1
    }
   },
   {
    "F": 75,
    "plan": {
-    "monsters": 4,
+    "monsters": 3,
     "kinds": {
-     "wasp": 1,
-     "beetle": 1,
+     "fly": 1,
      "spider": 1,
-     "fly": 1
+     "wasp": 1
     },
-    "bricks": 122,
+    "bricks": 85,
     "stuff": {
-     "brick": 186,
-     "raised": 398,
-     "rock": 10,
-     "tree": 12,
-     "tarvat": 2,
-     "marble": 2,
-     "item2": 2,
-     "item3": 2,
-     "item4": 3,
-     "chopper": 2,
+     "brick": 133,
+     "raised": 447,
+     "chopper": 3,
      "item1": 2,
-     "watervat": 1
+     "item3": 3,
+     "item4": 4,
+     "rock": 5,
+     "tarvat": 1,
+     "watervat": 2,
+     "marble": 2,
+     "item2": 2
     },
     "coins": 0,
     "robots": 0
    },
    "play": {
     "cleared": 0,
-    "caught": 7,
+    "caught": 10,
     "stuck": 0,
-    "ranOn": 1,
+    "ranOn": 0,
     "medianTurns": null,
-    "medianLived": 58,
-    "shortest": 22,
-    "longest": 1200,
+    "medianLived": 52,
+    "shortest": 20,
+    "longest": 128,
     "why": {
-     "caught": 7,
-     "ran on": 1
+     "caught": 10
     },
     "winRate": 0
    }
@@ -3104,85 +2958,82 @@
   {
    "F": 76,
    "plan": {
-    "monsters": 4,
+    "monsters": 3,
     "kinds": {
      "fly": 1,
-     "wasp": 1,
-     "beetle": 1,
-     "spider": 1
+     "spider": 1,
+     "wasp": 1
     },
-    "bricks": 122,
+    "bricks": 84,
     "stuff": {
-     "brick": 186,
-     "raised": 604,
-     "marble": 5,
-     "item1": 2,
-     "rock": 8,
-     "item4": 4,
-     "watervat": 2,
-     "tree": 8,
-     "item3": 2,
-     "item2": 2,
+     "brick": 148,
+     "raised": 659,
+     "item3": 3,
+     "item4": 3,
      "chopper": 4,
+     "rock": 8,
+     "item1": 2,
+     "item2": 2,
+     "watervat": 2,
+     "marble": 2,
      "tarvat": 2
     },
     "coins": 0,
     "robots": 0
    },
    "play": {
-    "cleared": 0,
-    "caught": 8,
+    "cleared": 1,
+    "caught": 9,
     "stuck": 0,
     "ranOn": 0,
-    "medianTurns": null,
-    "medianLived": 61,
-    "shortest": 18,
-    "longest": 132,
+    "medianTurns": 33,
+    "medianLived": 24,
+    "shortest": 14,
+    "longest": 264,
     "why": {
-     "caught": 8
+     "caught": 9,
+     "cleared": 1
     },
-    "winRate": 0
+    "winRate": 0.1
    }
   },
   {
    "F": 77,
    "plan": {
-    "monsters": 4,
+    "monsters": 3,
     "kinds": {
-     "spider": 1,
      "fly": 1,
-     "wasp": 1,
-     "beetle": 1
+     "spider": 1,
+     "wasp": 1
     },
-    "bricks": 122,
+    "bricks": 83,
     "stuff": {
-     "brick": 170,
-     "raised": 642,
-     "chopper": 3,
-     "item3": 2,
-     "tree": 11,
-     "rock": 8,
-     "watervat": 1,
-     "tarvat": 1,
+     "brick": 147,
+     "raised": 678,
+     "rock": 7,
      "item1": 2,
+     "item3": 2,
+     "watervat": 1,
      "item4": 2,
      "item2": 2,
-     "marble": 3
+     "tarvat": 1,
+     "chopper": 3,
+     "marble": 5
     },
     "coins": 0,
     "robots": 0
    },
    "play": {
     "cleared": 0,
-    "caught": 8,
+    "caught": 10,
     "stuck": 0,
     "ranOn": 0,
     "medianTurns": null,
-    "medianLived": 49,
-    "shortest": 32,
-    "longest": 80,
+    "medianLived": 38,
+    "shortest": 6,
+    "longest": 71,
     "why": {
-     "caught": 8
+     "caught": 10
     },
     "winRate": 0
    }
@@ -3192,40 +3043,39 @@
    "plan": {
     "monsters": 4,
     "kinds": {
-     "beetle": 1,
-     "spider": 1,
      "fly": 1,
-     "wasp": 1
+     "spider": 1,
+     "wasp": 1,
+     "snake": 1
     },
-    "bricks": 122,
+    "bricks": 96,
     "stuff": {
-     "brick": 170,
-     "raised": 514,
-     "marble": 5,
-     "item4": 4,
-     "tree": 8,
-     "chopper": 2,
-     "rock": 10,
+     "raised": 519,
+     "brick": 128,
+     "chopper": 3,
+     "rock": 8,
      "tarvat": 2,
+     "marble": 2,
+     "watervat": 1,
      "item3": 3,
+     "item4": 3,
      "item1": 2,
-     "item2": 2,
-     "watervat": 1
+     "item2": 2
     },
     "coins": 0,
     "robots": 0
    },
    "play": {
     "cleared": 0,
-    "caught": 8,
+    "caught": 10,
     "stuck": 0,
     "ranOn": 0,
     "medianTurns": null,
-    "medianLived": 47,
-    "shortest": 13,
-    "longest": 110,
+    "medianLived": 56,
+    "shortest": 21,
+    "longest": 361,
     "why": {
-     "caught": 8
+     "caught": 10
     },
     "winRate": 0
    }
@@ -3235,40 +3085,39 @@
    "plan": {
     "monsters": 4,
     "kinds": {
-     "wasp": 1,
-     "beetle": 1,
+     "fly": 1,
      "spider": 1,
-     "fly": 1
+     "wasp": 1,
+     "snake": 1
     },
-    "bricks": 122,
+    "bricks": 95,
     "stuff": {
-     "brick": 154,
-     "raised": 662,
-     "item4": 3,
-     "rock": 9,
-     "tarvat": 2,
-     "marble": 4,
-     "tree": 11,
-     "chopper": 3,
-     "item1": 2,
+     "brick": 159,
+     "raised": 757,
      "item3": 2,
-     "watervat": 2,
-     "item2": 2
+     "rock": 5,
+     "marble": 5,
+     "item1": 2,
+     "item2": 2,
+     "watervat": 1,
+     "item4": 3,
+     "tarvat": 1,
+     "chopper": 2
     },
     "coins": 0,
     "robots": 0
    },
    "play": {
     "cleared": 0,
-    "caught": 8,
+    "caught": 10,
     "stuck": 0,
     "ranOn": 0,
     "medianTurns": null,
-    "medianLived": 83,
-    "shortest": 17,
-    "longest": 242,
+    "medianLived": 24,
+    "shortest": 8,
+    "longest": 72,
     "why": {
-     "caught": 8
+     "caught": 10
     },
     "winRate": 0
    }
@@ -3279,39 +3128,38 @@
     "monsters": 4,
     "kinds": {
      "fly": 1,
+     "spider": 1,
      "wasp": 1,
-     "beetle": 1,
-     "spider": 1
+     "snake": 1
     },
-    "bricks": 122,
+    "bricks": 93,
     "stuff": {
-     "brick": 170,
-     "raised": 667,
-     "marble": 5,
-     "item2": 2,
-     "tree": 6,
-     "item3": 3,
-     "chopper": 2,
-     "tarvat": 2,
+     "brick": 125,
+     "raised": 682,
+     "item3": 2,
+     "rock": 9,
      "item4": 3,
+     "tarvat": 1,
+     "chopper": 3,
      "item1": 2,
-     "rock": 12,
-     "watervat": 1
+     "watervat": 1,
+     "marble": 5,
+     "item2": 2
     },
     "coins": 0,
     "robots": 0
    },
    "play": {
     "cleared": 0,
-    "caught": 8,
+    "caught": 10,
     "stuck": 0,
     "ranOn": 0,
     "medianTurns": null,
-    "medianLived": 33,
-    "shortest": 27,
-    "longest": 67,
+    "medianLived": 61,
+    "shortest": 10,
+    "longest": 109,
     "why": {
-     "caught": 8
+     "caught": 10
     },
     "winRate": 0
    }
@@ -3319,19 +3167,16 @@
   {
    "F": 81,
    "plan": {
-    "monsters": 4,
+    "monsters": 2,
     "kinds": {
-     "spider": 1,
-     "fly": 1,
-     "wasp": 1,
-     "beetle": 1
+     "beetle": 1,
+     "snake": 1
     },
-    "bricks": 122,
+    "bricks": 84,
     "stuff": {
-     "brick": 170,
+     "brick": 132,
      "raised": 731,
-     "marble": 5,
-     "rock": 11,
+     "rock": 8,
      "tree": 9,
      "item2": 2,
      "item4": 3,
@@ -3339,6 +3184,7 @@
      "chopper": 4,
      "tarvat": 1,
      "watervat": 1,
+     "marble": 5,
      "item1": 2
     },
     "coins": 0,
@@ -3346,15 +3192,15 @@
    },
    "play": {
     "cleared": 0,
-    "caught": 8,
+    "caught": 10,
     "stuck": 0,
     "ranOn": 0,
     "medianTurns": null,
-    "medianLived": 27,
-    "shortest": 12,
-    "longest": 82,
+    "medianLived": 43,
+    "shortest": 8,
+    "longest": 101,
     "why": {
-     "caught": 8
+     "caught": 10
     },
     "winRate": 0
    }
@@ -3362,22 +3208,20 @@
   {
    "F": 82,
    "plan": {
-    "monsters": 4,
+    "monsters": 2,
     "kinds": {
      "beetle": 1,
-     "spider": 1,
-     "fly": 1,
-     "wasp": 1
+     "snake": 1
     },
-    "bricks": 122,
+    "bricks": 83,
     "stuff": {
-     "brick": 170,
+     "brick": 131,
      "raised": 387,
      "rock": 3,
      "watervat": 2,
+     "marble": 5,
      "tree": 11,
      "chopper": 4,
-     "marble": 5,
      "item2": 2,
      "item4": 4,
      "item3": 2,
@@ -3389,15 +3233,15 @@
    },
    "play": {
     "cleared": 0,
-    "caught": 8,
+    "caught": 10,
     "stuck": 0,
     "ranOn": 0,
     "medianTurns": null,
-    "medianLived": 126,
-    "shortest": 34,
-    "longest": 198,
+    "medianLived": 28,
+    "shortest": 9,
+    "longest": 144,
     "why": {
-     "caught": 8
+     "caught": 10
     },
     "winRate": 0
    }
@@ -3405,19 +3249,17 @@
   {
    "F": 83,
    "plan": {
-    "monsters": 4,
+    "monsters": 2,
     "kinds": {
-     "wasp": 1,
      "beetle": 1,
-     "spider": 1,
-     "fly": 1
+     "snake": 1
     },
-    "bricks": 122,
+    "bricks": 81,
     "stuff": {
-     "brick": 170,
+     "brick": 113,
      "raised": 709,
      "item3": 3,
-     "rock": 10,
+     "rock": 7,
      "item2": 2,
      "tree": 8,
      "item1": 2,
@@ -3432,15 +3274,16 @@
    },
    "play": {
     "cleared": 0,
-    "caught": 8,
+    "caught": 9,
     "stuck": 0,
-    "ranOn": 0,
+    "ranOn": 1,
     "medianTurns": null,
-    "medianLived": 50,
-    "shortest": 26,
-    "longest": 108,
+    "medianLived": 27,
+    "shortest": 10,
+    "longest": 1200,
     "why": {
-     "caught": 8
+     "caught": 9,
+     "ran on": 1
     },
     "winRate": 0
    }
@@ -3448,24 +3291,23 @@
   {
    "F": 84,
    "plan": {
-    "monsters": 4,
+    "monsters": 3,
     "kinds": {
-     "fly": 1,
-     "wasp": 1,
      "beetle": 1,
+     "snake": 1,
      "spider": 1
     },
-    "bricks": 122,
+    "bricks": 94,
     "stuff": {
-     "brick": 154,
+     "brick": 142,
      "raised": 651,
      "tree": 11,
-     "marble": 3,
      "item3": 2,
      "tarvat": 2,
      "item1": 2,
      "item4": 3,
-     "rock": 12,
+     "marble": 3,
+     "rock": 9,
      "item2": 2,
      "chopper": 2,
      "watervat": 1
@@ -3475,15 +3317,15 @@
    },
    "play": {
     "cleared": 0,
-    "caught": 8,
+    "caught": 10,
     "stuck": 0,
     "ranOn": 0,
     "medianTurns": null,
-    "medianLived": 39,
-    "shortest": 17,
-    "longest": 211,
+    "medianLived": 30,
+    "shortest": 8,
+    "longest": 57,
     "why": {
-     "caught": 8
+     "caught": 10
     },
     "winRate": 0
    }
@@ -3491,24 +3333,23 @@
   {
    "F": 85,
    "plan": {
-    "monsters": 4,
+    "monsters": 3,
     "kinds": {
-     "spider": 1,
-     "fly": 1,
-     "wasp": 1,
-     "beetle": 1
+     "beetle": 1,
+     "snake": 1,
+     "spider": 1
     },
-    "bricks": 122,
+    "bricks": 93,
     "stuff": {
-     "brick": 154,
+     "brick": 157,
      "raised": 696,
      "tree": 12,
      "item4": 3,
      "chopper": 4,
      "watervat": 2,
      "item2": 2,
+     "rock": 9,
      "marble": 2,
-     "rock": 12,
      "item3": 3,
      "item1": 2,
      "tarvat": 2
@@ -3518,15 +3359,15 @@
    },
    "play": {
     "cleared": 0,
-    "caught": 8,
+    "caught": 10,
     "stuck": 0,
     "ranOn": 0,
     "medianTurns": null,
-    "medianLived": 38,
-    "shortest": 9,
-    "longest": 964,
+    "medianLived": 40,
+    "shortest": 13,
+    "longest": 80,
     "why": {
-     "caught": 8
+     "caught": 10
     },
     "winRate": 0
    }
@@ -3534,23 +3375,22 @@
   {
    "F": 86,
    "plan": {
-    "monsters": 4,
+    "monsters": 3,
     "kinds": {
      "beetle": 1,
-     "spider": 1,
-     "fly": 1,
-     "wasp": 1
+     "snake": 1,
+     "spider": 1
     },
-    "bricks": 122,
+    "bricks": 91,
     "stuff": {
-     "brick": 186,
+     "brick": 155,
      "tarvat": 2,
      "tree": 9,
      "raised": 424,
      "item2": 2,
+     "marble": 5,
      "chopper": 2,
      "item1": 2,
-     "marble": 5,
      "rock": 3,
      "item4": 3,
      "item3": 3,
@@ -3561,15 +3401,15 @@
    },
    "play": {
     "cleared": 0,
-    "caught": 8,
+    "caught": 10,
     "stuck": 0,
     "ranOn": 0,
     "medianTurns": null,
-    "medianLived": 78,
-    "shortest": 9,
-    "longest": 218,
+    "medianLived": 22,
+    "shortest": 8,
+    "longest": 84,
     "why": {
-     "caught": 8
+     "caught": 10
     },
     "winRate": 0
    }
@@ -3577,42 +3417,41 @@
   {
    "F": 87,
    "plan": {
-    "monsters": 4,
+    "monsters": 3,
     "kinds": {
-     "wasp": 1,
      "beetle": 1,
-     "spider": 1,
-     "fly": 1
+     "snake": 1,
+     "spider": 1
     },
-    "bricks": 122,
+    "bricks": 90,
     "stuff": {
-     "brick": 170,
+     "brick": 122,
      "raised": 640,
      "chopper": 3,
-     "marble": 3,
-     "rock": 12,
+     "rock": 9,
      "tree": 10,
      "item3": 2,
      "item1": 2,
      "item4": 2,
      "item2": 2,
      "tarvat": 1,
-     "watervat": 1
+     "watervat": 1,
+     "marble": 3
     },
     "coins": 0,
     "robots": 0
    },
    "play": {
     "cleared": 0,
-    "caught": 8,
+    "caught": 10,
     "stuck": 0,
     "ranOn": 0,
     "medianTurns": null,
-    "medianLived": 51,
-    "shortest": 18,
-    "longest": 161,
+    "medianLived": 30,
+    "shortest": 10,
+    "longest": 224,
     "why": {
-     "caught": 8
+     "caught": 10
     },
     "winRate": 0
    }
@@ -3622,21 +3461,21 @@
    "plan": {
     "monsters": 4,
     "kinds": {
-     "fly": 1,
-     "wasp": 1,
      "beetle": 1,
-     "spider": 1
+     "snake": 1,
+     "spider": 1,
+     "wasp": 1
     },
-    "bricks": 122,
+    "bricks": 103,
     "stuff": {
-     "brick": 154,
+     "brick": 151,
      "tree": 8,
      "item2": 2,
-     "rock": 9,
+     "rock": 8,
+     "marble": 3,
      "raised": 321,
      "item3": 3,
      "item1": 2,
-     "marble": 3,
      "item4": 4,
      "chopper": 3,
      "watervat": 2,
@@ -3647,16 +3486,15 @@
    },
    "play": {
     "cleared": 0,
-    "caught": 7,
+    "caught": 10,
     "stuck": 0,
-    "ranOn": 1,
+    "ranOn": 0,
     "medianTurns": null,
-    "medianLived": 83,
-    "shortest": 35,
-    "longest": 1200,
+    "medianLived": 36,
+    "shortest": 11,
+    "longest": 125,
     "why": {
-     "caught": 7,
-     "ran on": 1
+     "caught": 10
     },
     "winRate": 0
    }
@@ -3666,16 +3504,16 @@
    "plan": {
     "monsters": 4,
     "kinds": {
+     "beetle": 1,
+     "snake": 1,
      "spider": 1,
-     "fly": 1,
-     "wasp": 1,
-     "beetle": 1
+     "wasp": 1
     },
-    "bricks": 122,
+    "bricks": 102,
     "stuff": {
-     "brick": 170,
+     "brick": 150,
+     "rock": 6,
      "marble": 4,
-     "rock": 7,
      "raised": 653,
      "item1": 2,
      "watervat": 1,
@@ -3691,15 +3529,15 @@
    },
    "play": {
     "cleared": 0,
-    "caught": 8,
+    "caught": 10,
     "stuck": 0,
     "ranOn": 0,
     "medianTurns": null,
-    "medianLived": 48,
-    "shortest": 24,
-    "longest": 121,
+    "medianLived": 50,
+    "shortest": 14,
+    "longest": 125,
     "why": {
-     "caught": 8
+     "caught": 10
     },
     "winRate": 0
    }
@@ -3710,16 +3548,16 @@
     "monsters": 4,
     "kinds": {
      "beetle": 1,
+     "snake": 1,
      "spider": 1,
-     "fly": 1,
      "wasp": 1
     },
-    "bricks": 122,
+    "bricks": 100,
     "stuff": {
-     "brick": 170,
+     "brick": 148,
      "raised": 599,
-     "rock": 10,
      "marble": 5,
+     "rock": 8,
      "tree": 8,
      "item1": 2,
      "item4": 3,
@@ -3734,15 +3572,15 @@
    },
    "play": {
     "cleared": 0,
-    "caught": 8,
+    "caught": 10,
     "stuck": 0,
     "ranOn": 0,
     "medianTurns": null,
-    "medianLived": 40,
-    "shortest": 12,
-    "longest": 168,
+    "medianLived": 29,
+    "shortest": 9,
+    "longest": 130,
     "why": {
-     "caught": 8
+     "caught": 10
     },
     "winRate": 0
    }
@@ -3750,69 +3588,24 @@
   {
    "F": 91,
    "plan": {
-    "monsters": 4,
+    "monsters": 2,
     "kinds": {
-     "wasp": 1,
-     "beetle": 1,
-     "spider": 1,
-     "fly": 1
+     "snake": 1,
+     "wasp": 1
     },
-    "bricks": 122,
+    "bricks": 76,
     "stuff": {
-     "brick": 186,
-     "raised": 666,
-     "marble": 2,
-     "item4": 4,
-     "rock": 3,
-     "tree": 6,
-     "item2": 2,
-     "tarvat": 1,
-     "item3": 2,
-     "watervat": 2,
-     "chopper": 2,
-     "item1": 2
-    },
-    "coins": 0,
-    "robots": 0
-   },
-   "play": {
-    "cleared": 0,
-    "caught": 8,
-    "stuck": 0,
-    "ranOn": 0,
-    "medianTurns": null,
-    "medianLived": 101,
-    "shortest": 50,
-    "longest": 230,
-    "why": {
-     "caught": 8
-    },
-    "winRate": 0
-   }
-  },
-  {
-   "F": 92,
-   "plan": {
-    "monsters": 4,
-    "kinds": {
-     "fly": 1,
-     "wasp": 1,
-     "beetle": 1,
-     "spider": 1
-    },
-    "bricks": 122,
-    "stuff": {
-     "brick": 154,
-     "raised": 539,
-     "rock": 11,
-     "tree": 9,
-     "item2": 2,
+     "brick": 108,
+     "raised": 686,
      "item4": 2,
-     "chopper": 3,
-     "item1": 2,
      "marble": 2,
-     "watervat": 1,
+     "rock": 5,
+     "tree": 9,
+     "chopper": 2,
+     "item1": 2,
      "tarvat": 2,
+     "watervat": 2,
+     "item2": 2,
      "item3": 3
     },
     "coins": 0,
@@ -3822,13 +3615,55 @@
     "cleared": 0,
     "caught": 8,
     "stuck": 0,
+    "ranOn": 2,
+    "medianTurns": null,
+    "medianLived": 49,
+    "shortest": 9,
+    "longest": 1200,
+    "why": {
+     "caught": 8,
+     "ran on": 2
+    },
+    "winRate": 0
+   }
+  },
+  {
+   "F": 92,
+   "plan": {
+    "monsters": 2,
+    "kinds": {
+     "snake": 1,
+     "wasp": 1
+    },
+    "bricks": 75,
+    "stuff": {
+     "brick": 123,
+     "raised": 662,
+     "item2": 2,
+     "rock": 7,
+     "item3": 3,
+     "chopper": 3,
+     "tree": 6,
+     "item1": 2,
+     "tarvat": 2,
+     "marble": 3,
+     "item4": 2,
+     "watervat": 2
+    },
+    "coins": 0,
+    "robots": 0
+   },
+   "play": {
+    "cleared": 0,
+    "caught": 10,
+    "stuck": 0,
     "ranOn": 0,
     "medianTurns": null,
-    "medianLived": 51,
-    "shortest": 40,
-    "longest": 74,
+    "medianLived": 33,
+    "shortest": 6,
+    "longest": 249,
     "why": {
-     "caught": 8
+     "caught": 10
     },
     "winRate": 0
    }
@@ -3836,42 +3671,41 @@
   {
    "F": 93,
    "plan": {
-    "monsters": 4,
+    "monsters": 3,
     "kinds": {
-     "spider": 1,
-     "fly": 1,
+     "snake": 1,
      "wasp": 1,
      "beetle": 1
     },
-    "bricks": 122,
+    "bricks": 88,
     "stuff": {
-     "brick": 170,
-     "raised": 559,
-     "marble": 5,
-     "item3": 2,
+     "brick": 136,
+     "raised": 634,
+     "marble": 3,
+     "tree": 10,
+     "rock": 8,
+     "item4": 4,
+     "tarvat": 1,
+     "watervat": 1,
      "item2": 2,
-     "rock": 10,
-     "chopper": 4,
-     "tree": 7,
+     "item3": 2,
      "item1": 2,
-     "tarvat": 2,
-     "item4": 2,
-     "watervat": 1
+     "chopper": 2
     },
     "coins": 0,
     "robots": 0
    },
    "play": {
     "cleared": 0,
-    "caught": 8,
+    "caught": 10,
     "stuck": 0,
     "ranOn": 0,
     "medianTurns": null,
-    "medianLived": 26,
-    "shortest": 10,
-    "longest": 239,
+    "medianLived": 48,
+    "shortest": 6,
+    "longest": 446,
     "why": {
-     "caught": 8
+     "caught": 10
     },
     "winRate": 0
    }
@@ -3879,42 +3713,41 @@
   {
    "F": 94,
    "plan": {
-    "monsters": 4,
+    "monsters": 3,
     "kinds": {
-     "beetle": 1,
-     "spider": 1,
-     "fly": 1,
-     "wasp": 1
+     "snake": 1,
+     "wasp": 1,
+     "beetle": 1
     },
-    "bricks": 122,
+    "bricks": 86,
     "stuff": {
-     "brick": 154,
+     "brick": 134,
      "raised": 422,
-     "item4": 2,
-     "item3": 3,
-     "item2": 2,
      "item1": 2,
-     "rock": 8,
+     "item2": 2,
+     "marble": 5,
+     "item3": 2,
      "chopper": 4,
-     "tree": 10,
-     "tarvat": 2,
+     "item4": 4,
      "watervat": 2,
-     "marble": 2
+     "rock": 5,
+     "tree": 10,
+     "tarvat": 2
     },
     "coins": 0,
     "robots": 0
    },
    "play": {
     "cleared": 0,
-    "caught": 8,
+    "caught": 10,
     "stuck": 0,
     "ranOn": 0,
     "medianTurns": null,
-    "medianLived": 35,
-    "shortest": 22,
-    "longest": 249,
+    "medianLived": 34,
+    "shortest": 10,
+    "longest": 326,
     "why": {
-     "caught": 8
+     "caught": 10
     },
     "winRate": 0
    }
@@ -3922,45 +3755,43 @@
   {
    "F": 95,
    "plan": {
-    "monsters": 4,
+    "monsters": 3,
     "kinds": {
+     "snake": 1,
      "wasp": 1,
-     "beetle": 1,
-     "spider": 1,
-     "fly": 1
+     "beetle": 1
     },
-    "bricks": 122,
+    "bricks": 85,
     "stuff": {
-     "brick": 170,
-     "raised": 582,
-     "rock": 12,
-     "item4": 3,
-     "item1": 2,
-     "tree": 9,
-     "tarvat": 2,
-     "chopper": 3,
-     "item3": 2,
+     "brick": 133,
+     "raised": 719,
      "item2": 2,
-     "marble": 3,
-     "watervat": 1
+     "rock": 8,
+     "chopper": 4,
+     "item4": 4,
+     "marble": 2,
+     "watervat": 2,
+     "item3": 3,
+     "tree": 9,
+     "item1": 2,
+     "tarvat": 1
     },
     "coins": 0,
     "robots": 0
    },
    "play": {
-    "cleared": 1,
-    "caught": 7,
+    "cleared": 0,
+    "caught": 10,
     "stuck": 0,
     "ranOn": 0,
-    "medianTurns": 19,
-    "medianLived": 81,
-    "shortest": 12,
-    "longest": 195,
+    "medianTurns": null,
+    "medianLived": 26,
+    "shortest": 5,
+    "longest": 376,
     "why": {
-     "caught": 7,
-     "cleared": 1
+     "caught": 10
     },
-    "winRate": 0.13
+    "winRate": 0
    }
   },
   {
@@ -3968,40 +3799,40 @@
    "plan": {
     "monsters": 4,
     "kinds": {
-     "fly": 1,
+     "snake": 1,
      "wasp": 1,
      "beetle": 1,
      "spider": 1
     },
-    "bricks": 122,
+    "bricks": 98,
     "stuff": {
-     "brick": 170,
-     "raised": 583,
-     "item3": 2,
-     "chopper": 3,
-     "tarvat": 2,
+     "brick": 146,
+     "raised": 693,
+     "rock": 7,
+     "tree": 12,
+     "item3": 3,
+     "chopper": 4,
      "watervat": 1,
-     "rock": 11,
-     "tree": 9,
-     "item4": 2,
-     "marble": 3,
      "item1": 2,
-     "item2": 2
+     "item2": 2,
+     "tarvat": 1,
+     "marble": 2,
+     "item4": 2
     },
     "coins": 0,
     "robots": 0
    },
    "play": {
     "cleared": 0,
-    "caught": 8,
+    "caught": 10,
     "stuck": 0,
     "ranOn": 0,
     "medianTurns": null,
-    "medianLived": 55,
-    "shortest": 16,
-    "longest": 106,
+    "medianLived": 44,
+    "shortest": 13,
+    "longest": 154,
     "why": {
-     "caught": 8
+     "caught": 10
     },
     "winRate": 0
    }
@@ -4011,40 +3842,40 @@
    "plan": {
     "monsters": 4,
     "kinds": {
-     "spider": 1,
-     "fly": 1,
+     "snake": 1,
      "wasp": 1,
-     "beetle": 1
+     "beetle": 1,
+     "spider": 1
     },
-    "bricks": 122,
+    "bricks": 97,
     "stuff": {
-     "brick": 170,
-     "raised": 385,
-     "chopper": 4,
-     "marble": 3,
-     "rock": 12,
-     "tree": 10,
+     "brick": 145,
+     "raised": 514,
+     "item4": 4,
+     "tree": 7,
+     "marble": 4,
+     "rock": 8,
+     "chopper": 2,
      "tarvat": 2,
-     "item3": 2,
+     "watervat": 2,
      "item2": 2,
-     "watervat": 1,
      "item1": 2,
-     "item4": 2
+     "item3": 2
     },
     "coins": 0,
     "robots": 0
    },
    "play": {
     "cleared": 0,
-    "caught": 8,
+    "caught": 10,
     "stuck": 0,
     "ranOn": 0,
     "medianTurns": null,
-    "medianLived": 42,
-    "shortest": 4,
-    "longest": 107,
+    "medianLived": 24,
+    "shortest": 9,
+    "longest": 44,
     "why": {
-     "caught": 8
+     "caught": 10
     },
     "winRate": 0
    }
@@ -4054,40 +3885,40 @@
    "plan": {
     "monsters": 4,
     "kinds": {
+     "snake": 1,
+     "wasp": 1,
      "beetle": 1,
-     "spider": 1,
-     "fly": 1,
-     "wasp": 1
+     "spider": 1
     },
-    "bricks": 122,
+    "bricks": 96,
     "stuff": {
-     "brick": 170,
+     "brick": 144,
      "raised": 646,
-     "rock": 11,
+     "tarvat": 2,
+     "rock": 6,
      "item3": 3,
-     "tree": 11,
-     "marble": 5,
-     "item4": 4,
      "chopper": 3,
-     "item2": 2,
+     "tree": 6,
+     "item4": 2,
      "item1": 2,
-     "tarvat": 1,
-     "watervat": 2
+     "item2": 2,
+     "marble": 3,
+     "watervat": 1
     },
     "coins": 0,
     "robots": 0
    },
    "play": {
     "cleared": 0,
-    "caught": 8,
+    "caught": 10,
     "stuck": 0,
     "ranOn": 0,
     "medianTurns": null,
-    "medianLived": 52,
-    "shortest": 21,
-    "longest": 94,
+    "medianLived": 46,
+    "shortest": 15,
+    "longest": 101,
     "why": {
-     "caught": 8
+     "caught": 10
     },
     "winRate": 0
    }
@@ -4095,42 +3926,43 @@
   {
    "F": 99,
    "plan": {
-    "monsters": 4,
+    "monsters": 5,
     "kinds": {
+     "snake": 1,
      "wasp": 1,
      "beetle": 1,
      "spider": 1,
      "fly": 1
     },
-    "bricks": 122,
+    "bricks": 109,
     "stuff": {
-     "raised": 369,
-     "brick": 186,
-     "tarvat": 2,
-     "tree": 7,
-     "rock": 3,
-     "watervat": 2,
-     "item4": 3,
-     "item2": 2,
+     "raised": 432,
+     "brick": 141,
      "item3": 3,
-     "marble": 5,
-     "chopper": 2,
-     "item1": 2
+     "rock": 7,
+     "tree": 6,
+     "watervat": 1,
+     "chopper": 3,
+     "item1": 2,
+     "marble": 3,
+     "item2": 2,
+     "item4": 2,
+     "tarvat": 1
     },
     "coins": 0,
     "robots": 0
    },
    "play": {
     "cleared": 0,
-    "caught": 8,
+    "caught": 10,
     "stuck": 0,
     "ranOn": 0,
     "medianTurns": null,
-    "medianLived": 192,
-    "shortest": 19,
-    "longest": 318,
+    "medianLived": 30,
+    "shortest": 9,
+    "longest": 128,
     "why": {
-     "caught": 8
+     "caught": 10
     },
     "winRate": 0
    }
@@ -4138,26 +3970,27 @@
   {
    "F": 100,
    "plan": {
-    "monsters": 4,
+    "monsters": 5,
     "kinds": {
-     "fly": 1,
+     "snake": 1,
      "wasp": 1,
      "beetle": 1,
-     "spider": 1
+     "spider": 1,
+     "fly": 1
     },
-    "bricks": 122,
+    "bricks": 107,
     "stuff": {
-     "brick": 170,
-     "raised": 506,
-     "tree": 7,
-     "marble": 5,
-     "item4": 4,
-     "rock": 3,
+     "brick": 155,
+     "raised": 681,
+     "tree": 12,
+     "marble": 4,
+     "chopper": 3,
      "item1": 2,
-     "chopper": 4,
+     "item4": 2,
+     "rock": 7,
      "item2": 2,
-     "item3": 2,
      "watervat": 2,
+     "item3": 3,
      "tarvat": 2
     },
     "coins": 0,
@@ -4165,16 +3998,15 @@
    },
    "play": {
     "cleared": 0,
-    "caught": 7,
+    "caught": 10,
     "stuck": 0,
-    "ranOn": 1,
+    "ranOn": 0,
     "medianTurns": null,
-    "medianLived": 36,
-    "shortest": 20,
-    "longest": 1200,
+    "medianLived": 42,
+    "shortest": 8,
+    "longest": 152,
     "why": {
-     "ran on": 1,
-     "caught": 7
+     "caught": 10
     },
     "winRate": 0
    }

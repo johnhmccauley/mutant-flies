@@ -26,6 +26,7 @@ const path = require("path");
 const RUNS = parseInt(process.argv[2], 10) || 6;
 const LIMIT = parseInt(process.argv[3], 10) || 1200;
 const DEEP = 100;
+const SEED0 = parseInt(process.argv[4], 10) || 1;
 
 /* ------------------------------------------------------------------
    What the cellar is, before anybody plays it.
@@ -98,7 +99,7 @@ const rows = [];
 for (let F = 1; F <= DEEP; F++) {
   const shape = shapeOf(F, 1000 + F);
   const runs = [];
-  for (let r = 0; r < RUNS; r++) runs.push(playOne(F, 1 + r * 977 + F * 13));
+  for (let r = 0; r < RUNS; r++) runs.push(playOne(F, SEED0 + r * 977 + F * 13));
   const cleared = runs.filter((x) => x.out === "cleared");
   const turns = cleared.map((x) => x.turns).sort((a, b) => a - b);
   const lived = runs.map((x) => x.turns).sort((a, b) => a - b);

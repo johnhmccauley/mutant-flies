@@ -668,6 +668,93 @@
   var FEATURE_AT = { walls: 2, coins: 3, snake: 12, rocks: 15, robots: 16, slopes: 4, boots: 5, frost: 6, trees: 7, saw: 7,
                      marbles: 8, jar: 9, tar: 10, water: 11, choppers: 13 };
 
+
+  /* ====================================================================
+     TEN CELLARS AT A TIME
+
+     Below the hand-written plan the cellars used to come from one
+     formula, and measuring it showed what that actually produced: the
+     brick budget bottoms out at cellar 49 and the patience at 53, the
+     monster count caps at four from 31, and with four kinds the formula
+     covers every animal every time. So cellars 53 to 100 were one
+     cellar with a hundred different seeds - and the bot's survival
+     wandered UP over them, 45 turns at the forties and 67 at the
+     nineties, which is a difficulty curve pointing the wrong way.
+
+     A block of ten has a character now, and the character is what makes
+     it hard rather than the numbers alone. The Quarry is not "the same
+     cellar with fewer bricks", it is a room full of rock, and rock is
+     four bricks of shove that nothing can destroy. The Nest is not more
+     monsters, it is SEVERAL OF ONE, which behaves completely differently
+     from one of each - they do not take turns.
+
+     Each block still tightens across its ten, so there is a slope
+     inside a block as well as between them; `grind` is how far through
+     its ten a cellar is, and every budget leans on it.
+
+     `feat` here overrides what featuresFor turned on by depth: true
+     forces a thing in, false keeps it out. Keeping things OUT is what
+     makes a block feel like itself - The Timber Runs has no rock in it,
+     and that is why the wood reads.
+     ==================================================================== */
+  var THEMES = [
+    { at: 1, name: "The Shallow Cellars",
+      line: "One thing down here at a time, and bricks enough to think with." },
+    { at: 11, name: "Company",
+      line: "Two of them now. A wall is only the bricks holding something in, and you will want those bricks." },
+    { at: 21, name: "Broken Ground",
+      line: "The floor stops being a floor. What you shove uphill costs you, and what you drop runs away downhill.",
+      kinds: ["spider", "fly", "beetle"], PE: 146, PA: 126,
+      feat: { hilly: 2.2, marbles: true, rocks: false, choppers: false } },
+    { at: 31, name: "The Timber Runs",
+      line: "Wood everywhere, and machinery to turn it into bricks - if you can spare the turns to do it.",
+      kinds: ["beetle", "wasp", "fly", "spider", "snake"], PE: 84, PA: 98,
+      feat: { trees: true, saw: true, choppers: true, rocks: false, hilly: 0.6 } },
+    { at: 41, name: "The Wet Levels",
+      line: "Tar and water, both running downhill, both rearranging the room while you are still working in it.",
+      kinds: ["snake", "spider", "beetle"], PE: 126, PA: 110,
+      feat: { tar: true, water: true, trees: false, hilly: 1.8 } },
+    { at: 51, name: "The Quarry",
+      line: "Rock. Four bricks of shove apiece, and nothing down here can break one - so where it lies is where it stays.",
+      kinds: ["wasp", "beetle", "fly", "spider", "snake"], PE: 74, PA: 86,
+      feat: { rocks: true, trees: false, tar: false, water: false, hilly: 0.8 } },
+    { at: 61, name: "The Nest",
+      line: "Not one of each any more. Several of one, and several of one thing does not take turns with itself.",
+      swarm: true, PE: 86, PA: 96,
+      feat: { rocks: false, choppers: true } },
+    { at: 71, name: "The Long Drop",
+      line: "Small rooms with the dark all round them. Anything that goes over the side is gone, and that includes the bricks.",
+      kinds: ["fly", "spider", "wasp", "snake"], PE: 76, PA: 90,
+      feat: { hilly: 1.4, trees: false, marbles: true } },
+    { at: 81, name: "The Machine Floor",
+      line: "Somebody's machinery still works down here, and none of it knows whose side it is on.",
+      kinds: ["beetle", "snake", "spider", "wasp"], PE: 84, PA: 86,
+      feat: { choppers: true, robots: true, saw: true, rocks: true, trees: true } },
+    { at: 91, name: "The Deep",
+      line: "All of it at once, and the fewest bricks you have ever been given.",
+      kinds: ["snake", "wasp", "beetle", "spider", "fly"], PE: 76, PA: 78,
+      feat: { rocks: true, trees: true, tar: true, water: true, choppers: true,
+              marbles: true, hilly: 1.6 } }
+  ];
+
+  function themeFor(F) {
+    if (F > 100) {
+      /* the eight deep blocks, round and round, tightening as they go */
+      var deep = THEMES.slice(2);
+      return deep[Math.floor((F - 101) / 10) % deep.length];
+    }
+    var t = THEMES[0];
+    for (var i = 0; i < THEMES.length; i++) if (F >= THEMES[i].at) t = THEMES[i];
+    return t;
+  }
+
+  /* past the hundred the budgets keep coming down, a little per block,
+     and stop at a floor a cellar can still be finished from */
+  function deeper(F) { return Math.max(0.62, 1 - Math.floor((F - 101) / 10) * 0.04); }
+
+  /* how far through its own ten this cellar is, nought to one */
+  function grind(F) { return ((F - 1) % 10) / 9; }
+
   var PLAN = [
     /*  1 */ { kinds: ["fly"], PE: 200, PA: 400, adds: [] },
     /*  2 */ { kinds: ["fly"], PE: 175, PA: 300, adds: ["walls"] },
@@ -690,14 +777,35 @@
   /* below the plan the cellars keep coming, tightening slowly and never
      quite running out of bricks */
   function deepPlan(F) {
-    var n = Math.min(4, 2 + Math.floor((F - 17) / 7));
-    var kinds = [];
-    for (var i = 0; i < n; i++)
-      kinds.push(MONSTER_ORDER[(F + i * 3) % MONSTER_ORDER.length]);
+    var th = themeFor(F), g = grind(F);
+    var kinds;
+    if (th.swarm) {
+      /* several of one, which is a different animal from one of each:
+         they arrive together and they do not take turns */
+      var one = MONSTER_ORDER[F % MONSTER_ORDER.length];
+      kinds = [];
+      for (var k = 0, many = 4 + Math.round(g * 2); k < many; k++) kinds.push(one);
+    } else if (th.kinds) {
+      /* the block's own cast, coming in one at a time across its ten so
+         there is a slope inside the block and not only between them */
+      var want = Math.max(2, Math.round(2 + g * (th.kinds.length - 2)));
+      kinds = th.kinds.slice(0, want);
+    } else {
+      var n = Math.min(4, 2 + Math.floor((F - 17) / 7));
+      kinds = [];
+      for (var i = 0; i < n; i++)
+        kinds.push(MONSTER_ORDER[(F + i * 3) % MONSTER_ORDER.length]);
+    }
+    /* the budgets tighten across a block and again from block to block,
+       and they never quite run out - a cellar you cannot possibly wall
+       is not hard, it is broken */
+    var sink = (F > 100) ? deeper(F) : 1;
+    var base = (th.PE || Math.max(56, 120 - (F - 17) * 2) + 44) * sink;
+    var pat = (th.PA || Math.max(72, 108 - (F - 17))) * sink;
     return {
       kinds: kinds,
-      PE: Math.max(56, 120 - (F - 17) * 2) + 22 * (n - 1),
-      PA: Math.max(72, 108 - (F - 17)),
+      PE: Math.max(52, Math.round(base * (1 - g * 0.14)) + 14 * (kinds.length - 2)),
+      PA: Math.max(64, Math.round(pat * (1 - g * 0.12))),
       adds: []
     };
   }
@@ -746,8 +854,14 @@
       return { PE: row[0], PA: row[1], kinds: ["fly"], feat: {}, adds: [] };
     }
     var p = planFor(F);
+    var feat = featuresFor(F);
+    /* a block keeps things OUT as much as it lets them in, and that is
+       most of what makes it feel like itself: there is no rock in the
+       Timber Runs, which is why the wood reads as the subject */
+    var th = themeFor(F);
+    if (F > PLAN.length && th.feat) for (var k in th.feat) feat[k] = th.feat[k];
     return { PE: p.PE, PA: p.PA, kinds: p.kinds.slice(),
-             feat: featuresFor(F), adds: p.adds.slice() };
+             feat: feat, adds: p.adds.slice() };
   }
 
   function leashCells(PA) { return PA / 32; }
@@ -1546,7 +1660,8 @@
     /* Wide and low. A tall narrow mound is all cliff, and smoothing then
        grinds it - and everything round it - back to nothing, which is how
        the whole floor ended up flat. */
-    var mounds = 3 + this.grnd(4);
+    /* how broken the ground is, which is a thing a block decides */
+    var mounds = Math.max(1, Math.round((3 + this.grnd(4)) * (this.feat.hilly || 1)));
     for (var k = 0; k < mounds; k++) {
       var hp = this.someWhere(4, this.grnd.bind(this));
       var cx = hp[0], cy = hp[1];
@@ -2752,7 +2867,8 @@
     DRY: DRY, WATER: WATER, TAR: TAR,
     NOTHING: NOTHING, BOOTS: BOOTS, FROST: FROST, SAW: SAW, JAR: JAR, ITEMS: ITEMS,
     levelOf: levelOf, monstersFor: monstersFor, featuresFor: featuresFor,
-    DROP: DROP, WALL: WALL, luck: luck, briefingFor: briefingFor, BRIEFINGS: BRIEFINGS, leashCells: leashCells, palette: palette, bonusFor: bonusFor,
+    DROP: DROP, WALL: WALL, luck: luck, briefingFor: briefingFor,
+    THEMES: THEMES, themeFor: themeFor, BRIEFINGS: BRIEFINGS, leashCells: leashCells, palette: palette, bonusFor: bonusFor,
     MONSTERS: MONSTERS, MONSTER_ORDER: MONSTER_ORDER,
     titleCells: titleCells, TITLE_DATA: TITLE_DATA,
     UDG: UDG, ENVELOPES: ENVELOPES, INSTRUCTIONS: INSTRUCTIONS,

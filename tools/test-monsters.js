@@ -190,7 +190,14 @@ function withMonster(kind, level) {
   ok("300 levels deep, every cellar is configured", broken, 0);
   ok("and always has bricks to spare over the bare minimum", worst > 20, true);
   ok("all five monsters get used", kinds.size, 5);
-  ok("never more than four at once", MF.levelOf(999).kinds.length <= 4, true);
+  /* Four was the rule until the blocks of ten arrived. The Nest is the
+     one block whose whole idea is that there are more of them than you
+     have ever had at once, so six is the cap now - past that a cellar
+     stops being a puzzle and becomes a stampede. */
+  ok("never more than six at once", MF.levelOf(999).kinds.length <= 6, true);
+  var most = 0;
+  for (var F = 1; F <= 400; F++) most = Math.max(most, MF.levelOf(F).kinds.length);
+  ok("and six is really the most, all the way down", most <= 6, true);
 }
 {
   /* levels 1 and 2 must still be the original game, undisturbed */
