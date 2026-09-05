@@ -692,7 +692,8 @@
   function deepPlan(F) {
     var n = Math.min(4, 2 + Math.floor((F - 17) / 7));
     var kinds = [];
-    for (var i = 0; i < n; i++) kinds.push(MONSTER_ORDER[(F + i * 3) % 4]);
+    for (var i = 0; i < n; i++)
+      kinds.push(MONSTER_ORDER[(F + i * 3) % MONSTER_ORDER.length]);
     return {
       kinds: kinds,
       PE: Math.max(56, 120 - (F - 17) * 2) + 22 * (n - 1),
